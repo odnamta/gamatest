@@ -7,7 +7,7 @@
   - Function counts cards where `next_review <= now`
   - _Requirements: 1.2_
 
-- [ ] 1.2 Write property test for global due count
+- [ ]* 1.2 Write property test for global due count
   - **Property 1: Global due count accuracy**
   - **Validates: Requirements 1.2**
 
@@ -16,7 +16,7 @@
   - Returns `cards_reviewed` or 0 if no log exists
   - _Requirements: 1.3, 1.4_
 
-- [ ] 1.4 Write property test for daily progress
+- [ ]* 1.4 Write property test for daily progress
   - **Property 2: Daily progress calculation**
   - **Validates: Requirements 1.3, 1.4**
 
@@ -27,11 +27,11 @@
   - Implement fallback: if 0 due cards, fetch up to 10 new cards instead
   - _Requirements: 2.2, 2.3_
 
-- [ ] 1.6 Write property test for global cards ordering
+- [ ]* 1.6 Write property test for global cards ordering
   - **Property 3: Global due cards ordering and limit**
   - **Validates: Requirements 2.2**
 
-- [ ] 1.7 Write property test for new cards fallback
+- [ ]* 1.7 Write property test for new cards fallback
   - **Property 4: New cards fallback**
   - **Validates: Requirements 2.3**
 
@@ -85,11 +85,11 @@
   - Mobile-first: 44px minimum tap targets
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.4_
 
-- [ ] 5.2 Write property test for session summary state
+- [ ]* 5.2 Write property test for session summary state
   - **Property 5: Session summary state consistency**
   - **Validates: Requirements 2.5, 6.1**
 
-- [ ] 5.3 Write property test for continue button display
+- [ ]* 5.3 Write property test for continue button display
   - **Property 7: Continue button conditional display**
   - **Validates: Requirements 6.3, 6.4**
 
@@ -131,7 +131,7 @@
   - Show toast "Select text in the left box first." when no selection
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 7.3 Write property test for text selection transfer
+- [ ]* 7.3 Write property test for text selection transfer
   - **Property 6: Text selection transfer**
   - **Validates: Requirements 5.2**
 
