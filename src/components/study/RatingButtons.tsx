@@ -11,7 +11,7 @@ export interface RatingButtonsProps {
 /**
  * Rating buttons component for study mode.
  * Displays Again, Hard, Good, Easy buttons and connects to rateCardAction.
- * Requirements: 5.4
+ * Requirements: 4.4, 4.5, 5.4 - WCAG AA contrast in both light/dark modes
  */
 export function RatingButtons({ cardId, onRate }: RatingButtonsProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -31,7 +31,7 @@ export function RatingButtons({ cardId, onRate }: RatingButtonsProps) {
         variant="secondary"
         onClick={() => handleRate(1)}
         disabled={isLoading}
-        className="min-w-[80px] bg-red-900/50 hover:bg-red-800/50 border border-red-700"
+        className="min-w-[80px] bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800/50 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-100"
       >
         Again
       </Button>
@@ -39,7 +39,7 @@ export function RatingButtons({ cardId, onRate }: RatingButtonsProps) {
         variant="secondary"
         onClick={() => handleRate(2)}
         disabled={isLoading}
-        className="min-w-[80px] bg-orange-900/50 hover:bg-orange-800/50 border border-orange-700"
+        className="min-w-[80px] bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-200 dark:hover:bg-orange-800/50 border border-orange-300 dark:border-orange-700 text-orange-800 dark:text-orange-100"
       >
         Hard
       </Button>
@@ -47,7 +47,7 @@ export function RatingButtons({ cardId, onRate }: RatingButtonsProps) {
         variant="secondary"
         onClick={() => handleRate(3)}
         disabled={isLoading}
-        className="min-w-[80px] bg-green-900/50 hover:bg-green-800/50 border border-green-700"
+        className="min-w-[80px] bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 border border-green-300 dark:border-green-700 text-green-800 dark:text-green-100"
       >
         Good
       </Button>
@@ -55,7 +55,7 @@ export function RatingButtons({ cardId, onRate }: RatingButtonsProps) {
         variant="secondary"
         onClick={() => handleRate(4)}
         disabled={isLoading}
-        className="min-w-[80px] bg-blue-900/50 hover:bg-blue-800/50 border border-blue-700"
+        className="min-w-[80px] bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/50 border border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-100"
       >
         Easy
       </Button>

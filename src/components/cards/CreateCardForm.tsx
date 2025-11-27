@@ -50,6 +50,11 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
         error={!state.success ? state.fieldErrors?.back?.[0] : undefined}
       />
 
+      {/* Markdown helper text (Requirement 5.3) */}
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Supports markdown: <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">**bold**</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">*italic*</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">`code`</code>
+      </p>
+
       {/* Optional image URL */}
       <Input
         label="Image URL (optional)"

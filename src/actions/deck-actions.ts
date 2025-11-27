@@ -9,8 +9,14 @@ import type { ActionResult } from '@/types/actions'
  * Server Action for creating a new deck.
  * Validates input with Zod and creates deck via Supabase.
  * Requirements: 2.1, 9.3
+ * 
+ * When used with useActionState, the first argument is the previous state
+ * and the second argument is the FormData.
  */
-export async function createDeckAction(formData: FormData): Promise<ActionResult> {
+export async function createDeckAction(
+  prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const rawData = {
     title: formData.get('title'),
   }

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { StudySession } from './StudySession'
-import type { Card, Deck } from '@/types/database'
+import type { Card, Deck, UserStats } from '@/types/database'
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>
@@ -43,8 +43,16 @@ export default async function StudyPage({ params }: StudyPageProps) {
     .lte('next_review', now)
     .order('next_review', { ascending: true })
 
+  // Fetch user stats for session summary - Requirements: 3.1, 3.4, 3.5
+  const { data: userStats } = await supabase
+    .from('user_stats')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
+
   const deckData = deck as Deck
   const cardList = (dueCards || []) as Card[]
+  const userStatsData = userStats as UserStats | null
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -52,7 +60,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
       <div className="mb-6">
         <Link 
           href={`/decks/${deckId}`}
-          className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
+          className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300 transition-colors"
         >
           ← Back to Deck
         </Link>
@@ -60,13 +68,13 @@ export default async function StudyPage({ params }: StudyPageProps) {
 
       {/* Deck title */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-100 mb-2">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
           Studying: {deckData.title}
         </h1>
         {cardsError ? (
-          <p className="text-red-400">Error loading cards: {cardsError.message}</p>
+          <p className="text-red-600 dark:text-red-400">Error loading cards: {cardsError.message}</p>
         ) : (
-          <p className="text-slate-400">
+          <p className="text-slate-600 dark:text-slate-400">
             {cardList.length} {cardList.length === 1 ? 'card' : 'cards'} due for review
           </p>
         )}
@@ -75,12 +83,12 @@ export default async function StudyPage({ params }: StudyPageProps) {
       {/* Study session or completion message */}
       {cardList.length === 0 ? (
         // Completion state - Requirement 5.5
-        <div className="text-center py-12 bg-slate-800/30 border border-slate-700 rounded-xl">
+        <div className="text-center py-12 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-xl">
           <div className="text-4xl mb-4">🎉</div>
-          <h2 className="text-xl font-semibold text-slate-100 mb-2">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
             Study Session Complete!
           </h2>
-          <p className="text-slate-400 mb-6">
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
             You&apos;ve reviewed all due cards in this deck.
           </p>
           <Link 
@@ -91,7 +99,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
           </Link>
         </div>
       ) : (
-        <StudySession initialCards={cardList} deckId={deckId} />
+        <StudySession initialCards={cardList} deckId={deckId} userStats={userStatsData} />
       )}
     </div>
   )

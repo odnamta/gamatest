@@ -40,13 +40,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
       <Card variant="elevated" padding="lg" className="w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-100">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-slate-600 dark:text-slate-400 mt-1">
             {mode === 'login'
               ? 'Sign in to continue studying'
               : 'Start your learning journey'}
@@ -54,7 +54,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
             {error}
           </div>
         )}
@@ -100,7 +100,7 @@ export default function LoginPage() {
               setError(null)
               setFieldErrors({})
             }}
-            className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm transition-colors"
           >
             {mode === 'login'
               ? "Don't have an account? Sign up"

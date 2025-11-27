@@ -4,13 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { ratingSchema } from '@/lib/validations'
 import { calculateNextReview } from '@/lib/sm2'
+import { calculateStreak, updateLongestStreak, incrementTotalReviews } from '@/lib/streak'
 import type { NextCardResult } from '@/types/actions'
 import type { Card } from '@/types/database'
 
 /**
  * Server Action for rating a card during study.
- * Integrates SM-2 algorithm for card updates and returns next due card.
- * Requirements: 5.4
+ * Integrates SM-2 algorithm for card updates, updates user stats (streak, total reviews),
+ * upserts study logs, and returns next due card.
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 5.4, 9.4
  */
 export async function rateCardAction(
   cardId: string,
@@ -64,6 +66,114 @@ export async function rateCardAction(
 
   if (updateError) {
     return { success: false, error: updateError.message }
+  }
+
+  // === Gamification: Update user_stats and study_logs ===
+  const today = new Date()
+  const todayDateStr = today.toISOString().split('T')[0] // YYYY-MM-DD format
+
+  // Fetch or create user_stats record
+  const { data: existingStats, error: statsError } = await supabase
+    .from('user_stats')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
+
+  if (statsError && statsError.code !== 'PGRST116') {
+    // PGRST116 = no rows returned, which is expected for new users
+    return { success: false, error: statsError.message }
+  }
+
+  // Calculate streak updates
+  const lastStudyDate = existingStats?.last_study_date 
+    ? new Date(existingStats.last_study_date) 
+    : null
+  const currentStreak = existingStats?.current_streak ?? 0
+  const longestStreak = existingStats?.longest_streak ?? 0
+  const totalReviews = existingStats?.total_reviews ?? 0
+
+  const streakResult = calculateStreak({
+    lastStudyDate,
+    currentStreak,
+    todayDate: today,
+  })
+
+  const newLongestStreak = updateLongestStreak(streakResult.newStreak, longestStreak)
+  const newTotalReviews = incrementTotalReviews(totalReviews)
+
+  // Upsert user_stats
+  if (existingStats) {
+    // Update existing record
+    const { error: updateStatsError } = await supabase
+      .from('user_stats')
+      .update({
+        last_study_date: todayDateStr,
+        current_streak: streakResult.newStreak,
+        longest_streak: newLongestStreak,
+        total_reviews: newTotalReviews,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+
+    if (updateStatsError) {
+      return { success: false, error: updateStatsError.message }
+    }
+  } else {
+    // Insert new record for first-time user
+    const { error: insertStatsError } = await supabase
+      .from('user_stats')
+      .insert({
+        user_id: user.id,
+        last_study_date: todayDateStr,
+        current_streak: streakResult.newStreak,
+        longest_streak: newLongestStreak,
+        total_reviews: newTotalReviews,
+      })
+
+    if (insertStatsError) {
+      return { success: false, error: insertStatsError.message }
+    }
+  }
+
+  // Upsert study_logs - increment cards_reviewed for today
+  const { data: existingLog, error: logFetchError } = await supabase
+    .from('study_logs')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('study_date', todayDateStr)
+    .single()
+
+  if (logFetchError && logFetchError.code !== 'PGRST116') {
+    return { success: false, error: logFetchError.message }
+  }
+
+  if (existingLog) {
+    // Update existing log - increment cards_reviewed
+    const { error: updateLogError } = await supabase
+      .from('study_logs')
+      .update({
+        cards_reviewed: existingLog.cards_reviewed + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+      .eq('study_date', todayDateStr)
+
+    if (updateLogError) {
+      return { success: false, error: updateLogError.message }
+    }
+  } else {
+    // Insert new log for today
+    const { error: insertLogError } = await supabase
+      .from('study_logs')
+      .insert({
+        user_id: user.id,
+        study_date: todayDateStr,
+        cards_reviewed: 1,
+      })
+
+    if (insertLogError) {
+      return { success: false, error: insertLogError.message }
+    }
   }
 
   // Fetch next due card from the same deck

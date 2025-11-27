@@ -51,7 +51,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       <div className="mb-6">
         <Link 
           href="/dashboard"
-          className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
+          className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300 transition-colors"
         >
           ← Back to Dashboard
         </Link>
@@ -59,35 +59,41 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
 
       {/* Deck info */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100 mb-2">{deckData.title}</h1>
-        <p className="text-slate-400">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">{deckData.title}</h1>
+        <p className="text-slate-600 dark:text-slate-400">
           {cardList.length} {cardList.length === 1 ? 'card' : 'cards'} in this deck
         </p>
       </div>
 
-      {/* Study button */}
-      <div className="mb-8">
+      {/* Action buttons */}
+      <div className="mb-8 flex flex-wrap gap-3">
         <Link href={`/study/${deckId}`}>
           <Button size="lg">
             Study Now
           </Button>
         </Link>
+        {/* Requirement 7.4: Link to bulk import page */}
+        <Link href={`/decks/${deckId}/add-bulk`}>
+          <Button size="lg" variant="secondary">
+            Bulk Import
+          </Button>
+        </Link>
       </div>
 
       {/* Add new card form */}
-      <div className="mb-8 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
-        <h2 className="text-lg font-medium text-slate-100 mb-4">Add New Card</h2>
+      <div className="mb-8 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
+        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">Add New Card</h2>
         <CreateCardForm deckId={deckId} />
       </div>
 
       {/* Card list */}
       <div>
-        <h2 className="text-lg font-medium text-slate-100 mb-4">Cards</h2>
+        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-4">Cards</h2>
         {cardsError ? (
-          <p className="text-red-400">Error loading cards: {cardsError.message}</p>
+          <p className="text-red-600 dark:text-red-400">Error loading cards: {cardsError.message}</p>
         ) : cardList.length === 0 ? (
-          <div className="text-center py-8 bg-slate-800/30 border border-slate-700 rounded-lg">
-            <p className="text-slate-400">No cards yet</p>
+          <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
+            <p className="text-slate-600 dark:text-slate-400">No cards yet</p>
             <p className="text-slate-500 text-sm mt-1">
               Add your first card using the form above!
             </p>
@@ -97,11 +103,11 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
             {cardList.map((card) => (
               <div
                 key={card.id}
-                className="p-4 bg-slate-800 border border-slate-700 rounded-lg"
+                className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none"
               >
-                <p className="text-slate-100 line-clamp-2">{card.front}</p>
+                <p className="text-slate-900 dark:text-slate-100 line-clamp-2">{card.front}</p>
                 {card.image_url && (
-                  <span className="inline-flex items-center mt-2 px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+                  <span className="inline-flex items-center mt-2 px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                     Has image
                   </span>
                 )}

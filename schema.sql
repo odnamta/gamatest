@@ -67,3 +67,62 @@ CREATE POLICY "Users can delete cards in own decks" ON cards
 CREATE INDEX idx_decks_user_id ON decks(user_id);
 CREATE INDEX idx_cards_deck_id ON cards(deck_id);
 CREATE INDEX idx_cards_next_review ON cards(next_review);
+
+
+-- ============================================
+-- Gamification Tables (V1)
+-- ============================================
+
+-- User stats table for streak tracking and gamification
+CREATE TABLE user_stats (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  last_study_date DATE,
+  current_streak INTEGER DEFAULT 0,
+  longest_streak INTEGER DEFAULT 0,
+  total_reviews INTEGER DEFAULT 0,
+  daily_goal INTEGER DEFAULT 20,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies for user_stats
+ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own stats" ON user_stats
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own stats" ON user_stats
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own stats" ON user_stats
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Index on user_id (already PK, but explicit for clarity in queries)
+CREATE INDEX idx_user_stats_user_id ON user_stats(user_id);
+
+
+-- Study logs table for daily activity tracking (heatmap)
+CREATE TABLE study_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  study_date DATE NOT NULL,
+  cards_reviewed INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, study_date)
+);
+
+-- RLS Policies for study_logs
+ALTER TABLE study_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own logs" ON study_logs
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own logs" ON study_logs
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own logs" ON study_logs
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Index on (user_id, study_date) for efficient queries
+CREATE INDEX idx_study_logs_user_date ON study_logs(user_id, study_date);
