@@ -3,7 +3,7 @@
 import { forwardRef, InputHTMLAttributes } from 'react';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  label: string;
+  label?: string;
   name: string;
   type?: 'text' | 'email' | 'password' | 'url';
   error?: string;
@@ -19,12 +19,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="w-full">
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
-        >
-          {label}
-        </label>
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+          >
+            {label}
+          </label>
+        )}
         <input
           ref={ref}
           id={inputId}

@@ -1,12 +1,16 @@
 'use client'
 
 import { useMemo } from 'react'
-import { getHeatmapIntensity, type HeatmapIntensity } from '@/lib/heatmap'
+import { generateDayArray, type HeatmapIntensity } from '@/lib/heatmap'
+import { useResponsiveDayCount } from '@/lib/use-responsive-day-count'
 
 /**
  * StudyHeatmap Component - Client Component
- * Displays a 60-day grid of study activity with color-coded cells.
- * Requirements: 2.2, 2.3, 2.4, 2.5
+ * Displays a responsive grid of study activity with color-coded cells.
+ * - Small screens (< 1024px): 28 days (4 weeks)
+ * - Large screens (>= 1024px): 60 days
+ * 
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 2.2, 2.3, 2.4, 2.5
  */
 
 interface StudyHeatmapProps {
@@ -18,21 +22,17 @@ interface StudyHeatmapProps {
 
 /**
  * Maps intensity level to Tailwind CSS classes for cell colors.
- * Supports both light and dark modes (Requirements 4.4, 4.5).
+ * Supports both light and dark modes.
  */
 function getIntensityClasses(intensity: HeatmapIntensity): string {
   switch (intensity) {
     case 0:
-      // Empty cell with subtle border (Requirement 2.5)
       return 'bg-slate-200 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700'
     case 1:
-      // Light intensity (1-5 cards)
       return 'bg-emerald-200 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800'
     case 2:
-      // Medium intensity (6-15 cards)
       return 'bg-emerald-400 dark:bg-emerald-700/80 border border-emerald-500 dark:border-emerald-600'
     case 3:
-      // Dark intensity (16+ cards)
       return 'bg-emerald-600 dark:bg-emerald-500 border border-emerald-700 dark:border-emerald-400'
     default:
       return 'bg-slate-200 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700'
@@ -52,6 +52,9 @@ function formatDateForTooltip(dateStr: string): string {
 }
 
 export function StudyHeatmap({ studyLogs }: StudyHeatmapProps) {
+  // Get responsive day count (28 for small, 60 for large screens)
+  const dayCount = useResponsiveDayCount()
+
   // Create a map of date -> cards_reviewed for quick lookup
   const logMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -61,45 +64,40 @@ export function StudyHeatmap({ studyLogs }: StudyHeatmapProps) {
     return map
   }, [studyLogs])
 
-  // Generate the last 60 days (Requirement 2.2)
+  // Generate day array using pure function (ordered oldest to newest)
   const days = useMemo(() => {
-    const result: Array<{ date: string; count: number }> = []
-    const today = new Date()
-    
-    for (let i = 59; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(today.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
-      const count = logMap.get(dateStr) || 0
-      result.push({ date: dateStr, count })
-    }
-    
-    return result
-  }, [logMap])
+    return generateDayArray(dayCount, logMap)
+  }, [dayCount, logMap])
+
+  // Calculate grid columns based on day count
+  // 28 days = 7 columns (4 weeks), 60 days = 10 columns (6 weeks)
+  const gridCols = dayCount === 28 ? 7 : 10
 
   return (
     <div className="w-full">
       <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-        Study Activity (Last 60 Days)
+        Study Activity (Last {dayCount} Days)
       </h3>
       
-      {/* Horizontal scrolling container for mobile (Requirement 2.4) */}
-      <div className="overflow-x-auto pb-2">
-        <div className="inline-grid grid-cols-[repeat(60,1fr)] gap-1 min-w-max">
-          {days.map(({ date, count }) => {
-            const intensity = getHeatmapIntensity(count)
-            const classes = getIntensityClasses(intensity)
-            
-            return (
-              <div
-                key={date}
-                className={`w-3 h-3 rounded-sm ${classes} cursor-default transition-transform hover:scale-125`}
-                title={`${formatDateForTooltip(date)}: ${count} cards`}
-                aria-label={`${formatDateForTooltip(date)}: ${count} cards reviewed`}
-              />
-            )
-          })}
-        </div>
+      {/* Responsive grid - no horizontal scrolling */}
+      <div 
+        className="grid gap-1"
+        style={{ 
+          gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+        }}
+      >
+        {days.map(({ date, count, intensity }) => {
+          const classes = getIntensityClasses(intensity)
+          
+          return (
+            <div
+              key={date}
+              className={`aspect-square rounded-sm ${classes} cursor-default transition-transform hover:scale-110`}
+              title={`${formatDateForTooltip(date)}: ${count} cards`}
+              aria-label={`${formatDateForTooltip(date)}: ${count} cards reviewed`}
+            />
+          )
+        })}
       </div>
       
       {/* Legend */}

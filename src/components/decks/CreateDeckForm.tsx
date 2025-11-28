@@ -12,12 +12,11 @@ export function CreateDeckForm() {
   const [state, formAction, isPending] = useActionState(createDeckAction, initialState)
 
   return (
-    <form action={formAction} className="flex gap-3 items-end">
+    <form action={formAction} className="flex gap-3 items-center">
       <div className="flex-1">
         <Input
-          label="New Deck"
           name="title"
-          placeholder="Enter deck title..."
+          placeholder="Enter new deck title..."
           error={!state.success ? state.fieldErrors?.title?.[0] : undefined}
         />
       </div>

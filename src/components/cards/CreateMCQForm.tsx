@@ -5,38 +5,71 @@ import { createMCQAction } from '@/actions/mcq-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { getOptionLabel, adjustCorrectIndexAfterRemoval } from '@/lib/mcq-options'
 import type { ActionResult } from '@/types/actions'
 
 interface CreateMCQFormProps {
   deckId: string
+  initialStem?: string
+  initialOptions?: string[]
+  initialExplanation?: string
+  onSuccess?: () => void
 }
 
 const initialState: ActionResult = { success: true }
 
 const MIN_OPTIONS = 2
-const MAX_OPTIONS = 6
+const MAX_OPTIONS = 10  // Updated to support A-J for medical exams
 const DEFAULT_OPTIONS = 4
 
 /**
  * Client Component for creating new MCQ cards.
- * Includes stem textarea, dynamic options with add/remove, correct answer selector,
+ * Includes stem textarea, dynamic options with add/remove (A-J), correct answer selector,
  * optional explanation, and optional image URL.
- * Requirements: 3.1, 3.3
+ * 
+ * Requirements: 3.1, 3.3, 6.1, 6.2, 6.3, 6.4
  */
-export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
+export function CreateMCQForm({ 
+  deckId, 
+  initialStem = '',
+  initialOptions,
+  initialExplanation = '',
+  onSuccess,
+}: CreateMCQFormProps) {
   const [state, formAction, isPending] = useActionState(createMCQAction, initialState)
   const formRef = useRef<HTMLFormElement>(null)
-  const [options, setOptions] = useState<string[]>(Array(DEFAULT_OPTIONS).fill(''))
+  const [options, setOptions] = useState<string[]>(
+    initialOptions || Array(DEFAULT_OPTIONS).fill('')
+  )
   const [correctIndex, setCorrectIndex] = useState<number>(0)
+  const [stem, setStem] = useState(initialStem)
+  const [explanation, setExplanation] = useState(initialExplanation)
 
-  // Reset form on successful submission while maintaining deck context
+  // Track initial values for sync
+  const [lastInitialStem, setLastInitialStem] = useState(initialStem)
+  const [lastInitialExplanation, setLastInitialExplanation] = useState(initialExplanation)
+
+  // Sync with initial props when they change from parent
+  if (initialStem !== lastInitialStem) {
+    setStem(initialStem)
+    setLastInitialStem(initialStem)
+  }
+  if (initialExplanation !== lastInitialExplanation) {
+    setExplanation(initialExplanation)
+    setLastInitialExplanation(initialExplanation)
+  }
+
+  // Reset form on successful submission
   useEffect(() => {
     if (state.success && formRef.current) {
       formRef.current.reset()
       setOptions(Array(DEFAULT_OPTIONS).fill(''))
       setCorrectIndex(0)
+      setStem('')
+      setExplanation('')
+      onSuccess?.()
     }
-  }, [state])
+  }, [state, onSuccess])
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options]
@@ -54,12 +87,13 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
     if (options.length > MIN_OPTIONS) {
       const newOptions = options.filter((_, i) => i !== index)
       setOptions(newOptions)
-      // Adjust correctIndex if needed
-      if (correctIndex >= newOptions.length) {
-        setCorrectIndex(newOptions.length - 1)
-      } else if (correctIndex > index) {
-        setCorrectIndex(correctIndex - 1)
-      }
+      // Adjust correctIndex using utility function
+      const adjustedIndex = adjustCorrectIndexAfterRemoval(
+        correctIndex,
+        index,
+        newOptions.length
+      )
+      setCorrectIndex(adjustedIndex)
     }
   }
 
@@ -74,6 +108,8 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
       <Textarea
         label="Question Stem"
         name="stem"
+        value={stem}
+        onChange={(e) => setStem(e.target.value)}
         placeholder="Enter the question or scenario..."
         error={!state.success ? state.fieldErrors?.stem?.[0] : undefined}
       />
@@ -83,7 +119,7 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
         Supports markdown: <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">**bold**</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">*italic*</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">`code`</code>
       </p>
 
-      {/* Options section */}
+      {/* Options section - Dynamic with letter labels */}
       <div className="space-y-3">
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
           Answer Options
@@ -104,8 +140,13 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
               checked={correctIndex === index}
               onChange={() => setCorrectIndex(index)}
               className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
-              aria-label={`Mark option ${index + 1} as correct`}
+              aria-label={`Mark option ${getOptionLabel(index)} as correct`}
             />
+            
+            {/* Letter label */}
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400 w-6">
+              {getOptionLabel(index)}.
+            </span>
             
             {/* Option input */}
             <input
@@ -113,7 +154,7 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
               name={`option_${index}`}
               value={option}
               onChange={(e) => handleOptionChange(index, e.target.value)}
-              placeholder={`Option ${index + 1}`}
+              placeholder={`Option ${getOptionLabel(index)}`}
               className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
             />
             
@@ -123,7 +164,7 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
                 type="button"
                 onClick={() => removeOption(index)}
                 className="p-2 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors"
-                aria-label={`Remove option ${index + 1}`}
+                aria-label={`Remove option ${getOptionLabel(index)}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -143,12 +184,12 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
             </svg>
-            Add Option
+            + Add Option
           </button>
         )}
 
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Select the radio button next to the correct answer. Min {MIN_OPTIONS}, max {MAX_OPTIONS} options.
+          Select the radio button next to the correct answer. Min {MIN_OPTIONS}, max {MAX_OPTIONS} options (A-{getOptionLabel(MAX_OPTIONS - 1)}).
         </p>
       </div>
 
@@ -163,6 +204,8 @@ export function CreateMCQForm({ deckId }: CreateMCQFormProps) {
       <Textarea
         label="Explanation (optional)"
         name="explanation"
+        value={explanation}
+        onChange={(e) => setExplanation(e.target.value)}
         placeholder="Explain why the correct answer is correct..."
         error={!state.success ? state.fieldErrors?.explanation?.[0] : undefined}
       />

@@ -1,14 +1,15 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Textarea } from '@/components/ui/Textarea'
 import { BulkImportStepper } from '@/components/cards/BulkImportStepper'
-import { TextToStemButton } from '@/components/cards/TextToStemButton'
+import { TextSelectionToolbar, TargetField, getNextField } from '@/components/cards/TextSelectionToolbar'
+import { SourceBar } from '@/components/cards/SourceBar'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Upload } from 'lucide-react'
 
 /**
  * Bulk Import Page - Client Component
@@ -17,26 +18,86 @@ import { Sparkles } from 'lucide-react'
  * 
  * Feature: v3-ux-overhaul
  */
+// Linked source state type
+interface LinkedSource {
+  id: string
+  fileName: string
+  fileUrl?: string
+}
+
 export default function BulkImportPage() {
   const params = useParams()
   const deckId = params.deckId as string
   const { showToast } = useToast()
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
-  const [questionStem, setQuestionStem] = useState('')
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(2) // Default to step 2 (Select Text)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1) // Start at step 1 (Upload PDF)
+  
+  // Linked source state - Requirements 4.1, 4.2, 4.3
+  const [linkedSource, setLinkedSource] = useState<LinkedSource | null>(null)
+  const [showUploadDropzone, setShowUploadDropzone] = useState(true)
 
-  // Handle text selection transfer
-  const handleTextSelected = (text: string) => {
-    setQuestionStem(text)
+  // MCQ form state - lifted up for toolbar integration
+  const [questionStem, setQuestionStem] = useState('')
+  const [options, setOptions] = useState(['', '', '', ''])
+  const [explanation, setExplanation] = useState('')
+
+  // Refs for form fields (for auto-focus)
+  const stemRef = useRef<HTMLTextAreaElement>(null)
+  const optionRefs = useRef<(HTMLInputElement | null)[]>([])
+  const explanationRef = useRef<HTMLTextAreaElement>(null)
+
+  // Handle successful PDF upload
+  const handleUploadSuccess = useCallback((source: LinkedSource) => {
+    setLinkedSource(source)
+    setShowUploadDropzone(false)
+    setCurrentStep(2)
+    showToast('PDF uploaded successfully!', 'success')
+  }, [showToast])
+
+  // Handle change/replace PDF click
+  const handleChangeSource = useCallback(() => {
+    setShowUploadDropzone(true)
+  }, [])
+
+  // Handle copy to field from toolbar - Requirements 5.2, 5.3
+  const handleCopyToField = useCallback((field: TargetField, text: string) => {
+    switch (field) {
+      case 'stem':
+        setQuestionStem(text)
+        break
+      case 'optionA':
+        setOptions(prev => { const next = [...prev]; next[0] = text; return next })
+        break
+      case 'optionB':
+        setOptions(prev => { const next = [...prev]; next[1] = text; return next })
+        break
+      case 'optionC':
+        setOptions(prev => { const next = [...prev]; next[2] = text; return next })
+        break
+      case 'explanation':
+        setExplanation(text)
+        break
+    }
+    
     setCurrentStep(3)
-    showToast('Text copied to Question Stem!', 'success')
-  }
+    showToast(`Text copied to ${field === 'stem' ? 'Question Stem' : field}!`, 'success')
+
+    // Auto-focus next field - Requirement 5.3
+    const nextField = getNextField(field)
+    setTimeout(() => {
+      if (nextField === 'stem') stemRef.current?.focus()
+      else if (nextField === 'optionA') optionRefs.current[0]?.focus()
+      else if (nextField === 'optionB') optionRefs.current[1]?.focus()
+      else if (nextField === 'optionC') optionRefs.current[2]?.focus()
+      else if (nextField === 'explanation') explanationRef.current?.focus()
+    }, 50)
+  }, [showToast])
 
   // Handle no selection - Requirement 5.3
-  const handleNoSelection = () => {
+  const handleNoSelection = useCallback(() => {
     showToast('Select text in the left box first.', 'error')
-  }
+  }, [showToast])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -64,8 +125,57 @@ export default function BulkImportPage() {
       {/* Workflow Stepper - Requirements 4.1, 4.2, 4.3 */}
       <BulkImportStepper 
         currentStep={currentStep}
-        linkedSourceName={null} // TODO: Wire up to actual linked source
+        linkedSourceName={linkedSource?.fileName}
+        linkedSourceUrl={linkedSource?.fileUrl}
       />
+
+      {/* Source Bar or Upload Dropzone - Requirements 4.1, 4.2, 4.3 */}
+      <div className="mb-6">
+        {linkedSource && !showUploadDropzone ? (
+          <SourceBar
+            fileName={linkedSource.fileName}
+            fileUrl={linkedSource.fileUrl}
+            onChangeClick={handleChangeSource}
+          />
+        ) : (
+          <div className="p-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800/30">
+            <div className="text-center">
+              <Upload className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500 mb-3" />
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                Upload a PDF to link as source material
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
+                This helps track where your MCQs come from
+              </p>
+              {/* Placeholder upload button - actual upload logic would go here */}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  // Simulate upload for now - in real implementation, this would trigger file picker
+                  const mockSource: LinkedSource = {
+                    id: 'mock-id',
+                    fileName: 'Sample-Questions.pdf',
+                    fileUrl: undefined
+                  }
+                  handleUploadSuccess(mockSource)
+                }}
+              >
+                Select PDF File
+              </Button>
+              {linkedSource && (
+                <button
+                  type="button"
+                  onClick={() => setShowUploadDropzone(false)}
+                  className="block mx-auto mt-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Helper Instructions */}
       <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -80,25 +190,30 @@ export default function BulkImportPage() {
         </ol>
       </div>
 
-      {/* Action buttons between panels - Requirements 5.1, 5.4 */}
-      <div className="mb-6 flex flex-wrap gap-3 justify-center">
-        <TextToStemButton
+      {/* Text Selection Toolbar - Requirements 5.1, 5.2, 5.3 */}
+      <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
+        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-3">
+          Select text in the PDF area, then click a button to copy it to that field
+        </p>
+        <TextSelectionToolbar
           textAreaRef={textAreaRef}
-          onTextSelected={handleTextSelected}
+          onCopyToField={handleCopyToField}
           onNoSelection={handleNoSelection}
         />
         
-        {/* AI Draft placeholder - Requirements 5.4, 5.5, 5.6 */}
-        <Button
-          type="button"
-          variant="ghost"
-          disabled
-          title="Coming soon"
-          className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-400 dark:text-purple-500 border border-purple-200 dark:border-purple-800 cursor-not-allowed"
-        >
-          <Sparkles className="w-4 h-4" />
-          ✨ AI Draft (Coming Soon)
-        </Button>
+        {/* AI Draft placeholder */}
+        <div className="mt-3 flex justify-center">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled
+            title="Coming soon"
+            className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-400 dark:text-purple-500 border border-purple-200 dark:border-purple-800 cursor-not-allowed text-xs"
+          >
+            <Sparkles className="w-3 h-3" />
+            AI Draft (Coming Soon)
+          </Button>
+        </div>
       </div>
 
       {/* Split-view layout - Requirements 10.1, 10.3, 7.3 */}
@@ -139,34 +254,61 @@ Explanation: The correct answer is C because..."
             Create MCQ
           </h2>
           
-          {/* Inline MCQ form with pre-filled stem */}
-          <BulkMCQForm deckId={deckId} initialStem={questionStem} />
+          {/* Inline MCQ form with pre-filled values */}
+          <BulkMCQForm 
+            deckId={deckId} 
+            stem={questionStem}
+            setStem={setQuestionStem}
+            options={options}
+            setOptions={setOptions}
+            explanation={explanation}
+            setExplanation={setExplanation}
+            stemRef={stemRef}
+            optionRefs={optionRefs}
+            explanationRef={explanationRef}
+          />
         </div>
       </div>
     </div>
   )
 }
 
-// Inline MCQ form component that accepts initial stem
-function BulkMCQForm({ deckId, initialStem }: { deckId: string; initialStem: string }) {
-  const [stem, setStem] = useState(initialStem)
-  const [options, setOptions] = useState(['', '', '', ''])
+// Inline MCQ form component with controlled state from parent
+interface BulkMCQFormProps {
+  deckId: string
+  stem: string
+  setStem: (value: string) => void
+  options: string[]
+  setOptions: React.Dispatch<React.SetStateAction<string[]>>
+  explanation: string
+  setExplanation: (value: string) => void
+  stemRef: React.RefObject<HTMLTextAreaElement | null>
+  optionRefs: React.MutableRefObject<(HTMLInputElement | null)[]>
+  explanationRef: React.RefObject<HTMLTextAreaElement | null>
+}
+
+function BulkMCQForm({ 
+  deckId, 
+  stem, 
+  setStem, 
+  options, 
+  setOptions, 
+  explanation, 
+  setExplanation,
+  stemRef,
+  optionRefs,
+  explanationRef,
+}: BulkMCQFormProps) {
   const [correctIndex, setCorrectIndex] = useState(0)
-  const [explanation, setExplanation] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [lastInitialStem, setLastInitialStem] = useState(initialStem)
-
-  // Sync with initialStem prop when it changes from parent
-  if (initialStem !== lastInitialStem) {
-    setStem(initialStem)
-    setLastInitialStem(initialStem)
-  }
 
   const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...options]
-    newOptions[index] = value
-    setOptions(newOptions)
+    setOptions(prev => {
+      const newOptions = [...prev]
+      newOptions[index] = value
+      return newOptions
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,7 +329,7 @@ function BulkMCQForm({ deckId, initialStem }: { deckId: string; initialStem: str
 
       if (result.success) {
         setMessage({ type: 'success', text: 'MCQ created successfully!' })
-        // Reset form
+        // Reset form - use parent setters
         setStem('')
         setOptions(['', '', '', ''])
         setCorrectIndex(0)
@@ -216,15 +358,21 @@ function BulkMCQForm({ deckId, initialStem }: { deckId: string; initialStem: str
       )}
 
       {/* Stem */}
-      <Textarea
-        label="Question Stem"
-        name="stem"
-        value={stem}
-        onChange={(e) => setStem(e.target.value)}
-        placeholder="Enter the question or scenario..."
-      />
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Question Stem
+        </label>
+        <textarea
+          ref={stemRef}
+          name="stem"
+          value={stem}
+          onChange={(e) => setStem(e.target.value)}
+          placeholder="Enter the question or scenario..."
+          className="w-full min-h-[100px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+        />
+      </div>
 
-      {/* Options */}
+      {/* Options - Dynamic with add/remove */}
       <div className="space-y-3">
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
           Answer Options
@@ -237,25 +385,75 @@ function BulkMCQForm({ deckId, initialStem }: { deckId: string; initialStem: str
               onChange={() => setCorrectIndex(index)}
               className="w-4 h-4 text-blue-600"
             />
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400 w-6">
+              {String.fromCharCode(65 + index)}.
+            </span>
             <input
+              ref={el => { optionRefs.current[index] = el }}
               type="text"
               value={option}
               onChange={(e) => handleOptionChange(index, e.target.value)}
-              placeholder={`Option ${index + 1}`}
+              placeholder={`Option ${String.fromCharCode(65 + index)}`}
               className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {/* Remove button - only show if more than 2 options */}
+            {options.length > 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const newOptions = options.filter((_, i) => i !== index)
+                  setOptions(newOptions)
+                  // Adjust correct index if needed
+                  if (correctIndex >= newOptions.length) {
+                    setCorrectIndex(newOptions.length - 1)
+                  } else if (correctIndex > index) {
+                    setCorrectIndex(correctIndex - 1)
+                  }
+                }}
+                className="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                aria-label={`Remove option ${String.fromCharCode(65 + index)}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
           </div>
         ))}
+        
+        {/* Add option button - max 10 options */}
+        {options.length < 10 && (
+          <button
+            type="button"
+            onClick={() => setOptions([...options, ''])}
+            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            + Add Option
+          </button>
+        )}
+        
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Min 2, max 10 options (A-J)
+        </p>
       </div>
 
       {/* Explanation */}
-      <Textarea
-        label="Explanation (optional)"
-        name="explanation"
-        value={explanation}
-        onChange={(e) => setExplanation(e.target.value)}
-        placeholder="Explain why the correct answer is correct..."
-      />
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Explanation (optional)
+        </label>
+        <textarea
+          ref={explanationRef}
+          name="explanation"
+          value={explanation}
+          onChange={(e) => setExplanation(e.target.value)}
+          placeholder="Explain why the correct answer is correct..."
+          className="w-full min-h-[80px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+        />
+      </div>
 
       {/* Submit */}
       <div className="flex justify-end">
