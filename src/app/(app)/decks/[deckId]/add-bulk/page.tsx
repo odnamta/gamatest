@@ -9,14 +9,17 @@ import { TextSelectionToolbar, TargetField, getNextField } from '@/components/ca
 import { SourceBar } from '@/components/cards/SourceBar'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { Sparkles, Upload } from 'lucide-react'
+import { Sparkles, Upload, Loader2 } from 'lucide-react'
+import { draftMCQFromText } from '@/actions/ai-actions'
+import { RATE_LIMIT_MS } from '@/lib/ai-config'
+import type { MCQDraft } from '@/lib/mcq-draft-schema'
 
 /**
  * Bulk Import Page - Client Component
  * Enhanced UI for PDF-assisted MCQ creation with text selection helper.
  * Requirements: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 7.3, 9.1, 9.4, 10.1, 10.2, 10.3, 10.4
  * 
- * Feature: v3-ux-overhaul
+ * Feature: v3-ux-overhaul, v4-ai-brain
  */
 // Linked source state type
 interface LinkedSource {
@@ -39,8 +42,13 @@ export default function BulkImportPage() {
 
   // MCQ form state - lifted up for toolbar integration
   const [questionStem, setQuestionStem] = useState('')
-  const [options, setOptions] = useState(['', '', '', ''])
+  const [options, setOptions] = useState(['', '', '', '', '']) // 5 options for AI compatibility
   const [explanation, setExplanation] = useState('')
+  const [correctIndex, setCorrectIndex] = useState(0)
+
+  // AI Draft state - Requirements FR-1, FR-5.2
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [lastGenerateTime, setLastGenerateTime] = useState(0)
 
   // Refs for form fields (for auto-focus)
   const stemRef = useRef<HTMLTextAreaElement>(null)
@@ -102,6 +110,66 @@ export default function BulkImportPage() {
   const handleNoSelection = useCallback(() => {
     showToast('Select text in the left box first.', 'error')
   }, [showToast])
+
+  // Handle AI Draft button click - Requirements FR-1, FR-4, FR-5
+  const handleAIDraft = useCallback(async () => {
+    // Check if text is selected (FR-1.1, FR-4.3)
+    const selectedText = textAreaRef.current
+      ? textAreaRef.current.value.substring(
+          textAreaRef.current.selectionStart,
+          textAreaRef.current.selectionEnd
+        )
+      : ''
+
+    if (!selectedText.trim()) {
+      showToast('Please select some text first', 'error')
+      return
+    }
+
+    // Check rate limit (FR-5.2)
+    const now = Date.now()
+    if (now - lastGenerateTime < RATE_LIMIT_MS) {
+      showToast('Please wait a moment before generating again', 'error')
+      return
+    }
+
+    // Start generation (FR-1.2, FR-1.3)
+    setIsGenerating(true)
+    setLastGenerateTime(now)
+
+    try {
+      const result = await draftMCQFromText({
+        sourceText: selectedText,
+        deckId,
+        deckName: linkedSource?.fileName?.replace('.pdf', ''),
+      })
+
+      if (result.ok) {
+        // Populate form with draft (FR-3.1, FR-3.2, FR-3.3)
+        setQuestionStem(result.draft.stem)
+        setOptions(result.draft.options)
+        setCorrectIndex(result.draft.correct_index)
+        setExplanation(result.draft.explanation)
+        setCurrentStep(3)
+        showToast('MCQ draft generated! Review and edit before saving.', 'success')
+      } else {
+        // Show error toast based on error type (FR-4.1, FR-4.2)
+        switch (result.error) {
+          case 'TEXT_TOO_SHORT':
+            showToast('Please select a longer paragraph (at least 50 characters)', 'error')
+            break
+          case 'OPENAI_ERROR':
+          case 'PARSE_ERROR':
+            showToast('Something went wrong. Please try again.', 'error')
+            break
+        }
+      }
+    } catch {
+      showToast('Something went wrong. Please try again.', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [deckId, linkedSource?.fileName, lastGenerateTime, showToast])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -205,18 +273,31 @@ export default function BulkImportPage() {
           onNoSelection={handleNoSelection}
         />
         
-        {/* AI Draft placeholder */}
-        <div className="mt-3 flex justify-center">
+        {/* AI Draft Button - Requirements FR-1, FR-5 */}
+        <div className="mt-3 flex flex-col items-center gap-1">
           <Button
             type="button"
             variant="ghost"
-            disabled
-            title="Coming soon"
-            className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-400 dark:text-purple-500 border border-purple-200 dark:border-purple-800 cursor-not-allowed text-xs"
+            disabled={isGenerating}
+            onClick={handleAIDraft}
+            className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-xs"
           >
-            <Sparkles className="w-3 h-3" />
-            AI Draft (Coming Soon)
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3 h-3" />
+                AI Draft
+              </>
+            )}
           </Button>
+          {/* Helper text - Requirement FR-5.1, FR-5.3 */}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            AI generates a draft. Always review before saving.
+          </p>
         </div>
       </div>
 
@@ -265,6 +346,8 @@ Explanation: The correct answer is C because..."
             setStem={setQuestionStem}
             options={options}
             setOptions={setOptions}
+            correctIndex={correctIndex}
+            setCorrectIndex={setCorrectIndex}
             explanation={explanation}
             setExplanation={setExplanation}
             stemRef={stemRef}
@@ -284,6 +367,8 @@ interface BulkMCQFormProps {
   setStem: (value: string) => void
   options: string[]
   setOptions: React.Dispatch<React.SetStateAction<string[]>>
+  correctIndex: number
+  setCorrectIndex: (value: number) => void
   explanation: string
   setExplanation: (value: string) => void
   stemRef: React.RefObject<HTMLTextAreaElement | null>
@@ -297,13 +382,14 @@ function BulkMCQForm({
   setStem, 
   options, 
   setOptions, 
+  correctIndex,
+  setCorrectIndex,
   explanation, 
   setExplanation,
   stemRef,
   optionRefs,
   explanationRef,
 }: BulkMCQFormProps) {
-  const [correctIndex, setCorrectIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -333,9 +419,9 @@ function BulkMCQForm({
 
       if (result.success) {
         setMessage({ type: 'success', text: 'MCQ created successfully!' })
-        // Reset form - use parent setters
+        // Reset form - use parent setters (5 options for AI compatibility)
         setStem('')
-        setOptions(['', '', '', ''])
+        setOptions(['', '', '', '', ''])
         setCorrectIndex(0)
         setExplanation('')
       } else {
