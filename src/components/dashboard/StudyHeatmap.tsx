@@ -112,9 +112,9 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
       </div>
       
       {/* Heatmap + Year selector side by side */}
-      <div className="flex gap-4">
-        {/* Heatmap container */}
-        <div className="flex-1 overflow-x-auto">
+      <div className="flex gap-2">
+        {/* Heatmap container - no flex-1 to prevent stretching */}
+        <div className="overflow-x-auto">
           <div className="inline-flex flex-col min-w-fit">
           {/* Month labels row */}
           <div className="flex">
