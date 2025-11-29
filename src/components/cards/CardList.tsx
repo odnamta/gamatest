@@ -1,29 +1,47 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CardListItem } from './CardListItem'
 import { BulkActionsBar } from './BulkActionsBar'
 import { DeckSelector } from './DeckSelector'
+import { FilterBar } from '@/components/tags/FilterBar'
+import { TagSelector } from '@/components/tags/TagSelector'
 import { deleteCard, duplicateCard, bulkDeleteCards, bulkMoveCards } from '@/actions/card-actions'
 import { useToast } from '@/components/ui/Toast'
-import type { Card } from '@/types/database'
+import type { Card, Tag } from '@/types/database'
+
+// Extended card type with tags
+interface CardWithTags extends Card {
+  tags?: Tag[]
+}
 
 interface CardListProps {
-  cards: Card[]
+  cards: CardWithTags[]
   deckId: string
   deckTitle?: string
+  allTags?: Tag[]
 }
 
 /**
  * CardList - Client component wrapper for card list with bulk actions
  * Requirements: FR-1, FR-3, FR-4, C.1-C.9
  */
-export function CardList({ cards, deckId, deckTitle = 'deck' }: CardListProps) {
+export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [] }: CardListProps) {
   const router = useRouter()
   const { showToast } = useToast()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeckSelector, setShowDeckSelector] = useState(false)
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+
+  // Filter cards by selected tags (AND logic - card must have ALL selected tags)
+  const filteredCards = useMemo(() => {
+    if (filterTagIds.length === 0) return cards
+    return cards.filter((card) => {
+      const cardTagIds = card.tags?.map((t) => t.id) || []
+      return filterTagIds.every((tagId) => cardTagIds.includes(tagId))
+    })
+  }, [cards, filterTagIds])
 
   // Selection handlers
   const toggleSelection = (id: string) => {
@@ -36,7 +54,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck' }: CardListProps) {
   }
 
   const selectAll = () => {
-    setSelectedIds(new Set(cards.map((c) => c.id)))
+    setSelectedIds(new Set(filteredCards.map((c) => c.id)))
   }
 
   const clearSelection = () => {
@@ -126,6 +144,27 @@ export function CardList({ cards, deckId, deckTitle = 'deck' }: CardListProps) {
 
   return (
     <>
+      {/* Tag filter selector */}
+      {allTags.length > 0 && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Filter by tags
+          </label>
+          <TagSelector
+            selectedTagIds={filterTagIds}
+            onChange={setFilterTagIds}
+          />
+        </div>
+      )}
+
+      {/* Active filter bar */}
+      <FilterBar
+        tags={allTags}
+        selectedTagIds={filterTagIds}
+        onTagsChange={setFilterTagIds}
+        onClear={() => setFilterTagIds([])}
+      />
+
       {/* Bulk actions bar */}
       <BulkActionsBar
         selectedCount={selectedIds.size}
@@ -136,27 +175,46 @@ export function CardList({ cards, deckId, deckTitle = 'deck' }: CardListProps) {
       />
 
       {/* Select all toggle */}
-      {cards.length > 0 && (
+      {filteredCards.length > 0 && (
         <div className="flex items-center gap-2 mb-3">
           <button
-            onClick={selectedIds.size === cards.length ? clearSelection : selectAll}
+            onClick={selectedIds.size === filteredCards.length ? clearSelection : selectAll}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
-            {selectedIds.size === cards.length ? 'Deselect all' : 'Select all'}
+            {selectedIds.size === filteredCards.length ? 'Deselect all' : 'Select all'}
           </button>
-          {selectedIds.size > 0 && selectedIds.size < cards.length && (
-            <span className="text-sm text-slate-500">({selectedIds.size} of {cards.length})</span>
+          {selectedIds.size > 0 && selectedIds.size < filteredCards.length && (
+            <span className="text-sm text-slate-500">({selectedIds.size} of {filteredCards.length})</span>
           )}
+          {filterTagIds.length > 0 && (
+            <span className="text-sm text-slate-500">
+              (showing {filteredCards.length} of {cards.length} cards)
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* No results message */}
+      {filteredCards.length === 0 && filterTagIds.length > 0 && (
+        <div className="text-center py-8 bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <p className="text-slate-600 dark:text-slate-400">No cards match the selected tags</p>
+          <button
+            onClick={() => setFilterTagIds([])}
+            className="text-blue-600 dark:text-blue-400 text-sm mt-2 hover:underline"
+          >
+            Clear filters
+          </button>
         </div>
       )}
 
       {/* Card list with dividers */}
       <div className="divide-y divide-slate-100 dark:divide-slate-700/50 space-y-3">
-        {cards.map((card) => (
+        {filteredCards.map((card) => (
           <CardListItem
             key={card.id}
             card={card}
             deckId={deckId}
+            tags={card.tags}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
             isSelected={selectedIds.has(card.id)}

@@ -305,6 +305,55 @@ CREATE INDEX idx_deck_sources_deck_id ON deck_sources(deck_id);
 
 
 -- ============================================
+-- Tagging System Tables (V5)
+-- ============================================
+
+-- Tags table for card organization
+CREATE TABLE tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, name)
+);
+
+-- RLS Policies for tags (user ownership)
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own tags" ON tags
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Index on user_id
+CREATE INDEX idx_tags_user_id ON tags(user_id);
+
+
+-- Card tags join table (links cards to tags)
+CREATE TABLE card_tags (
+  card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (card_id, tag_id)
+);
+
+-- RLS Policies for card_tags (via card ownership)
+ALTER TABLE card_tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage card_tags for own cards" ON card_tags
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM cards
+      JOIN decks ON decks.id = cards.deck_id
+      WHERE cards.id = card_tags.card_id AND decks.user_id = auth.uid()
+    )
+  );
+
+-- Indexes for efficient filtering
+CREATE INDEX idx_card_tags_card_id ON card_tags(card_id);
+CREATE INDEX idx_card_tags_tag_id ON card_tags(tag_id);
+
+
+-- ============================================
 -- MIGRATION GUIDE: V2 Tables
 -- ============================================
 -- 

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateCard } from '@/actions/card-actions'
+import { getCardTags, assignTagsToCard } from '@/actions/tag-actions'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
+import { TagSelector } from '@/components/tags/TagSelector'
 import type { Card } from '@/types/database'
 
 interface EditCardFormProps {
@@ -36,6 +38,18 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
   const [correctIndex, setCorrectIndex] = useState(card.correct_index ?? 0)
   const [explanation, setExplanation] = useState(card.explanation || '')
 
+  // Tag state
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+
+  // Load existing tags on mount
+  useEffect(() => {
+    async function loadTags() {
+      const tags = await getCardTags(card.id)
+      setSelectedTagIds(tags.map(t => t.id))
+    }
+    loadTags()
+  }, [card.id])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -59,6 +73,8 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
           })
 
       if (result.ok) {
+        // Update tags
+        await assignTagsToCard(card.id, selectedTagIds)
         showToast('Card updated', 'success')
         router.push(`/decks/${deckId}`)
         router.refresh()
@@ -199,6 +215,17 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
           />
         </div>
 
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Tags (optional)
+          </label>
+          <TagSelector
+            selectedTagIds={selectedTagIds}
+            onChange={setSelectedTagIds}
+          />
+        </div>
+
         {/* Submit - desktop */}
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={isSubmitting}>
@@ -267,6 +294,17 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
           onChange={(e) => setImageUrl(e.target.value)}
           placeholder="https://example.com/image.jpg"
           className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Tags (optional)
+        </label>
+        <TagSelector
+          selectedTagIds={selectedTagIds}
+          onChange={setSelectedTagIds}
         />
       </div>
 

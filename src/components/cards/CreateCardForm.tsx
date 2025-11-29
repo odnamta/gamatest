@@ -1,10 +1,11 @@
 'use client'
 
-import { useActionState, useRef, useEffect } from 'react'
+import { useActionState, useRef, useEffect, useState } from 'react'
 import { createCardAction } from '@/actions/card-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { TagSelector } from '@/components/tags/TagSelector'
 import type { ActionResult } from '@/types/actions'
 
 interface CreateCardFormProps {
@@ -21,11 +22,13 @@ const initialState: ActionResult = { success: true }
 export function CreateCardForm({ deckId }: CreateCardFormProps) {
   const [state, formAction, isPending] = useActionState(createCardAction, initialState)
   const formRef = useRef<HTMLFormElement>(null)
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   // Reset form on successful submission
   useEffect(() => {
     if (state.success && formRef.current) {
       formRef.current.reset()
+      setSelectedTagIds([])
     }
   }, [state])
 
@@ -54,6 +57,21 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Supports markdown: <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">**bold**</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">*italic*</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">`code`</code>
       </p>
+
+      {/* Tags */}
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Tags (optional)
+        </label>
+        <TagSelector
+          selectedTagIds={selectedTagIds}
+          onChange={setSelectedTagIds}
+        />
+        {/* Hidden inputs for tag IDs */}
+        {selectedTagIds.map((tagId, index) => (
+          <input key={tagId} type="hidden" name={`tagId_${index}`} value={tagId} />
+        ))}
+      </div>
 
       {/* Optional image URL */}
       <Input

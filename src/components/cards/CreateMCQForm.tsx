@@ -5,6 +5,7 @@ import { createMCQAction } from '@/actions/mcq-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
+import { TagSelector } from '@/components/tags/TagSelector'
 import { getOptionLabel, adjustCorrectIndexAfterRemoval } from '@/lib/mcq-options'
 import type { ActionResult } from '@/types/actions'
 
@@ -44,6 +45,7 @@ export function CreateMCQForm({
   const [correctIndex, setCorrectIndex] = useState<number>(0)
   const [stem, setStem] = useState(initialStem)
   const [explanation, setExplanation] = useState(initialExplanation)
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   // Track initial values for sync
   const [lastInitialStem, setLastInitialStem] = useState(initialStem)
@@ -67,6 +69,7 @@ export function CreateMCQForm({
       setCorrectIndex(0)
       setStem('')
       setExplanation('')
+      setSelectedTagIds([])
       onSuccess?.()
     }
   }, [state, onSuccess])
@@ -118,6 +121,21 @@ export function CreateMCQForm({
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Supports markdown: <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">**bold**</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">*italic*</code>, <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">`code`</code>
       </p>
+
+      {/* Tags */}
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+          Tags (optional)
+        </label>
+        <TagSelector
+          selectedTagIds={selectedTagIds}
+          onChange={setSelectedTagIds}
+        />
+        {/* Hidden inputs for tag IDs */}
+        {selectedTagIds.map((tagId, index) => (
+          <input key={tagId} type="hidden" name={`tagId_${index}`} value={tagId} />
+        ))}
+      </div>
 
       {/* Options section - Dynamic with letter labels */}
       <div className="space-y-3">

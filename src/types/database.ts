@@ -134,3 +134,27 @@ export interface DeckSource {
   source_id: string;
   created_at: string;
 }
+
+
+// ============================================
+// Tagging System Types (V5)
+// ============================================
+
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+export interface CardTag {
+  card_id: string;
+  tag_id: string;
+  created_at: string;
+}
+
+// Extended Card type with tags included
+export interface CardWithTags extends Card {
+  tags: Tag[];
+}

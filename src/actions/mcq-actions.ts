@@ -28,6 +28,17 @@ export async function createMCQAction(
     i++
   }
 
+  // Parse tag IDs from form data
+  const tagIds: string[] = []
+  let t = 0
+  while (formData.has(`tagId_${t}`)) {
+    const tagId = formData.get(`tagId_${t}`)
+    if (typeof tagId === 'string') {
+      tagIds.push(tagId)
+    }
+    t++
+  }
+
   const rawData = {
     deckId: formData.get('deckId'),
     stem: formData.get('stem'),
@@ -99,6 +110,15 @@ export async function createMCQAction(
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // Assign tags to the new card (if any)
+  if (tagIds.length > 0 && data) {
+    const cardTags = tagIds.map((tagId) => ({
+      card_id: data.id,
+      tag_id: tagId,
+    }))
+    await supabase.from('card_tags').insert(cardTags)
   }
 
   // Revalidate deck details page to show new card

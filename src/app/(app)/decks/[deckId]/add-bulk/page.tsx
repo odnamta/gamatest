@@ -2,8 +2,8 @@
 
 import { useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useParams } from 'next/navigation'
-import { Textarea } from '@/components/ui/Textarea'
 import { BulkImportStepper } from '@/components/cards/BulkImportStepper'
 import { TextSelectionToolbar, TargetField, getNextField } from '@/components/cards/TextSelectionToolbar'
 import { SourceBar } from '@/components/cards/SourceBar'
@@ -12,7 +12,22 @@ import { useToast } from '@/components/ui/Toast'
 import { Sparkles, Upload, Loader2 } from 'lucide-react'
 import { draftMCQFromText } from '@/actions/ai-actions'
 import { RATE_LIMIT_MS } from '@/lib/ai-config'
-import type { MCQDraft } from '@/lib/mcq-draft-schema'
+import { SelectionTooltip } from '@/components/pdf/SelectionTooltip'
+import { uploadSourceAction } from '@/actions/source-actions'
+
+// Dynamic import PDFViewer to avoid SSR issues with react-pdf (DOMMatrix not defined)
+const PDFViewer = dynamic(
+  () => import('@/components/pdf/PDFViewer').then(mod => ({ default: mod.PDFViewer })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Loading PDF viewer...</p>
+      </div>
+    )
+  }
+)
 
 /**
  * Bulk Import Page - Client Component
@@ -28,17 +43,32 @@ interface LinkedSource {
   fileUrl?: string
 }
 
+// Selection state for PDF tooltip
+interface SelectionState {
+  text: string
+  position: { x: number; y: number }
+}
+
 export default function BulkImportPage() {
   const params = useParams()
   const deckId = params.deckId as string
   const { showToast } = useToast()
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const formRef = useRef<HTMLDivElement>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1) // Start at step 1 (Upload PDF)
   
   // Linked source state - Requirements 4.1, 4.2, 4.3
   const [linkedSource, setLinkedSource] = useState<LinkedSource | null>(null)
   const [showUploadDropzone, setShowUploadDropzone] = useState(true)
+  
+  // PDF upload state
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // PDF selection state - Requirements V5 2.7, 2.11
+  const [pdfSelection, setPdfSelection] = useState<SelectionState | null>(null)
 
   // MCQ form state - lifted up for toolbar integration
   const [questionStem, setQuestionStem] = useState('')
@@ -66,6 +96,160 @@ export default function BulkImportPage() {
   // Handle change/replace PDF click
   const handleChangeSource = useCallback(() => {
     setShowUploadDropzone(true)
+    setPdfSelection(null)
+    setUploadError(null)
+  }, [])
+
+  // Handle file selection and upload - Requirements 9.1, 9.2
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    
+    // Reset file input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+    
+    // If no file selected (user cancelled), do nothing
+    if (!file) return
+    
+    // Validate it's a real File object
+    if (!(file instanceof File)) {
+      setUploadError('Invalid file selected')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('title', file.name.replace(/\.pdf$/i, ''))
+      formData.append('deckId', deckId)
+
+      const result = await uploadSourceAction(formData)
+
+      if (!result.success) {
+        setUploadError(result.error || 'Upload failed')
+      } else if (result.data) {
+        // Only set linked source and show success on actual upload completion
+        const source = result.data as { id: string; title: string; file_url?: string }
+        handleUploadSuccess({
+          id: source.id,
+          fileName: file.name,
+          fileUrl: source.file_url,
+        })
+      }
+    } catch (err) {
+      console.error('PDF upload error:', err)
+      let errorMessage = 'An unexpected error occurred'
+      if (err instanceof Error) {
+        if (err.message.includes('Body exceeded') || err.message.includes('413')) {
+          errorMessage = 'File too large. Maximum size is 50MB.'
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.'
+        } else {
+          errorMessage = err.message
+        }
+      }
+      setUploadError(errorMessage)
+    } finally {
+      setIsUploading(false)
+    }
+  }, [deckId, handleUploadSuccess])
+
+  // Handle upload button click - just opens file picker
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  // Handle PDF text selection - Requirements V5 2.7
+  const handlePdfTextSelect = useCallback((text: string, position: { x: number; y: number }) => {
+    setPdfSelection({ text, position })
+  }, [])
+
+  // Scroll to form on mobile - Requirements V5 2.6
+  const scrollToForm = useCallback(() => {
+    if (window.innerWidth < 1024 && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [])
+
+  // Handle "To Stem" from PDF selection - Requirements V5 2.8
+  const handlePdfToStem = useCallback(() => {
+    if (pdfSelection) {
+      setQuestionStem(pdfSelection.text)
+      setCurrentStep(3)
+      showToast('Text copied to Question Stem!', 'success')
+      scrollToForm()
+      setTimeout(() => stemRef.current?.focus(), 100)
+    }
+  }, [pdfSelection, showToast, scrollToForm])
+
+  // Handle "To Explanation" from PDF selection - Requirements V5 2.9
+  const handlePdfToExplanation = useCallback(() => {
+    if (pdfSelection) {
+      setExplanation(pdfSelection.text)
+      setCurrentStep(3)
+      showToast('Text copied to Explanation!', 'success')
+      scrollToForm()
+      setTimeout(() => explanationRef.current?.focus(), 100)
+    }
+  }, [pdfSelection, showToast, scrollToForm])
+
+  // Handle "To AI Draft" from PDF selection - Requirements V5 2.10
+  const handlePdfToAIDraft = useCallback(async () => {
+    if (!pdfSelection) return
+    
+    const selectedText = pdfSelection.text
+    
+    // Check rate limit
+    const now = Date.now()
+    if (now - lastGenerateTime < RATE_LIMIT_MS) {
+      showToast('Please wait a moment before generating again', 'error')
+      return
+    }
+
+    setIsGenerating(true)
+    setLastGenerateTime(now)
+    scrollToForm()
+
+    try {
+      const result = await draftMCQFromText({
+        sourceText: selectedText,
+        deckId,
+        deckName: linkedSource?.fileName?.replace('.pdf', ''),
+      })
+
+      if (result.ok) {
+        setQuestionStem(result.draft.stem)
+        setOptions(result.draft.options)
+        setCorrectIndex(result.draft.correct_index)
+        setExplanation(result.draft.explanation)
+        setCurrentStep(3)
+        showToast('MCQ draft generated! Review and edit before saving.', 'success')
+      } else {
+        switch (result.error) {
+          case 'TEXT_TOO_SHORT':
+            showToast('Please select a longer paragraph (at least 50 characters)', 'error')
+            break
+          case 'NOT_CONFIGURED':
+            showToast('AI is not configured yet. Please set OPENAI_API_KEY in .env.local', 'error')
+            break
+          default:
+            showToast('Something went wrong. Please try again.', 'error')
+        }
+      }
+    } catch {
+      showToast('Something went wrong. Please try again.', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [pdfSelection, lastGenerateTime, deckId, linkedSource?.fileName, showToast, scrollToForm])
+
+  // Close PDF selection tooltip - Requirements V5 2.11, 2.12
+  const handleClosePdfSelection = useCallback(() => {
+    setPdfSelection(null)
   }, [])
 
   // Handle copy to field from toolbar - Requirements 5.2, 5.3
@@ -222,22 +406,38 @@ export default function BulkImportPage() {
               <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
                 This helps track where your MCQs come from
               </p>
-              {/* Placeholder upload button - actual upload logic would go here */}
+              {/* Hidden file input for PDF selection */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+                aria-label="Upload PDF file"
+              />
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => {
-                  // Simulate upload for now - in real implementation, this would trigger file picker
-                  const mockSource: LinkedSource = {
-                    id: 'mock-id',
-                    fileName: 'Sample-Questions.pdf',
-                    fileUrl: undefined
-                  }
-                  handleUploadSuccess(mockSource)
-                }}
+                onClick={handleUploadClick}
+                disabled={isUploading}
               >
-                Select PDF File
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Select PDF File'
+                )}
               </Button>
+              {uploadError && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
+                  {uploadError}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                PDF files only, max 50MB
+              </p>
               {linkedSource && (
                 <button
                   type="button"
@@ -304,17 +504,37 @@ export default function BulkImportPage() {
         </div>
       </div>
 
-      {/* Split-view layout - Requirements 10.1, 10.3, 7.3 */}
+      {/* Split-view layout - Requirements 10.1, 10.3, 7.3, V5 2.5, 2.6 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left side: PDF text paste area */}
+        {/* Left side: PDF Viewer or text paste area */}
         <div className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-            PDF Text Reference
-          </h2>
-          
-          <textarea
-            ref={textAreaRef}
-            placeholder="Paste text from your PDF here...
+          {linkedSource?.fileUrl ? (
+            /* Integrated PDF Viewer - Requirements V5 2.1-2.4 */
+            <>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                {linkedSource.fileName}
+              </h2>
+              <div className="min-h-[500px] lg:min-h-[600px]">
+                <PDFViewer
+                  fileUrl={linkedSource.fileUrl}
+                  fileId={linkedSource.id}
+                  onTextSelect={handlePdfTextSelect}
+                />
+              </div>
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                Select text in the PDF to copy it to the form or generate an AI draft.
+              </p>
+            </>
+          ) : (
+            /* Fallback: Manual text paste area */
+            <>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                PDF Text Reference
+              </h2>
+              
+              <textarea
+                ref={textAreaRef}
+                placeholder="Paste text from your PDF here...
 
 Example:
 1. A 32-year-old G2P1 woman at 28 weeks gestation presents with...
@@ -327,17 +547,19 @@ D) Option D
 Answer: C
 
 Explanation: The correct answer is C because..."
-            className="w-full min-h-[400px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm resize-y"
-            onClick={() => setCurrentStep(2)}
-          />
-          
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Select text and click the copy button above to transfer it to the form.
-          </p>
+                className="w-full min-h-[400px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-mono text-sm resize-y"
+                onClick={() => setCurrentStep(2)}
+              />
+              
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                Select text and click the copy button above to transfer it to the form.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Right side: MCQ creation form */}
-        <div className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
+        <div ref={formRef} className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
             Create MCQ
           </h2>
@@ -359,6 +581,18 @@ Explanation: The correct answer is C because..."
           />
         </div>
       </div>
+
+      {/* PDF Selection Tooltip - Requirements V5 2.7, 2.11 */}
+      {pdfSelection && (
+        <SelectionTooltip
+          position={pdfSelection.position}
+          selectedText={pdfSelection.text}
+          onToStem={handlePdfToStem}
+          onToExplanation={handlePdfToExplanation}
+          onToAIDraft={handlePdfToAIDraft}
+          onClose={handleClosePdfSelection}
+        />
+      )}
     </div>
   )
 }

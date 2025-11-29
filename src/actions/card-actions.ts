@@ -22,6 +22,17 @@ export async function createCardAction(
     imageUrl: formData.get('imageUrl') || '',
   }
 
+  // Parse tag IDs from form data
+  const tagIds: string[] = []
+  let t = 0
+  while (formData.has(`tagId_${t}`)) {
+    const tagId = formData.get(`tagId_${t}`)
+    if (typeof tagId === 'string') {
+      tagIds.push(tagId)
+    }
+    t++
+  }
+
   // Server-side Zod validation (Requirement 9.3)
   const validationResult = createCardSchema.safeParse(rawData)
   
@@ -76,6 +87,15 @@ export async function createCardAction(
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // Assign tags to the new card (if any)
+  if (tagIds.length > 0 && data) {
+    const cardTags = tagIds.map((tagId) => ({
+      card_id: data.id,
+      tag_id: tagId,
+    }))
+    await supabase.from('card_tags').insert(cardTags)
   }
 
   // Revalidate deck details page to show new card

@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { Pencil, Trash2, Copy } from 'lucide-react'
-import type { Card } from '@/types/database'
+import { TagBadge } from '@/components/tags/TagBadge'
+import type { Card, Tag } from '@/types/database'
 
 interface CardListItemProps {
   card: Card
   deckId: string
+  tags?: Tag[]
   onDelete: (cardId: string, preview: string, type: string) => void
   onDuplicate: (cardId: string) => void
   isSelected?: boolean
@@ -17,7 +19,7 @@ interface CardListItemProps {
  * CardListItem - Displays a single card with Edit/Delete actions
  * Requirements: FR-1
  */
-export function CardListItem({ card, deckId, onDelete, onDuplicate, isSelected, onToggleSelect }: CardListItemProps) {
+export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, isSelected, onToggleSelect }: CardListItemProps) {
   const isMCQ = card.card_type === 'mcq'
   const preview = isMCQ ? card.stem : card.front
   const typeLabel = isMCQ ? 'MCQ' : 'Flashcard'
@@ -63,6 +65,10 @@ export function CardListItem({ card, deckId, onDelete, onDuplicate, isSelected, 
                 Has image
               </span>
             )}
+            {/* Tag badges */}
+            {tags.map((tag) => (
+              <TagBadge key={tag.id} tag={tag} size="sm" />
+            ))}
           </div>
         </div>
 
