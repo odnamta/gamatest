@@ -9,11 +9,17 @@ import { TextSelectionToolbar, TargetField, getNextField } from '@/components/ca
 import { SourceBar } from '@/components/cards/SourceBar'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { Sparkles, Upload, Loader2 } from 'lucide-react'
+import { Sparkles, Upload, Loader2, Layers } from 'lucide-react'
 import { draftMCQFromText } from '@/actions/ai-actions'
+import { draftBatchMCQFromText } from '@/actions/batch-mcq-actions'
 import { RATE_LIMIT_MS } from '@/lib/ai-config'
 import { SelectionTooltip } from '@/components/pdf/SelectionTooltip'
 import { uploadSourceAction } from '@/actions/source-actions'
+import { useSessionTags } from '@/hooks/use-session-tags'
+import { TagSelector } from '@/components/tags/TagSelector'
+import { BatchReviewPanel } from '@/components/batch/BatchReviewPanel'
+import { toUIFormatArray, type MCQBatchDraftUI } from '@/lib/batch-mcq-schema'
+import { useHotkeys, getPlatformModifier } from '@/hooks/use-hotkeys'
 
 // Dynamic import PDFViewer to avoid SSR issues with react-pdf (DOMMatrix not defined)
 const PDFViewer = dynamic(
@@ -79,6 +85,15 @@ export default function BulkImportPage() {
   // AI Draft state - Requirements FR-1, FR-5.2
   const [isGenerating, setIsGenerating] = useState(false)
   const [lastGenerateTime, setLastGenerateTime] = useState(0)
+
+  // V6: Session Tags - Requirements R2.1
+  const { sessionTagIds, setSessionTagIds, sessionTagNames, isLoading: isLoadingTags } = useSessionTags(deckId)
+
+  // V6: Batch AI Draft state - Requirements R1.1, R1.3
+  const [batchDrafts, setBatchDrafts] = useState<MCQBatchDraftUI[]>([])
+  const [isBatchPanelOpen, setIsBatchPanelOpen] = useState(false)
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false)
+  const [lastBatchTime, setLastBatchTime] = useState(0)
 
   // Refs for form fields (for auto-focus)
   const stemRef = useRef<HTMLTextAreaElement>(null)
@@ -251,6 +266,113 @@ export default function BulkImportPage() {
   const handleClosePdfSelection = useCallback(() => {
     setPdfSelection(null)
   }, [])
+
+  // V6: Handle "AI Batch Draft" from PDF selection - Requirements R1.1
+  const handlePdfToAIBatch = useCallback(async () => {
+    if (!pdfSelection) return
+    
+    const selectedText = pdfSelection.text
+    
+    // Check rate limit
+    const now = Date.now()
+    if (now - lastBatchTime < RATE_LIMIT_MS) {
+      showToast('Please wait a moment before generating again', 'error')
+      return
+    }
+
+    setIsBatchGenerating(true)
+    setLastBatchTime(now)
+    setPdfSelection(null) // Close tooltip
+
+    try {
+      const result = await draftBatchMCQFromText({
+        deckId,
+        text: selectedText,
+        defaultTags: sessionTagNames,
+      })
+
+      if (result.ok) {
+        if (result.drafts.length === 0) {
+          showToast('No MCQs found in selected text. Try selecting different content.', 'info')
+        } else {
+          const uiDrafts = toUIFormatArray(result.drafts)
+          setBatchDrafts(uiDrafts)
+          setIsBatchPanelOpen(true)
+          showToast(`Generated ${result.drafts.length} MCQ drafts!`, 'success')
+        }
+      } else {
+        showToast(result.error.message || 'Failed to generate drafts', 'error')
+      }
+    } catch {
+      showToast('Something went wrong. Please try again.', 'error')
+    } finally {
+      setIsBatchGenerating(false)
+    }
+  }, [pdfSelection, lastBatchTime, deckId, sessionTagNames, showToast])
+
+  // V6: Handle batch save success - Requirements R1.4
+  const handleBatchSaveSuccess = useCallback((_count: number) => {
+    setBatchDrafts([])
+    setIsBatchPanelOpen(false)
+    // Focus PDF viewer container after save
+    pdfContainerRef.current?.focus()
+  }, [])
+
+  // Ref for PDF viewer container (for focus management) - Requirements R3.2
+  const pdfContainerRef = useRef<HTMLDivElement>(null)
+
+  // V6: Hotkeys integration - Requirements R3.1, R3.2
+  const platformMod = getPlatformModifier()
+  
+  // Handler for single-card submit via hotkey
+  const handleHotkeySubmit = useCallback(() => {
+    // Find and click the submit button in the form
+    const submitBtn = formRef.current?.querySelector('button[type="submit"]') as HTMLButtonElement | null
+    if (submitBtn && !submitBtn.disabled) {
+      submitBtn.click()
+    }
+  }, [])
+
+  // Handler for batch draft via hotkey
+  const handleHotkeyBatchDraft = useCallback(() => {
+    if (pdfSelection?.text) {
+      handlePdfToAIBatch()
+    } else {
+      showToast('Select text in the PDF first to use AI Batch Draft', 'info')
+    }
+  }, [pdfSelection?.text, handlePdfToAIBatch, showToast])
+
+  // Handler for Escape key
+  const handleHotkeyEscape = useCallback(() => {
+    if (isBatchPanelOpen) {
+      setIsBatchPanelOpen(false)
+    } else if (pdfSelection) {
+      setPdfSelection(null)
+    }
+  }, [isBatchPanelOpen, pdfSelection])
+
+  useHotkeys([
+    {
+      // Cmd/Ctrl+Enter → submit single-card form
+      key: 'Enter',
+      modifiers: [platformMod],
+      handler: handleHotkeySubmit,
+      enabled: !isBatchPanelOpen,
+    },
+    {
+      // Shift+Cmd/Ctrl+Enter → trigger batch draft
+      key: 'Enter',
+      modifiers: ['shift', platformMod],
+      handler: handleHotkeyBatchDraft,
+      enabled: !isBatchPanelOpen && !isBatchGenerating,
+    },
+    {
+      // Escape → close batch panel or clear selection tooltip
+      key: 'Escape',
+      handler: handleHotkeyEscape,
+      enabled: true,
+    },
+  ])
 
   // Handle copy to field from toolbar - Requirements 5.2, 5.3
   const handleCopyToField = useCallback((field: TargetField, text: string) => {
@@ -452,6 +574,24 @@ export default function BulkImportPage() {
         )}
       </div>
 
+      {/* V6: Session Tags Selector - Requirements R2.1 */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Session Tags
+          <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+            Applied to all cards created from this page
+          </span>
+        </label>
+        {isLoadingTags ? (
+          <div className="h-[42px] bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
+        ) : (
+          <TagSelector
+            selectedTagIds={sessionTagIds}
+            onChange={setSessionTagIds}
+          />
+        )}
+      </div>
+
       {/* Helper Instructions */}
       <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
@@ -476,30 +616,53 @@ export default function BulkImportPage() {
           onNoSelection={handleNoSelection}
         />
         
-        {/* AI Draft Button - Requirements FR-1, FR-5 */}
-        <div className="mt-3 flex flex-col items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={isGenerating}
-            onClick={handleAIDraft}
-            className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-xs"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3 h-3" />
-                AI Draft
-              </>
-            )}
-          </Button>
+        {/* AI Draft Buttons - Requirements FR-1, FR-5, R1.1 */}
+        <div className="mt-3 flex flex-col items-center gap-2">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isGenerating}
+              onClick={handleAIDraft}
+              className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-xs"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3" />
+                  AI Draft
+                </>
+              )}
+            </Button>
+            {/* V6: AI Batch Draft Button - Requirements R1.1 */}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isBatchGenerating}
+              onClick={handlePdfToAIBatch}
+              className="flex items-center gap-2 text-xs"
+              title="Generate up to 5 MCQs from selected text"
+            >
+              {isBatchGenerating ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Batch...
+                </>
+              ) : (
+                <>
+                  <Layers className="w-3 h-3" />
+                  AI Batch Draft
+                </>
+              )}
+            </Button>
+          </div>
           {/* Helper text - Requirement FR-5.1, FR-5.3 */}
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            AI generates a draft. Always review before saving.
+            AI Draft: 1 MCQ | AI Batch Draft: up to 5 MCQs
           </p>
         </div>
       </div>
@@ -507,7 +670,11 @@ export default function BulkImportPage() {
       {/* Split-view layout - Requirements 10.1, 10.3, 7.3, V5 2.5, 2.6 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left side: PDF Viewer or text paste area */}
-        <div className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
+        <div 
+          ref={pdfContainerRef}
+          tabIndex={-1}
+          className="p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
           {linkedSource?.fileUrl ? (
             /* Integrated PDF Viewer - Requirements V5 2.1-2.4 */
             <>
@@ -578,6 +745,8 @@ Explanation: The correct answer is C because..."
             stemRef={stemRef}
             optionRefs={optionRefs}
             explanationRef={explanationRef}
+            sessionTagIds={sessionTagIds}
+            onSaveSuccess={() => pdfContainerRef.current?.focus()}
           />
         </div>
       </div>
@@ -590,9 +759,22 @@ Explanation: The correct answer is C because..."
           onToStem={handlePdfToStem}
           onToExplanation={handlePdfToExplanation}
           onToAIDraft={handlePdfToAIDraft}
+          onToAIBatch={handlePdfToAIBatch}
           onClose={handleClosePdfSelection}
         />
       )}
+
+      {/* V6: Batch Review Panel - Requirements R1.3, R1.4 */}
+      <BatchReviewPanel
+        isOpen={isBatchPanelOpen}
+        onClose={() => setIsBatchPanelOpen(false)}
+        drafts={batchDrafts}
+        onDraftsChange={setBatchDrafts}
+        sessionTagIds={sessionTagIds}
+        sessionTagNames={sessionTagNames}
+        deckId={deckId}
+        onSaveSuccess={handleBatchSaveSuccess}
+      />
     </div>
   )
 }
@@ -611,6 +793,8 @@ interface BulkMCQFormProps {
   stemRef: React.RefObject<HTMLTextAreaElement | null>
   optionRefs: React.MutableRefObject<(HTMLInputElement | null)[]>
   explanationRef: React.RefObject<HTMLTextAreaElement | null>
+  sessionTagIds?: string[] // V6: Session tags to apply
+  onSaveSuccess?: () => void // V6: Callback after successful save for focus management
 }
 
 function BulkMCQForm({ 
@@ -626,6 +810,8 @@ function BulkMCQForm({
   stemRef,
   optionRefs,
   explanationRef,
+  sessionTagIds = [],
+  onSaveSuccess,
 }: BulkMCQFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -650,6 +836,8 @@ function BulkMCQForm({
       formData.append('correctIndex', correctIndex.toString())
       formData.append('explanation', explanation)
       options.forEach((opt, i) => formData.append(`option_${i}`, opt))
+      // V6: Include session tags - Requirements R2.2
+      sessionTagIds.forEach((tagId, i) => formData.append(`tagId_${i}`, tagId))
 
       const { createMCQAction } = await import('@/actions/mcq-actions')
       const result = await createMCQAction({ success: true }, formData)
@@ -661,6 +849,8 @@ function BulkMCQForm({
         setOptions(['', '', '', '', ''])
         setCorrectIndex(0)
         setExplanation('')
+        // V6: Focus back to PDF viewer - Requirements R3.2
+        onSaveSuccess?.()
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to create MCQ' })
       }

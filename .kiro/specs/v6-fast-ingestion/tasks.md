@@ -1,0 +1,297 @@
+# Implementation Plan – V6 Fast Ingestion & Batching
+
+## Task Group 1: Shared Types & Schemas
+
+- [x] 1. Create batch MCQ schemas and types
+  - [x] 1.1 Create batch-mcq-schema.ts
+    - Location: src/lib/batch-mcq-schema.ts
+    - Define mcqBatchItemSchema with stem, options (2-5), correctIndex (0-4), explanation, tags (1-3)
+    - Define mcqBatchDraftSchema = z.array(mcqBatchItemSchema).max(5)
+    - Define draftBatchInputSchema for server action input
+    - Define bulkCreateInputSchema for bulk create input
+    - Export TypeScript types inferred from schemas
+    - _Req: R1.2_
+  - [x] 1.2 Define client-side MCQBatchDraftUI type
+    - Add MCQBatchDraftUI interface with id, stem, options, correctIndex, explanation, aiTags, include
+    - Add helper function to transform server draft to UI draft (with include: true default)
+    - _Req: R1.3_
+  - [x] 1.3 Write property tests for batch schema
+    - Test mcqBatchItemSchema accepts valid drafts
+    - Test mcqBatchItemSchema rejects invalid drafts
+    - Test draft include defaults to true
+    - **Property 4: Batch draft schema validation**
+    - **Property 7: Draft include defaults to true**
+    - _Req: R1.2, R1.3_
+
+## Task Group 2: Tag Merge Utility
+
+- [x] 2. Create tag merge utility
+  - [x] 2.1 Create tag-merge.ts
+    - Location: src/lib/tag-merge.ts
+    - Implement mergeAndDeduplicateTags(sessionTags: string[], aiTags: string[]): string[]
+    - Normalize: trim whitespace, handle case-insensitive comparison
+    - Deduplicate by normalized name, preserving first occurrence
+    - _Req: R1.5, R2.3_
+  - [x] 2.2 Write property tests for tag merge
+    - Test session + AI tag merging produces unique results
+    - Test normalization (trim, case handling)
+    - **Property 9: Tag merge produces unique normalized tags**
+    - _Req: R1.5, R2.3_
+
+## Task Group 3: draftBatchMCQFromText Server Action
+
+- [x] 3. Implement batch AI draft action
+  - [x] 3.1 Create action file
+    - Location: src/actions/batch-mcq-actions.ts
+    - Add 'use server' directive
+    - Import OpenAI client and AI config
+    - _Req: R1.1_
+  - [x] 3.2 Implement input validation
+    - Validate input with draftBatchInputSchema
+    - Return typed error { ok: false, error: { message, code } } on validation failure
+    - _Req: R1.2, NFR-2_
+  - [x] 3.3 Build OpenAI prompt
+    - Create system prompt explaining OBGYN MCQ extraction
+    - Request up to 5 MCQs with stem, options, correctIndex, explanation, tags
+    - Specify JSON output format with questions array key
+    - Specify tags must be topic-based, not book names
+    - _Req: R1.2_
+  - [x] 3.4 Call OpenAI with JSON mode
+    - Use response_format: { type: "json_object" }
+    - Parse response and extract questions array
+    - Validate with mcqBatchDraftSchema
+    - Cap at 5 items if more returned
+    - _Req: R1.2, NFR-2_
+  - [x] 3.5 Handle errors gracefully
+    - On Zod validation fail: return { ok: false, error: { message: 'Invalid AI response', code: 'PARSE_ERROR' } }
+    - On OpenAI error: return { ok: false, error: { message: 'AI service unavailable', code: 'OPENAI_ERROR' } }
+    - On empty result: return { ok: true, drafts: [] } (not an error)
+    - _Req: R1.2, NFR-2_
+  - [x] 3.6 Write property tests for batch action
+    - Test batch output size is bounded 0-5
+    - Test output capped at 5 when AI returns more
+    - Test invalid AI response returns typed error
+    - **Property 3: Batch output size is bounded 0-5**
+    - **Property 5: Batch output capped at 5**
+    - **Property 6: Invalid AI response returns typed error**
+    - _Req: R1.2, NFR-2_
+
+## Task Group 4: bulkCreateMCQ Server Action
+
+- [x] 4. Implement bulk create action
+  - [x] 4.1 Add bulk create function
+    - Add bulkCreateMCQ function to src/actions/batch-mcq-actions.ts
+    - Validate input with bulkCreateInputSchema
+    - _Req: R1.4_
+  - [x] 4.2 Verify deck ownership
+    - Get authenticated user via getUser()
+    - Query deck to confirm user_id matches
+    - Return error if unauthorized
+    - _Req: R1.4_
+  - [x] 4.3 Implement tag resolution
+    - For each card's tagNames array: normalize, query existing tags, create new tags
+    - Reuse existing tag creation logic from V5 tag-actions.ts
+    - Build tag_id array for each card
+    - _Req: R1.5_
+  - [x] 4.4 Implement atomic card insert
+    - Insert all card rows in single Supabase call
+    - Insert all card_tags join rows
+    - Use SM-2 defaults from getCardDefaults()
+    - On any error: ensure no partial state
+    - _Req: R1.4, NFR-2_
+  - [x] 4.5 Return result and revalidate
+    - Success: { ok: true, createdCount, deckId }
+    - Error: { ok: false, error: { message, code } }
+    - Call revalidatePath(`/decks/${deckId}`) on success
+    - _Req: R1.4_
+  - [x] 4.6 Write property tests for bulk create
+    - Test atomic bulk save (all or nothing)
+    - Test failed save creates zero cards
+    - Test new AI tags created for user
+    - **Property 11: Atomic bulk save - all or nothing**
+    - **Property 12: Failed bulk save creates zero cards**
+    - **Property 14: New AI tags created for user**
+    - _Req: R1.4, R1.5, NFR-2_
+
+## Task Group 5: Session Tag Presets
+
+- [x] 5. Implement session tags
+  - [x] 5.1 Create useSessionTags hook
+    - Location: src/hooks/use-session-tags.ts
+    - Implement localStorage read on mount with key session_tags_{deckId}
+    - Implement localStorage write on change
+    - Return { sessionTagIds, setSessionTagIds }
+    - _Req: R2.1_
+  - [x] 5.2 Add tag name resolution
+    - Fetch user tags via getUserTags() on mount
+    - Compute sessionTagNames from sessionTagIds
+    - Return sessionTagNames for display and API calls
+    - _Req: R2.1_
+  - [x] 5.3 Add Session Tags selector to Bulk Import page
+    - Import useSessionTags hook
+    - Import existing TagSelector component
+    - Add UI section near top of page with label "Session Tags"
+    - Add hint text: "Applied to all cards from this session"
+    - _Req: R2.1_
+  - [x] 5.4 Apply session tags to single-card form
+    - Pass sessionTagIds to BulkMCQForm component
+    - In handleSubmit, append session tag IDs to form data
+    - _Req: R2.2_
+  - [x] 5.5 Apply session tags to single-card AI Draft
+    - When populating form from AI draft, include session tags
+    - _Req: R2.2_
+  - [x] 5.6 Write property tests for session tags
+    - Test localStorage round-trip
+    - Test session tags applied to all saved cards
+    - Test empty session tags not applied
+    - Test no duplicate tags on merged cards
+    - **Property 16: Session tags localStorage round-trip**
+    - **Property 13: Session tags applied to all saved cards**
+    - **Property 17: Empty session tags not applied**
+    - **Property 18: No duplicate tags on merged cards**
+    - _Req: R2.1, R2.2, R2.3_
+
+## Task Group 6: Batch Review Panel UI
+
+- [x] 6. Build BatchReviewPanel component
+  - [x] 6.1 Create BatchDraftCard component
+    - Location: src/components/batch/BatchDraftCard.tsx
+    - Props: draft, index, sessionTagNames, onChange
+    - Render include checkbox, stem textarea, options inputs, correct radio, explanation
+    - _Req: R1.3_
+  - [x] 6.2 Implement tag display in BatchDraftCard
+    - Show session tags as read-only pills using TagBadge
+    - Show AI tags as removable chips
+    - Handle AI tag removal via onChange
+    - _Req: R1.3, R1.5_
+  - [x] 6.3 Create BatchReviewPanel component
+    - Location: src/components/batch/BatchReviewPanel.tsx
+    - Props: isOpen, onClose, drafts, onDraftsChange, sessionTagIds, sessionTagNames, deckId, onSaveSuccess
+    - _Req: R1.3_
+  - [x] 6.4 Implement modal/drawer layout
+    - Desktop: centered modal or side drawer
+    - Mobile: full-screen overlay with close button
+    - Use fixed inset-0 with backdrop
+    - Handle Escape key to close
+    - _Req: R1.3, NFR-3_
+  - [x] 6.5 Render draft cards
+    - Map drafts to BatchDraftCard components
+    - Handle draft changes via onDraftsChange
+    - _Req: R1.3_
+  - [x] 6.6 Implement footer actions
+    - Left: "N of M selected" count
+    - Right: "Discard All" (secondary), "Save Selected (N)" (primary)
+    - Disable "Save Selected" when N = 0
+    - _Req: R1.4_
+  - [x] 6.7 Implement save flow
+    - Filter drafts where include === true
+    - Merge session tags + AI tags using mergeAndDeduplicateTags
+    - Call bulkCreateMCQ with merged data
+    - Show loading spinner, handle success/error
+    - On success: close panel, call onSaveSuccess(count)
+    - _Req: R1.4, R1.5_
+  - [x] 6.8 Write property tests for panel
+    - Test unchecked drafts excluded from save payload
+    - Test save button disabled when no drafts selected
+    - **Property 8: Unchecked drafts excluded from save payload**
+    - **Property 10: Save button disabled when no drafts selected**
+    - _Req: R1.3, R1.4_
+
+## Task Group 7: AI Batch Button Wiring
+
+- [x] 7. Wire up AI Batch Draft button
+  - [x] 7.1 Add AI Batch button to SelectionTooltip
+    - Modify src/components/pdf/SelectionTooltip.tsx
+    - Add onToAIBatch prop
+    - Add "AI Batch" button with Layers icon
+    - _Req: R1.1_
+  - [x] 7.2 Add AI Batch Draft button to toolbar
+    - In Bulk Import page, add "AI Batch Draft" button next to "AI Draft"
+    - Secondary/outline styling
+    - Disabled when no PDF selection text
+    - _Req: R1.1_
+  - [x] 7.3 Add batch state to Bulk Import page
+    - Add batchDrafts, isBatchPanelOpen, isBatchGenerating, lastBatchTime state
+    - _Req: R1.1_
+  - [x] 7.4 Implement batch handler
+    - Create handleAIBatchDraft callback
+    - Check for selection, rate limit
+    - Call draftBatchMCQFromText
+    - Transform drafts to UI format
+    - Open BatchReviewPanel on success
+    - _Req: R1.1, NFR-1_
+  - [x] 7.5 Render BatchReviewPanel
+    - Add BatchReviewPanel to page JSX
+    - Wire up props and callbacks
+    - Focus PDF viewer on save success
+    - _Req: R1.3, R1.4_
+  - [x] 7.6 Write property tests for button wiring
+    - Test button disabled state matches selection state
+    - Test loading state prevents duplicate submissions
+    - **Property 1: Button disabled state matches selection state**
+    - **Property 2: Loading state prevents duplicate submissions**
+    - _Req: R1.1, NFR-1_
+
+## Task Group 8: Hotkeys
+
+- [x] 8. Implement keyboard shortcuts
+  - [x] 8.1 Create useHotkeys hook
+    - Location: src/hooks/use-hotkeys.ts
+    - Accept array of HotkeyConfig objects
+    - Attach/remove keydown listener
+    - Skip events in unrelated inputs
+    - _Req: R3.1, R3.2_
+  - [x] 8.2 Handle platform detection
+    - Detect Mac vs Windows/Linux
+    - Use appropriate modifier key (meta vs ctrl)
+    - _Req: R3.1_
+  - [x] 8.3 Integrate hotkeys with Bulk Import page
+    - Cmd/Ctrl+Enter → trigger single-card submit
+    - Shift+Cmd/Ctrl+Enter → trigger batch draft (if selection)
+    - Escape → close batch panel or clear selection tooltip
+    - _Req: R3.1_
+  - [x] 8.4 Implement focus management
+    - After single-card save: focus PDF viewer container
+    - After batch save: focus PDF viewer container
+    - Add tabIndex={-1} to PDF viewer container
+    - _Req: R3.2_
+  - [x] 8.5 Write property tests for hotkeys
+    - Test shortcuts blocked in unrelated inputs
+    - **Property 19: Shortcuts blocked in unrelated inputs**
+    - _Req: R3.2_
+
+## Task Group 9: Final Integration & QA
+
+- [x] 9. Final integration and testing
+  - [x] 9.1 Wire up all components
+    - Ensure SelectionTooltip passes onToAIBatch to page handler
+    - Ensure session tags flow through all creation paths
+    - _Req: R1.1, R2.2_
+  - [x] 9.2 Add loading states and error handling
+    - Show spinner on batch button during generation
+    - Show spinner on save button during bulk create
+    - Display error toasts for all failure cases
+    - _Req: R1.1, R1.4, NFR-1_
+  - [x] 9.3 Verify existing single-card flow unchanged
+    - Test single-card manual creation still works
+    - Test single-card AI Draft still works
+    - Ensure no regressions
+    - _Req: (V6 is additive)_
+  - [x] 9.4 Write remaining property tests
+    - Test Zod validation before display
+    - Test tag RLS ownership respected
+    - **Property 20: Zod validation before display**
+    - **Property 15: Tag RLS ownership respected**
+    - _Req: NFR-2, R1.5_
+  - [x] 9.5 Run full test suite
+    - npm run lint passes
+    - npm run test passes
+    - npm run build succeeds
+    - _Req: NFR-1, NFR-2_
+  - [x] 9.6 Manual QA checklist
+    - Desktop batch flow end-to-end
+    - Mobile batch panel full-screen
+    - Keyboard shortcuts work correctly
+    - Session tags persist across page reloads
+    - Existing single-card flow unchanged
+    - _Req: All_

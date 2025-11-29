@@ -9,6 +9,7 @@ interface SelectionTooltipProps {
   onToStem: () => void
   onToExplanation: () => void
   onToAIDraft: () => void
+  onToAIBatch?: () => void
   onClose: () => void
 }
 
@@ -22,6 +23,7 @@ export function SelectionTooltip({
   onToStem,
   onToExplanation,
   onToAIDraft,
+  onToAIBatch,
   onClose,
 }: SelectionTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -90,11 +92,25 @@ export function SelectionTooltip({
           onClose()
         }}
         className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-        title="Generate with AI"
+        title="Generate 1 MCQ with AI"
       >
         <Sparkles className="w-4 h-4" />
         <span className="hidden sm:inline">AI Draft</span>
       </button>
+      
+      {onToAIBatch && (
+        <button
+          onClick={() => {
+            onToAIBatch()
+            onClose()
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
+          title="Generate up to 5 MCQs with AI"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="hidden sm:inline">AI Batch</span>
+        </button>
+      )}
     </div>
   )
 }
