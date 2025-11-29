@@ -104,29 +104,18 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
 
   return (
     <div className="w-full">
-      {/* Header with title and year selector */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
           {totalContributions} cards reviewed in {displayYear}
         </h3>
-        {/* Year selector - always render structure, use opacity for hydration safety */}
-        <div className={`flex gap-1 transition-opacity ${isClient ? 'opacity-100' : 'opacity-0'}`}>
-          {availableYears.map(year => (
-            <button
-              key={year}
-              onClick={() => setSelectedYear(year)}
-              disabled={!isClient}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${year === displayYear ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-            >
-              {year}
-            </button>
-          ))}
-        </div>
       </div>
       
-      {/* Centered heatmap container */}
-      <div className="w-full flex justify-center">
-        <div className="inline-block overflow-x-auto">
+      {/* Heatmap + Year selector side by side */}
+      <div className="flex gap-4">
+        {/* Heatmap container */}
+        <div className="flex-1 overflow-x-auto">
+          <div className="inline-flex flex-col min-w-fit">
           {/* Month labels row */}
           <div className="flex">
             <div className="w-[30px] flex-shrink-0" />
@@ -164,8 +153,8 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
             </div>
           </div>
           
-          {/* Legend - centered under the grid */}
-          <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          {/* Legend - right aligned under the grid */}
+          <div className="flex items-center justify-end gap-2 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
             <span>Less</span>
             <div className="flex gap-[2px]">
               <div className={`w-[10px] h-[10px] rounded-sm ${getIntensityClasses(0)}`} />
@@ -175,6 +164,21 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
             </div>
             <span>More</span>
           </div>
+          </div>
+        </div>
+        
+        {/* Year selector on the right - always render, use opacity for hydration safety */}
+        <div className={`flex flex-col gap-1 flex-shrink-0 transition-opacity ${isClient ? 'opacity-100' : 'opacity-0'}`}>
+          {availableYears.map(year => (
+            <button
+              key={year}
+              onClick={() => setSelectedYear(year)}
+              disabled={!isClient}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${year === displayYear ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+              {year}
+            </button>
+          ))}
         </div>
       </div>
     </div>
