@@ -164,8 +164,8 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
             </div>
           </div>
           
-          {/* Legend - aligned with grid, not full width */}
-          <div className="flex items-center justify-end gap-2 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          {/* Legend - centered under the grid */}
+          <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-slate-500 dark:text-slate-400">
             <span>Less</span>
             <div className="flex gap-[2px]">
               <div className={`w-[10px] h-[10px] rounded-sm ${getIntensityClasses(0)}`} />
