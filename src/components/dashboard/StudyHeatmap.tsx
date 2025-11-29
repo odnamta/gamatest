@@ -109,19 +109,19 @@ export function StudyHeatmap({ studyLogs, currentYear }: StudyHeatmapProps) {
         <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
           {totalContributions} cards reviewed in {displayYear}
         </h3>
-        {isClient && (
-          <div className="flex gap-1">
-            {availableYears.map(year => (
-              <button
-                key={year}
-                onClick={() => setSelectedYear(year)}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${year === displayYear ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-              >
-                {year}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Year selector - always render structure, use opacity for hydration safety */}
+        <div className={`flex gap-1 transition-opacity ${isClient ? 'opacity-100' : 'opacity-0'}`}>
+          {availableYears.map(year => (
+            <button
+              key={year}
+              onClick={() => setSelectedYear(year)}
+              disabled={!isClient}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${year === displayYear ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
       </div>
       
       {/* Centered heatmap container */}
