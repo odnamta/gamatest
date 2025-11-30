@@ -29,7 +29,9 @@ import {
   addToSessionCardCount, 
   resetSessionCardCount 
 } from '@/lib/session-hud-storage'
+import { extractCleanPageText } from '@/lib/pdf-text-extraction'
 import type { ProcessedImage } from '@/lib/image-processing'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 // Dynamic import PDFViewer to avoid SSR issues with react-pdf
 const PDFViewer = dynamic(
@@ -117,6 +119,9 @@ export default function BulkImportPage() {
 
   // V6.2: Scroll position preservation
   const [savedScrollPosition, setSavedScrollPosition] = useState(0)
+
+  // V6.3: Page Scanner state
+  const [isPageScanning, setIsPageScanning] = useState(false)
 
   // Refs for form fields
   const stemRef = useRef<HTMLTextAreaElement>(null)
@@ -379,6 +384,61 @@ export default function BulkImportPage() {
     }
     pdfContainerRef.current?.focus()
   }, [linkedSource?.id])
+
+  // V6.3: Handle "Scan Full Page" button click
+  const handleScanPage = useCallback(async (pdfDocument: PDFDocumentProxy, pageNumber: number) => {
+    const now = Date.now()
+    if (now - lastBatchTime < RATE_LIMIT_MS) {
+      showToast('Please wait a moment before scanning again', 'error')
+      return
+    }
+
+    // Save scroll position before opening modal
+    if (pdfContainerRef.current) {
+      setSavedScrollPosition(pdfContainerRef.current.scrollTop)
+    }
+
+    setIsPageScanning(true)
+    setLastBatchTime(now)
+
+    try {
+      // Extract and clean text from the current page
+      const pageText = await extractCleanPageText(pdfDocument, pageNumber)
+      
+      if (!pageText || pageText.length < 50) {
+        showToast('Not enough text on this page to generate MCQs', 'info')
+        setIsPageScanning(false)
+        return
+      }
+
+      // Call batch draft with extracted text
+      const result = await draftBatchMCQFromText({
+        deckId,
+        text: pageText,
+        defaultTags: sessionTagNames,
+        mode: aiMode,
+        imageBase64: processedImage?.base64 || undefined,
+      })
+
+      if (result.ok) {
+        if (result.drafts.length === 0) {
+          showToast('No MCQs could be generated from this page. Try a different page.', 'info')
+        } else {
+          const uiDrafts = toUIFormatArray(result.drafts)
+          setBatchDrafts(uiDrafts)
+          setIsBatchPanelOpen(true)
+          showToast(`Generated ${result.drafts.length} MCQ drafts from page ${pageNumber}!`, 'success')
+        }
+      } else {
+        showToast(result.error.message || 'Failed to generate drafts', 'error')
+      }
+    } catch (err) {
+      console.error('Page scan error:', err)
+      showToast('Failed to extract text from page. Please try again.', 'error')
+    } finally {
+      setIsPageScanning(false)
+    }
+  }, [lastBatchTime, deckId, sessionTagNames, aiMode, processedImage, showToast])
 
 
   // V6: Hotkeys integration
@@ -760,10 +820,12 @@ export default function BulkImportPage() {
                   fileUrl={linkedSource.fileUrl}
                   fileId={linkedSource.id}
                   onTextSelect={handlePdfTextSelect}
+                  onScanPage={handleScanPage}
+                  isScanning={isPageScanning}
                 />
               </div>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                Select text in the PDF to copy it to the form or generate an AI draft.
+                Select text or click &quot;Scan Page&quot; to generate MCQs with AI.
               </p>
             </>
           ) : (

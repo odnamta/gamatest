@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
-import { ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw, FileText } from 'lucide-react'
 import { savePdfPage, getPdfPage } from '@/lib/pdf-state'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 // Only import TextLayer CSS - we disable AnnotationLayer to prevent
 // visual corruption from highlight annotations in some PDFs (e.g., LANGE QnA)
@@ -17,17 +18,28 @@ interface PDFViewerProps {
   fileUrl: string
   fileId: string
   onTextSelect?: (text: string, position: { x: number; y: number }) => void
+  /** V6.3: Callback when user clicks "Scan Full Page" button */
+  onScanPage?: (pdfDocument: PDFDocumentProxy, pageNumber: number) => void
+  /** V6.3: Whether page scan is in progress */
+  isScanning?: boolean
 }
 
 /**
  * PDFViewer - Integrated PDF viewer with text selection support
  * Requirements: V5 Feature Set 2 - Req 2.1-2.4
+ * V6.3: Added Page Scanner support
  * 
  * IMPORTANT: Do NOT apply global CSS to canvas elements or .react-pdf__Page.
  * The text layer alignment depends on react-pdf controlling the canvas size.
  * Use the `width` prop on <Page> for responsive sizing instead of CSS overrides.
  */
-export function PDFViewer({ fileUrl, fileId, onTextSelect }: PDFViewerProps) {
+export function PDFViewer({ 
+  fileUrl, 
+  fileId, 
+  onTextSelect,
+  onScanPage,
+  isScanning = false,
+}: PDFViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined)
   const [numPages, setNumPages] = useState<number>(0)
@@ -36,6 +48,8 @@ export function PDFViewer({ fileUrl, fileId, onTextSelect }: PDFViewerProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
+  // V6.3: Store PDF document reference for page scanning
+  const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null)
 
   // Measure container width for responsive PDF sizing
   useEffect(() => {
@@ -70,8 +84,9 @@ export function PDFViewer({ fileUrl, fileId, onTextSelect }: PDFViewerProps) {
     setNumPages(0)
   }, [fileUrl])
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages)
+  const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
+    setNumPages(pdf.numPages)
+    setPdfDocument(pdf)
     setIsLoading(false)
     setError(null)
   }, [])
@@ -119,6 +134,13 @@ export function PDFViewer({ fileUrl, fileId, onTextSelect }: PDFViewerProps) {
       y: rect.top,
     })
   }, [onTextSelect])
+
+  // V6.3: Handle "Scan Full Page" button click
+  const handleScanPage = useCallback(() => {
+    if (pdfDocument && onScanPage) {
+      onScanPage(pdfDocument, pageNumber)
+    }
+  }, [pdfDocument, pageNumber, onScanPage])
 
   // Guard: no fileUrl provided
   if (!fileUrl) {
@@ -200,28 +222,54 @@ export function PDFViewer({ fileUrl, fileId, onTextSelect }: PDFViewerProps) {
 
       {/* Navigation controls */}
       {!isLoading && numPages > 0 && (
-        <div className="flex items-center justify-center gap-4 py-3 border-t border-slate-200 dark:border-slate-700">
-          <button
-            onClick={goToPrevPage}
-            disabled={pageNumber <= 1}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          
-          <span className="text-sm text-slate-600 dark:text-slate-400">
-            Page {pageNumber} of {numPages}
-          </span>
-          
-          <button
-            onClick={goToNextPage}
-            disabled={pageNumber >= numPages}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            aria-label="Next page"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+        <div className="flex items-center justify-between py-3 border-t border-slate-200 dark:border-slate-700 px-2">
+          {/* Page navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToPrevPage}
+              disabled={pageNumber <= 1}
+              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            <span className="text-sm text-slate-600 dark:text-slate-400 min-w-[100px] text-center">
+              Page {pageNumber} of {numPages}
+            </span>
+            
+            <button
+              onClick={goToNextPage}
+              disabled={pageNumber >= numPages}
+              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* V6.3: Scan Full Page button */}
+          {onScanPage && (
+            <button
+              onClick={handleScanPage}
+              disabled={isScanning || !pdfDocument}
+              className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+              aria-label="Scan full page for MCQs"
+              title="Extract all text from this page and generate MCQs"
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="hidden sm:inline">Scanning...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Scan Page</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
     </div>

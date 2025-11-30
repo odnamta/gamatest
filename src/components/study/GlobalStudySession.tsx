@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Flashcard } from './Flashcard'
 import { MCQQuestion } from './MCQQuestion'
 import { RatingButtons } from './RatingButtons'
@@ -13,6 +13,10 @@ import {
 } from '@/lib/session-state'
 import { useToast } from '@/components/ui/Toast'
 import type { Card, MCQCard } from '@/types/database'
+
+// V6.3: Auto-advance localStorage key
+const AUTO_ADVANCE_KEY = 'study-auto-advance'
+const AUTO_ADVANCE_DELAY = 1500 // 1.5 seconds
 
 export interface GlobalStudySessionProps {
   initialCards: Card[]
@@ -57,6 +61,36 @@ export function GlobalStudySession({
   // MCQ-specific state
   const [isAnswered, setIsAnswered] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
+  // V6.3: Auto-advance state
+  const [autoAdvance, setAutoAdvance] = useState(false)
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Load auto-advance preference on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(AUTO_ADVANCE_KEY)
+      setAutoAdvance(saved === 'true')
+    }
+  }, [])
+
+  // Save auto-advance preference when changed
+  const toggleAutoAdvance = useCallback(() => {
+    setAutoAdvance(prev => {
+      const newValue = !prev
+      localStorage.setItem(AUTO_ADVANCE_KEY, String(newValue))
+      return newValue
+    })
+  }, [])
+
+  // Clear auto-advance timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current)
+      }
+    }
+  }, [])
 
   // Use sessionCards (fixed at mount) instead of initialCards (may change)
   const currentCard = sessionCards[currentIndex] || null
@@ -159,6 +193,13 @@ export function GlobalStudySession({
     if (!result.success) {
       setError(result.error || 'Failed to rate card')
     }
+
+    // V6.3: Auto-advance after delay if enabled
+    if (autoAdvance) {
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        moveToNext()
+      }, AUTO_ADVANCE_DELAY)
+    }
   }
 
   // Handle MCQ continue (after viewing explanation)
@@ -180,14 +221,51 @@ export function GlobalStudySession({
     )
   }
 
+  // Calculate progress percentage
+  const progressPercent = sessionCardCount > 0 
+    ? ((currentIndex + 1) / sessionCardCount) * 100 
+    : 0
+
   return (
     <div>
-      {/* Progress indicator - uses fixed sessionCardCount, not mutable props */}
-      <div className="mb-6 text-center">
-        <span className="text-sm text-slate-600 dark:text-slate-400">
-          Card {currentIndex + 1} of {sessionCardCount}
-          {remainingInBatch > 0 && ` • ${remainingInBatch} remaining in batch`}
-        </span>
+      {/* V6.3: Progress header with auto-advance toggle */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-slate-600 dark:text-slate-400">
+            Card {currentIndex + 1} of {sessionCardCount}
+            {remainingInBatch > 0 && ` • ${remainingInBatch} remaining`}
+          </span>
+          
+          {/* Auto-advance toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-slate-500 dark:text-slate-400">Auto-advance</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoAdvance}
+              onClick={toggleAutoAdvance}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                autoAdvance 
+                  ? 'bg-blue-600' 
+                  : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  autoAdvance ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </label>
+        </div>
+        
+        {/* V6.3: Visual progress bar */}
+        <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       {/* Error display */}

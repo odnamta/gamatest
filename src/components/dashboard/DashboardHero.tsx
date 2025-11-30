@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Flame, Play, RotateCcw } from 'lucide-react'
+import { Flame, Play, RotateCcw, Settings } from 'lucide-react'
+import { ConfigureSessionModal } from '@/components/study/ConfigureSessionModal'
 
 /**
  * Session state stored in localStorage for resume capability.
@@ -75,6 +76,8 @@ export function DashboardHero({
   userName,
 }: DashboardHeroProps) {
   const [hasUnfinishedSession, setHasUnfinishedSession] = useState(false)
+  // V6.3: Custom session modal state
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false)
 
   // Check for unfinished session on mount (client-side only)
   useEffect(() => {
@@ -174,25 +177,44 @@ export function DashboardHero({
         </div>
       ) : (
         /* Primary CTA - Requirements 1.6, 1.8, 7.2 */
-        <Link href="/study/global" className="block">
+        <div className="space-y-3">
+          <Link href="/study/global" className="block">
+            <Button
+              size="lg"
+              className="w-full min-h-[44px] text-lg"
+            >
+              {hasUnfinishedSession ? (
+                <>
+                  <RotateCcw className="w-5 h-5 mr-2" />
+                  Resume Session
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 mr-2" />
+                  Start Today&apos;s Session
+                </>
+              )}
+            </Button>
+          </Link>
+          
+          {/* V6.3: Custom Session button */}
           <Button
+            variant="secondary"
             size="lg"
-            className="w-full min-h-[44px] text-lg"
+            className="w-full min-h-[44px]"
+            onClick={() => setIsCustomModalOpen(true)}
           >
-            {hasUnfinishedSession ? (
-              <>
-                <RotateCcw className="w-5 h-5 mr-2" />
-                Resume Session
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5 mr-2" />
-                Start Today&apos;s Session
-              </>
-            )}
+            <Settings className="w-5 h-5 mr-2" />
+            Custom Session
           </Button>
-        </Link>
+        </div>
       )}
+
+      {/* V6.3: Configure Session Modal */}
+      <ConfigureSessionModal
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+      />
     </Card>
   )
 }

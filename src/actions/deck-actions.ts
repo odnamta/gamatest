@@ -100,3 +100,30 @@ export async function deleteDeckAction(deckId: string): Promise<ActionResult> {
 
   return { success: true }
 }
+
+
+/**
+ * Server Action for fetching all user's decks.
+ * V6.3: Used by ConfigureSessionModal for deck selection.
+ */
+export async function getUserDecks(): Promise<{ id: string; title: string }[]> {
+  const user = await getUser()
+  if (!user) {
+    return []
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  const { data, error } = await supabase
+    .from('decks')
+    .select('id, title')
+    .eq('user_id', user.id)
+    .order('title', { ascending: true })
+
+  if (error) {
+    console.error('Failed to fetch user decks:', error)
+    return []
+  }
+
+  return data || []
+}
