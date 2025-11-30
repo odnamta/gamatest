@@ -4,14 +4,16 @@ import { Button } from '@/components/ui/Button'
 import { ArrowDown } from 'lucide-react'
 
 /**
- * Target fields for text selection copy (A-D options for medical exams)
+ * Target fields for text selection copy (A-E options for medical exams)
+ * V6.6: Added optionE support
  */
-export type TargetField = 'stem' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'explanation'
+export type TargetField = 'stem' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'optionE' | 'explanation'
 
 /**
  * Field sequence for auto-focus navigation
+ * V6.6: Added optionE between optionD and explanation
  */
-export const FIELD_SEQUENCE: TargetField[] = ['stem', 'optionA', 'optionB', 'optionC', 'optionD', 'explanation']
+export const FIELD_SEQUENCE: TargetField[] = ['stem', 'optionA', 'optionB', 'optionC', 'optionD', 'optionE', 'explanation']
 
 /**
  * Gets the next field in the sequence for auto-focus.
@@ -121,6 +123,13 @@ export function TextSelectionToolbar({
         className={secondaryClass}
       >
         To Option D
+      </button>
+      <button
+        type="button"
+        onClick={() => handleCopyClick('optionE')}
+        className={secondaryClass}
+      >
+        To Option E
       </button>
 
       {/* To Explanation */}

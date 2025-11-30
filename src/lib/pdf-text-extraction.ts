@@ -115,3 +115,50 @@ export async function extractCleanPageText(
   const rawText = await extractPageText(pdfDocument, pageNumber)
   return cleanPageText(rawText)
 }
+
+
+/**
+ * V6.6: Page entry for combining multiple pages
+ */
+export interface PageTextEntry {
+  pageNumber: number
+  text: string
+}
+
+/**
+ * V6.6: Combine text from multiple pages with clear separators.
+ * Used by Context Stitcher feature for handling questions spanning page breaks.
+ * 
+ * @param pages - Array of page entries with pageNumber and text
+ * @returns Combined text with `\n\n--- Page X ---\n` separators
+ */
+export function combinePageTexts(pages: PageTextEntry[]): string {
+  if (pages.length === 0) {
+    return ''
+  }
+  
+  if (pages.length === 1) {
+    return pages[0].text
+  }
+  
+  // Sort by page number to ensure correct order
+  const sortedPages = [...pages].sort((a, b) => a.pageNumber - b.pageNumber)
+  
+  // Combine with separators
+  return sortedPages
+    .map((page, index) => {
+      if (index === 0) {
+        return page.text
+      }
+      return `\n\n--- Page ${page.pageNumber} ---\n${page.text}`
+    })
+    .join('')
+}
+
+/**
+ * V6.6: Check if a page number is the last page of a PDF.
+ * Used to disable "Append Next Page" and "Include Next Page" controls.
+ */
+export function isLastPage(pdfDocument: PDFDocumentProxy, pageNumber: number): boolean {
+  return pageNumber >= pdfDocument.numPages
+}

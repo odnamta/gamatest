@@ -38,18 +38,21 @@ export type DraftMCQInput = z.infer<typeof draftMCQInputSchema>
 /**
  * Schema for MCQ draft returned by OpenAI.
  * Validates the JSON structure matches our expected format.
+ * V6.6: Added optional tags field for AI-generated concept tags
  */
 export const mcqDraftSchema = z.object({
   stem: z.string().min(10, 'Question stem is too short'),
   options: z
     .array(z.string().min(1, 'Option cannot be empty'))
-    .length(5, 'Must have exactly 5 options (A-E)'),
+    .min(2, 'Must have at least 2 options')
+    .max(5, 'Must have at most 5 options (A-E)'),
   correct_index: z
     .number()
     .int('Correct index must be an integer')
     .min(0, 'Correct index must be 0-4')
     .max(4, 'Correct index must be 0-4'),
   explanation: z.string().min(10, 'Explanation is too short'),
+  tags: z.array(z.string()).optional(), // V6.6: AI-generated concept tags
 })
 
 export type MCQDraft = z.infer<typeof mcqDraftSchema>

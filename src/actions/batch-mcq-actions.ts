@@ -34,8 +34,17 @@ CRITICAL DATA INTEGRITY RULES:
    - Preserve exact wording for medical terminology and values.`
 
 /**
+ * V6.6: Vision priority instruction - when image is provided
+ */
+const VISION_PRIORITY_INSTRUCTION = `
+IF an image is provided, treat it as primary. The text may just be background.
+Prefer questions that clearly come from the image.
+If NO question is visible, say so instead of inventing one.`
+
+/**
  * System prompt for EXTRACT mode (Q&A sources) - batch version.
  * V6.2: Extracts existing MCQs verbatim from Q&A text.
+ * V6.6: Added Vision priority instruction
  */
 const BATCH_EXTRACT_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
 Your task is to EXTRACT existing multiple-choice questions from the provided text.
@@ -54,6 +63,7 @@ EXTRACTION RULES:
 - Do NOT create new questions or add options that aren't clearly present in the text.
 - If the text contains questions with fewer than 5 options, that's fine (2-5 options allowed).
 - If no clear MCQs are found, return {"questions": []}.
+${VISION_PRIORITY_INSTRUCTION}
 ${DATA_INTEGRITY_RULES}
 
 Example response format:
@@ -95,6 +105,7 @@ GENERATION RULES:
 - Distractors must not contradict medical facts stated in the passage.
 - Write at board exam difficulty level.
 - If the text doesn't contain enough content for MCQs, return {"questions": []}.
+${VISION_PRIORITY_INSTRUCTION}
 ${DATA_INTEGRITY_RULES}
 
 Example response format:
@@ -201,6 +212,15 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
   }
   
   const { text, defaultTags, mode = 'extract', imageBase64, imageUrl } = validationResult.data
+  
+  // V6.6: Debug logging for image presence
+  if (imageBase64 || imageUrl) {
+    console.log('[draftBatchMCQFromText] Image provided:', {
+      hasBase64: !!imageBase64,
+      base64Length: imageBase64?.length || 0,
+      hasUrl: !!imageUrl,
+    })
+  }
   
   try {
     // Build message content (with optional image for Vision MVP)

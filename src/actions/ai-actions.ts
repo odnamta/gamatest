@@ -26,38 +26,59 @@ CRITICAL DATA INTEGRITY RULES:
    - Preserve exact wording for medical terminology and values.`
 
 /**
+ * V6.6: Tag generation instruction - shared across modes
+ */
+const TAG_GENERATION_INSTRUCTION = `
+- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
+  - Format: Use PascalCase without spaces (e.g., GestationalDiabetes, PregnancyInducedHypertension)
+  - Do NOT generate structural tags (e.g., Chapter1, Lange, Section2) - these are handled separately`
+
+/**
+ * V6.6: Vision priority instruction - when image is provided
+ */
+const VISION_PRIORITY_INSTRUCTION = `
+IF an image is provided, treat it as primary. The text may just be background.
+Prefer questions that clearly come from the image.
+If NO question is visible, say so instead of inventing one.`
+
+/**
  * System prompt for EXTRACT mode (Q&A sources).
  * V6.2: Extracts existing MCQs verbatim from Q&A text.
+ * V6.6: Added tags field and Vision priority
  */
 const EXTRACT_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
 Your task is to EXTRACT an existing multiple-choice question from the provided text.
 
 Return valid JSON with these exact fields:
 - stem: The question text (extracted verbatim, fix obvious OCR spacing only)
-- options: Array of exactly 5 answer choices (A through E) - extracted verbatim
-- correct_index: Index of correct answer (0-4)
+- options: Array of 2-5 answer choices - extracted verbatim (do not pad if fewer than 5)
+- correct_index: Index of correct answer (0-based)
 - explanation: The explanation from the source, or a brief teaching point if none provided
+${TAG_GENERATION_INSTRUCTION}
 
 EXTRACTION RULES:
 - Identify any existing multiple-choice question already present in the selected text.
 - Extract the question stem and options VERBATIM (fix obvious OCR spacing only).
 - Do NOT create new questions or add options that aren't clearly present in the text.
-- If the text contains a question with fewer than 5 options, pad with "Not applicable" options.
+- If the text contains a question with fewer than 5 options, extract only the options present.
 - If no clear MCQ is found, return the closest question-like content.
+${VISION_PRIORITY_INSTRUCTION}
 ${DATA_INTEGRITY_RULES}`
 
 /**
  * System prompt for GENERATE mode (Textbook sources).
  * V6.2: Creates new MCQs from textbook content.
+ * V6.6: Added tags field and Vision priority
  */
 const GENERATE_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
 Your task is to CREATE ONE new high-yield board-style MCQ from the provided textbook passage.
 
 Return valid JSON with these exact fields:
 - stem: The question text (clinical vignette or direct question)
-- options: Array of exactly 5 answer choices (A through E)
-- correct_index: Index of correct answer (0-4)
+- options: Array of 4-5 answer choices (A through D or E)
+- correct_index: Index of correct answer (0-based)
 - explanation: Concise teaching explanation for why the answer is correct
+${TAG_GENERATION_INSTRUCTION}
 
 GENERATION RULES:
 - Read the textbook-like passage carefully.
@@ -67,6 +88,7 @@ GENERATION RULES:
 - Invent plausible distractors (wrong answers), but they must still be conceptually related to the passage.
 - Distractors must not contradict medical facts stated in the passage.
 - Write at board exam difficulty level.
+${VISION_PRIORITY_INSTRUCTION}
 ${DATA_INTEGRITY_RULES}`
 
 /**
@@ -158,6 +180,15 @@ export async function draftMCQFromText(input: DraftMCQInput): Promise<MCQDraftRe
   }
   
   const { sourceText, deckName, mode = 'extract', imageBase64, imageUrl } = validationResult.data
+  
+  // V6.6: Debug logging for image presence
+  if (imageBase64 || imageUrl) {
+    console.log('[draftMCQFromText] Image provided:', {
+      hasBase64: !!imageBase64,
+      base64Length: imageBase64?.length || 0,
+      hasUrl: !!imageUrl,
+    })
+  }
   
   try {
     // Build message content (with optional image for Vision MVP)

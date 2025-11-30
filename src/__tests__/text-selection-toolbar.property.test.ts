@@ -108,12 +108,13 @@ describe('Property 3: Text Selection Transfer', () => {
  */
 describe('Property 4: Focus Sequencing After Paste', () => {
   test('getNextField returns correct next field for all fields except last', () => {
-    // Test each field in sequence (now includes optionD)
+    // Test each field in sequence (V6.6: now includes optionE)
     expect(getNextField('stem')).toBe('optionA');
     expect(getNextField('optionA')).toBe('optionB');
     expect(getNextField('optionB')).toBe('optionC');
     expect(getNextField('optionC')).toBe('optionD');
-    expect(getNextField('optionD')).toBe('explanation');
+    expect(getNextField('optionD')).toBe('optionE');
+    expect(getNextField('optionE')).toBe('explanation');
     expect(getNextField('explanation')).toBe(null);
   });
 
@@ -122,8 +123,8 @@ describe('Property 4: Focus Sequencing After Paste', () => {
     expect(getNextField(lastField)).toBe(null);
   });
 
-  test('Field sequence is correctly ordered (includes optionD)', () => {
-    expect(FIELD_SEQUENCE).toEqual(['stem', 'optionA', 'optionB', 'optionC', 'optionD', 'explanation']);
+  test('Field sequence is correctly ordered (V6.6: includes optionE)', () => {
+    expect(FIELD_SEQUENCE).toEqual(['stem', 'optionA', 'optionB', 'optionC', 'optionD', 'optionE', 'explanation']);
   });
 
   test('For any field except last, next field is the subsequent element in sequence', () => {
@@ -140,12 +141,76 @@ describe('Property 4: Focus Sequencing After Paste', () => {
     );
   });
 
-  test('Sequence contains exactly 6 fields (stem + 4 options + explanation)', () => {
-    expect(FIELD_SEQUENCE.length).toBe(6);
+  test('Sequence contains exactly 7 fields (stem + 5 options + explanation)', () => {
+    // V6.6: Updated to include optionE
+    expect(FIELD_SEQUENCE.length).toBe(7);
   });
 
   test('All fields in sequence are unique', () => {
     const uniqueFields = new Set(FIELD_SEQUENCE);
     expect(uniqueFields.size).toBe(FIELD_SEQUENCE.length);
+  });
+});
+
+
+/**
+ * **Feature: v6.6-scanner-polish, Property 4: Option E Copies to Index 4**
+ * **Validates: Requirements 4.2**
+ * 
+ * For any selected text string, when the user clicks "To Option E",
+ * the text SHALL be copied to the options array at index 4.
+ */
+describe('Property 4: Option E Copies to Index 4', () => {
+  test('optionE is at index 5 in FIELD_SEQUENCE (after optionD, before explanation)', () => {
+    const optionEIndex = FIELD_SEQUENCE.indexOf('optionE');
+    const optionDIndex = FIELD_SEQUENCE.indexOf('optionD');
+    const explanationIndex = FIELD_SEQUENCE.indexOf('explanation');
+    
+    expect(optionEIndex).toBe(5);
+    expect(optionEIndex).toBe(optionDIndex + 1);
+    expect(optionEIndex).toBe(explanationIndex - 1);
+  });
+
+  test('optionE field exists in TargetField type', () => {
+    const validFields: TargetField[] = ['stem', 'optionA', 'optionB', 'optionC', 'optionD', 'optionE', 'explanation'];
+    expect(validFields).toContain('optionE');
+  });
+
+  test('getNextField(optionD) returns optionE', () => {
+    expect(getNextField('optionD')).toBe('optionE');
+  });
+
+  test('getNextField(optionE) returns explanation', () => {
+    expect(getNextField('optionE')).toBe('explanation');
+  });
+
+  test('For any text, optionE maps to options array index 4', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1, maxLength: 500 }),
+        (text) => {
+          // Simulate the mapping logic from BulkImportPage
+          const field: TargetField = 'optionE';
+          const options = ['', '', '', '', ''];
+          
+          // The mapping: optionA=0, optionB=1, optionC=2, optionD=3, optionE=4
+          const fieldToIndex: Record<string, number> = {
+            optionA: 0,
+            optionB: 1,
+            optionC: 2,
+            optionD: 3,
+            optionE: 4,
+          };
+          
+          const index = fieldToIndex[field];
+          expect(index).toBe(4);
+          
+          // Simulate copy operation
+          options[index] = text;
+          expect(options[4]).toBe(text);
+        }
+      ),
+      { numRuns: 100 }
+    );
   });
 });

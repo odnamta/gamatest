@@ -29,7 +29,7 @@ import {
   addToSessionCardCount, 
   resetSessionCardCount 
 } from '@/lib/session-hud-storage'
-import { extractCleanPageText } from '@/lib/pdf-text-extraction'
+import { extractCleanPageText, combinePageTexts } from '@/lib/pdf-text-extraction'
 import type { ProcessedImage } from '@/lib/image-processing'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 
@@ -122,6 +122,14 @@ export default function BulkImportPage() {
 
   // V6.3: Page Scanner state
   const [isPageScanning, setIsPageScanning] = useState(false)
+
+  // V6.6: Context Stitcher state
+  const [includeNextPage, setIncludeNextPage] = useState(false)
+  const [isAppending, setIsAppending] = useState(false)
+  const [stitchedText, setStitchedText] = useState('')
+
+  // V6.6: AI-generated tags for single draft
+  const [aiTagNames, setAiTagNames] = useState<string[]>([])
 
   // Refs for form fields
   const stemRef = useRef<HTMLTextAreaElement>(null)
@@ -270,9 +278,16 @@ export default function BulkImportPage() {
 
       if (result.ok) {
         setQuestionStem(result.draft.stem)
-        setOptions(result.draft.options)
+        // V6.6: Pad options to 5 if fewer returned
+        const paddedOptions = [...result.draft.options]
+        while (paddedOptions.length < 5) {
+          paddedOptions.push('')
+        }
+        setOptions(paddedOptions)
         setCorrectIndex(result.draft.correct_index)
         setExplanation(result.draft.explanation)
+        // V6.6: Set AI-generated tags
+        setAiTagNames(result.draft.tags || [])
         setCurrentStep(3)
         showToast('MCQ draft generated! Review and edit before saving.', 'success')
       } else {
@@ -300,8 +315,12 @@ export default function BulkImportPage() {
   }, [])
 
   // V6: Handle "AI Batch Draft" from PDF selection
+  // V6.6: Added consistent warning when no selection
   const handlePdfToAIBatch = useCallback(async () => {
-    if (!pdfSelection) return
+    if (!pdfSelection) {
+      showToast('Select text in the left box first.', 'error')
+      return
+    }
     
     const selectedText = pdfSelection.text
     const now = Date.now()
@@ -386,6 +405,7 @@ export default function BulkImportPage() {
   }, [linkedSource?.id])
 
   // V6.3: Handle "Scan Full Page" button click
+  // V6.6: Updated to support includeNextPage mode
   const handleScanPage = useCallback(async (pdfDocument: PDFDocumentProxy, pageNumber: number) => {
     const now = Date.now()
     if (now - lastBatchTime < RATE_LIMIT_MS) {
@@ -402,10 +422,21 @@ export default function BulkImportPage() {
     setLastBatchTime(now)
 
     try {
-      // Extract and clean text from the current page
+      // V6.6: Extract text from current page (and optionally next page)
       const pageText = await extractCleanPageText(pdfDocument, pageNumber)
       
-      if (!pageText || pageText.length < 50) {
+      let combinedText = pageText
+      
+      // V6.6: If includeNextPage is checked and not on last page, combine both pages
+      if (includeNextPage && pageNumber < pdfDocument.numPages) {
+        const nextPageText = await extractCleanPageText(pdfDocument, pageNumber + 1)
+        combinedText = combinePageTexts([
+          { pageNumber, text: pageText },
+          { pageNumber: pageNumber + 1, text: nextPageText },
+        ])
+      }
+      
+      if (!combinedText || combinedText.length < 50) {
         showToast('Not enough text on this page to generate MCQs', 'info')
         setIsPageScanning(false)
         return
@@ -414,7 +445,7 @@ export default function BulkImportPage() {
       // Call batch draft with extracted text
       const result = await draftBatchMCQFromText({
         deckId,
-        text: pageText,
+        text: combinedText,
         defaultTags: sessionTagNames,
         mode: aiMode,
         imageBase64: processedImage?.base64 || undefined,
@@ -427,7 +458,10 @@ export default function BulkImportPage() {
           const uiDrafts = toUIFormatArray(result.drafts)
           setBatchDrafts(uiDrafts)
           setIsBatchPanelOpen(true)
-          showToast(`Generated ${result.drafts.length} MCQ drafts from page ${pageNumber}!`, 'success')
+          const pageLabel = includeNextPage && pageNumber < pdfDocument.numPages 
+            ? `pages ${pageNumber}-${pageNumber + 1}` 
+            : `page ${pageNumber}`
+          showToast(`Generated ${result.drafts.length} MCQ drafts from ${pageLabel}!`, 'success')
         }
       } else {
         showToast(result.error.message || 'Failed to generate drafts', 'error')
@@ -438,7 +472,38 @@ export default function BulkImportPage() {
     } finally {
       setIsPageScanning(false)
     }
-  }, [lastBatchTime, deckId, sessionTagNames, aiMode, processedImage, showToast])
+  }, [lastBatchTime, deckId, sessionTagNames, aiMode, processedImage, includeNextPage, showToast])
+
+  // V6.6: Handle "Append Next Page" button click
+  const handleAppendNextPage = useCallback(async (pdfDocument: PDFDocumentProxy, nextPageNumber: number) => {
+    setIsAppending(true)
+    
+    try {
+      const nextPageText = await extractCleanPageText(pdfDocument, nextPageNumber)
+      
+      if (!nextPageText || nextPageText.trim().length === 0) {
+        showToast('No text found on the next page', 'info')
+        return
+      }
+      
+      // Append to textarea with separator
+      const separator = `\n\n--- Page ${nextPageNumber} ---\n`
+      const currentText = textAreaRef.current?.value || stitchedText
+      const newText = currentText + separator + nextPageText
+      
+      setStitchedText(newText)
+      if (textAreaRef.current) {
+        textAreaRef.current.value = newText
+      }
+      
+      showToast(`Appended text from page ${nextPageNumber}`, 'success')
+    } catch (err) {
+      console.error('Append page error:', err)
+      showToast('Failed to extract text from next page', 'error')
+    } finally {
+      setIsAppending(false)
+    }
+  }, [stitchedText, showToast])
 
 
   // V6: Hotkeys integration
@@ -488,6 +553,7 @@ export default function BulkImportPage() {
   ])
 
   // Handle copy to field from toolbar
+  // V6.6: Added optionE support
   const handleCopyToField = useCallback((field: TargetField, text: string) => {
     switch (field) {
       case 'stem':
@@ -505,6 +571,9 @@ export default function BulkImportPage() {
       case 'optionD':
         setOptions(prev => { const next = [...prev]; next[3] = text; return next })
         break
+      case 'optionE':
+        setOptions(prev => { const next = [...prev]; next[4] = text; return next })
+        break
       case 'explanation':
         setExplanation(text)
         break
@@ -520,6 +589,7 @@ export default function BulkImportPage() {
       else if (nextField === 'optionB') optionRefs.current[1]?.focus()
       else if (nextField === 'optionC') optionRefs.current[2]?.focus()
       else if (nextField === 'optionD') optionRefs.current[3]?.focus()
+      else if (nextField === 'optionE') optionRefs.current[4]?.focus()
       else if (nextField === 'explanation') explanationRef.current?.focus()
     }, 50)
   }, [showToast])
@@ -562,9 +632,16 @@ export default function BulkImportPage() {
 
       if (result.ok) {
         setQuestionStem(result.draft.stem)
-        setOptions(result.draft.options)
+        // V6.6: Pad options to 5 if fewer returned
+        const paddedOptions = [...result.draft.options]
+        while (paddedOptions.length < 5) {
+          paddedOptions.push('')
+        }
+        setOptions(paddedOptions)
         setCorrectIndex(result.draft.correct_index)
         setExplanation(result.draft.explanation)
+        // V6.6: Set AI-generated tags
+        setAiTagNames(result.draft.tags || [])
         setCurrentStep(3)
         showToast('MCQ draft generated! Review and edit before saving.', 'success')
       } else {
@@ -715,6 +792,10 @@ export default function BulkImportPage() {
             onImageProcessed={setProcessedImage}
             disabled={isGenerating || isBatchGenerating}
           />
+          {/* V6.6: Helper text for Vision usage */}
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Use this when the question or diagram is an IMAGE (e.g. CT, ultrasound, graph). It is not for embedding images into the card.
+          </p>
         </div>
       </div>
 
@@ -822,6 +903,10 @@ export default function BulkImportPage() {
                   onTextSelect={handlePdfTextSelect}
                   onScanPage={handleScanPage}
                   isScanning={isPageScanning}
+                  includeNextPage={includeNextPage}
+                  onIncludeNextPageChange={setIncludeNextPage}
+                  onAppendNextPage={handleAppendNextPage}
+                  isAppending={isAppending}
                 />
               </div>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
@@ -866,6 +951,8 @@ export default function BulkImportPage() {
             explanationRef={explanationRef}
             sessionTagIds={sessionTagIds}
             onSaveSuccess={handleSingleCardSaveSuccess}
+            aiTagNames={aiTagNames}
+            onAiTagNamesChange={setAiTagNames}
           />
         </div>
       </div>
@@ -916,6 +1003,9 @@ interface BulkMCQFormProps {
   explanationRef: React.RefObject<HTMLTextAreaElement | null>
   sessionTagIds?: string[]
   onSaveSuccess?: () => void
+  // V6.6: AI-generated tags
+  aiTagNames?: string[]
+  onAiTagNamesChange?: (tags: string[]) => void
 }
 
 function BulkMCQForm({ 
@@ -933,6 +1023,8 @@ function BulkMCQForm({
   explanationRef,
   sessionTagIds = [],
   onSaveSuccess,
+  aiTagNames = [],
+  onAiTagNamesChange,
 }: BulkMCQFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -1082,6 +1174,41 @@ function BulkMCQForm({
           className="w-full min-h-[80px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
         />
       </div>
+
+      {/* V6.6: AI-generated tags display */}
+      {aiTagNames.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            AI Tags
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {aiTagNames.map((tag, index) => (
+              <span
+                key={`ai-${tag}-${index}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newTags = aiTagNames.filter((_, i) => i !== index)
+                    onAiTagNamesChange?.(newTags)
+                  }}
+                  className="hover:text-purple-900 dark:hover:text-purple-100"
+                  aria-label={`Remove tag ${tag}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            AI-suggested concept tags (click × to remove)
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>

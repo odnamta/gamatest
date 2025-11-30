@@ -96,11 +96,11 @@ describe('Property 2: Invalid Response Returns PARSE_ERROR', () => {
   });
 
   test('rejects MCQ with wrong number of options', () => {
-    // Test with fewer than 5 options
+    // V6.6: Schema now allows 2-5 options, so test with fewer than 2 options
     fc.assert(
       fc.property(
         fc.string({ minLength: 10 }),
-        fc.array(fc.string({ minLength: 1 }), { minLength: 1, maxLength: 4 }),
+        fc.array(fc.string({ minLength: 1 }), { minLength: 0, maxLength: 1 }),
         fc.integer({ min: 0, max: 4 }),
         fc.string({ minLength: 10 }),
         (stem, options, correct_index, explanation) => {

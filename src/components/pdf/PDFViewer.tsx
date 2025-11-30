@@ -22,6 +22,14 @@ interface PDFViewerProps {
   onScanPage?: (pdfDocument: PDFDocumentProxy, pageNumber: number) => void
   /** V6.3: Whether page scan is in progress */
   isScanning?: boolean
+  /** V6.6: Include next page in scan */
+  includeNextPage?: boolean
+  /** V6.6: Callback when include next page changes */
+  onIncludeNextPageChange?: (value: boolean) => void
+  /** V6.6: Callback to append next page text */
+  onAppendNextPage?: (pdfDocument: PDFDocumentProxy, nextPageNumber: number) => void
+  /** V6.6: Whether append is in progress */
+  isAppending?: boolean
 }
 
 /**
@@ -39,6 +47,10 @@ export function PDFViewer({
   onTextSelect,
   onScanPage,
   isScanning = false,
+  includeNextPage = false,
+  onIncludeNextPageChange,
+  onAppendNextPage,
+  isAppending = false,
 }: PDFViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined)
@@ -141,6 +153,16 @@ export function PDFViewer({
       onScanPage(pdfDocument, pageNumber)
     }
   }, [pdfDocument, pageNumber, onScanPage])
+
+  // V6.6: Handle "Append Next Page" button click
+  const handleAppendNextPage = useCallback(() => {
+    if (pdfDocument && onAppendNextPage && pageNumber < numPages) {
+      onAppendNextPage(pdfDocument, pageNumber + 1)
+    }
+  }, [pdfDocument, pageNumber, numPages, onAppendNextPage])
+
+  // V6.6: Check if on last page (for disabling controls)
+  const isOnLastPage = pageNumber >= numPages
 
   // Guard: no fileUrl provided
   if (!fileUrl) {
@@ -248,27 +270,69 @@ export function PDFViewer({
             </button>
           </div>
 
-          {/* V6.3: Scan Full Page button */}
-          {onScanPage && (
+          {/* V6.6: Append Next Page button */}
+          {onAppendNextPage && (
             <button
-              onClick={handleScanPage}
-              disabled={isScanning || !pdfDocument}
-              className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-              aria-label="Scan full page for MCQs"
-              title="Extract all text from this page and generate MCQs"
+              onClick={handleAppendNextPage}
+              disabled={isAppending || !pdfDocument || isOnLastPage}
+              className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+              aria-label="Append next page text"
+              title={isOnLastPage ? 'Already on last page' : 'Append text from next page'}
             >
-              {isScanning ? (
+              {isAppending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="hidden sm:inline">Scanning...</span>
+                  <span className="hidden sm:inline">Appending...</span>
                 </>
               ) : (
                 <>
-                  <FileText className="w-4 h-4" />
-                  <span className="hidden sm:inline">Scan Page</span>
+                  <span className="text-base">➕</span>
+                  <span className="hidden sm:inline">Append Next</span>
                 </>
               )}
             </button>
+          )}
+
+          {/* V6.3: Scan Full Page button with V6.6 Include Next Page checkbox */}
+          {onScanPage && (
+            <div className="flex items-center gap-2">
+              {/* V6.6: Include Next Page checkbox */}
+              {onIncludeNextPageChange && (
+                <label 
+                  className={`flex items-center gap-1.5 text-xs ${isOnLastPage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  title={isOnLastPage ? 'No next page available' : 'Include text from next page in scan'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeNextPage}
+                    onChange={(e) => onIncludeNextPageChange(e.target.checked)}
+                    disabled={isOnLastPage}
+                    className="w-3.5 h-3.5 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="hidden sm:inline text-slate-600 dark:text-slate-400">+1 Page</span>
+                </label>
+              )}
+              
+              <button
+                onClick={handleScanPage}
+                disabled={isScanning || !pdfDocument}
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                aria-label="Scan full page for MCQs"
+                title="Extract all text from this page and generate MCQs"
+              >
+                {isScanning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Scanning...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4" />
+                    <span className="hidden sm:inline">Scan Page</span>
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </div>
       )}

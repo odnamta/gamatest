@@ -1,0 +1,142 @@
+# Implementation Plan
+
+- [x] 1. Add Option E support to TextSelectionToolbar
+  - [x] 1.1 Extend TargetField type and FIELD_SEQUENCE
+    - Add `optionE` to TargetField union type
+    - Insert `optionE` between `optionD` and `explanation` in FIELD_SEQUENCE
+    - _Requirements: 4.4_
+  - [x] 1.2 Add "To Option E" button to toolbar
+    - Add button with same styling as A-D buttons
+    - Wire up click handler to call `onCopyToField('optionE', text)`
+    - _Requirements: 4.1_
+  - [x] 1.3 Write property test for Option E copy behavior
+    - **Property 4: Option E Copies to Index 4**
+    - **Validates: Requirements 4.2**
+  - [x] 1.4 Update BulkImportPage handleCopyToField
+    - Add case for `optionE` to set `options[4]`
+    - Update optionRefs to include index 4
+    - _Requirements: 4.2, 4.3_
+
+- [x] 2. Extend MCQ draft schema to support tags
+  - [x] 2.1 Update mcqDraftSchema in mcq-draft-schema.ts
+    - Add optional `tags: z.array(z.string()).optional()` field
+    - Update MCQDraft type to include `tags?: string[]`
+    - _Requirements: 7.4_
+  - [x] 2.2 Update draftMCQFromText system prompts
+    - Add tag generation instruction to both EXTRACT and GENERATE prompts
+    - Use same format as batch: "tags: Array of 1-3 MEDICAL CONCEPT tags"
+    - _Requirements: 7.1_
+  - [x] 2.3 Write property test for single draft tags
+    - **Property 5: Single Draft Includes Tags**
+    - **Validates: Requirements 7.1**
+
+- [x] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. Add Vision priority to AI prompts
+  - [x] 4.1 Update system prompts in ai-actions.ts
+    - Add Vision priority instruction when image is provided
+    - "IF an image is provided, treat it as primary..."
+    - _Requirements: 3.1_
+  - [x] 4.2 Update system prompts in batch-mcq-actions.ts
+    - Add same Vision priority instruction to batch prompts
+    - _Requirements: 3.1_
+  - [x] 4.3 Add debug logging for image presence
+    - Log presence and size of imageBase64/imageUrl in both actions
+    - _Requirements: 3.2_
+  - [x] 4.4 Add helper text under ImageDropZone
+    - Display: "Use this when the question or diagram is an IMAGE..."
+    - _Requirements: 3.3_
+
+- [x] 5. Implement Context Stitcher - Append Next Page
+  - [x] 5.1 Add combinePageTexts utility function
+    - Create function in pdf-text-extraction.ts
+    - Accept array of { pageNumber, text } objects
+    - Return combined text with `\n\n--- Page X ---\n` separators
+    - _Requirements: 1.2, 2.3_
+  - [x] 5.2 Write property test for page concatenation format
+    - **Property 1: Page Text Concatenation Format**
+    - **Validates: Requirements 1.2, 2.3**
+  - [x] 5.3 Add Append Next Page button to BulkImportPage
+    - Add button near PDF controls when PDF is linked
+    - Add isAppending state for loading indicator
+    - _Requirements: 1.1, 1.5_
+  - [x] 5.4 Implement handleAppendNextPage handler
+    - Extract text from currentPage + 1 using extractCleanPageText
+    - Append to textarea with separator using combinePageTexts
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x] 5.5 Add last page boundary check
+    - Disable button when currentPage === numPages
+    - Show tooltip "Already on last page"
+    - _Requirements: 1.4_
+  - [x] 5.6 Write property test for last page boundary
+    - **Property 2: Last Page Boundary Disables Controls**
+    - **Validates: Requirements 1.4, 2.4**
+
+- [x] 6. Implement Context Stitcher - Scan Page +1 Mode
+  - [x] 6.1 Add Include Next Page checkbox to BulkImportPage
+    - Add checkbox near Scan Page button
+    - Add includeNextPage state
+    - _Requirements: 2.1_
+  - [x] 6.2 Update handleScanPage to support +1 mode
+    - If includeNextPage is true, extract both pages
+    - Combine using combinePageTexts before passing to batch draft
+    - _Requirements: 2.2, 2.3_
+  - [x] 6.3 Write property test for two-page scan
+    - **Property 3: Two-Page Scan Combines Both Pages**
+    - **Validates: Requirements 2.2**
+  - [x] 6.4 Apply last page boundary to checkbox
+    - Disable checkbox when currentPage === numPages
+    - Show tooltip "No next page available"
+    - _Requirements: 2.4_
+
+- [x] 7. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 8. Implement Single Draft Tag Parity
+  - [x] 8.1 Update BulkMCQForm to accept AI tags
+    - Add aiTagNames prop to BulkMCQForm
+    - Add local state for form tags (merged session + AI)
+    - _Requirements: 7.2_
+  - [x] 8.2 Add TagSelector to BulkMCQForm
+    - Display TagSelector below explanation field
+    - Pre-fill with session tags + AI tags (purple styling for AI)
+    - _Requirements: 7.2_
+  - [x] 8.3 Implement tag deduplication helper
+    - Create mergeTagsWithDeduplication function
+    - Use case-insensitive comparison
+    - _Requirements: 7.3_
+  - [x] 8.4 Write property test for tag deduplication
+    - **Property 6: Tag Deduplication is Case-Insensitive**
+    - **Validates: Requirements 7.3**
+  - [x] 8.5 Wire up AI tags from draftMCQFromText response
+    - Pass draft.tags to BulkMCQForm when AI draft succeeds
+    - Merge with session tags using deduplication helper
+    - _Requirements: 7.1, 7.3_
+
+- [x] 9. Implement Editable Tags in Batch Review
+  - [x] 9.1 Update BatchDraftCard to use TagSelector
+    - Replace read-only tag chips with TagSelector component
+    - Pass sessionTagIds for pre-selection
+    - _Requirements: 8.1_
+  - [x] 9.2 Implement tag change handler in BatchDraftCard
+    - Update draft.aiTags when TagSelector changes
+    - Call onChange with updated draft
+    - _Requirements: 8.2, 8.3_
+  - [x] 9.3 Ensure stable keys for draft list
+    - Use draft.id as key in BatchReviewPanel map
+    - Prevent re-mounting on tag edits
+    - _Requirements: 8.4_
+  - [x] 9.4 Write property test for batch tag persistence
+    - **Property 7: Batch Tag Edits are Persisted**
+    - **Validates: Requirements 8.2, 8.3, 8.5**
+
+- [x] 10. Add warning consistency for AI buttons
+  - [x] 10.1 Update AI Batch Draft no-selection warning
+    - Show "Select text in the left box first." when no selection
+    - Match existing AI Draft warning message
+    - _Requirements: 5.1, 5.2_
+
+- [x] 11. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

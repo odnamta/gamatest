@@ -132,12 +132,12 @@ export function BatchDraftCard({
         />
       </div>
 
-      {/* Tags */}
+      {/* Tags - V6.6: Editable */}
       <div>
         <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
           Tags
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 mb-2">
           {/* Session tags (read-only) */}
           {sessionTagNames.map((tag) => (
             <span
@@ -149,9 +149,9 @@ export function BatchDraftCard({
           ))}
           
           {/* AI tags (removable) */}
-          {draft.aiTags.map((tag) => (
+          {draft.aiTags.map((tag, tagIndex) => (
             <span
-              key={`ai-${tag}`}
+              key={`ai-${tag}-${tagIndex}`}
               className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded"
             >
               {tag}
@@ -172,6 +172,48 @@ export function BatchDraftCard({
             <span className="text-xs text-slate-400">No tags</span>
           )}
         </div>
+        
+        {/* V6.6: Add new tag input */}
+        {draft.include && (
+          <div className="flex gap-1">
+            <input
+              type="text"
+              placeholder="Add tag..."
+              className="flex-1 px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  const input = e.currentTarget
+                  const newTag = input.value.trim()
+                  if (newTag && !draft.aiTags.some(t => t.toLowerCase() === newTag.toLowerCase())) {
+                    onChange({
+                      ...draft,
+                      aiTags: [...draft.aiTags, newTag],
+                    })
+                    input.value = ''
+                  }
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                const newTag = input.value.trim()
+                if (newTag && !draft.aiTags.some(t => t.toLowerCase() === newTag.toLowerCase())) {
+                  onChange({
+                    ...draft,
+                    aiTags: [...draft.aiTags, newTag],
+                  })
+                  input.value = ''
+                }
+              }}
+              className="px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-900/50"
+            >
+              +
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
