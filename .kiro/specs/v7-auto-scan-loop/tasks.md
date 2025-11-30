@@ -1,0 +1,160 @@
+# Implementation Plan
+
+- [x] 1. Core Hook Implementation
+  - [x] 1.1 Create `src/hooks/use-auto-scan.ts` with state management
+    - Define `AutoScanState` interface with isScanning, currentPage, stats, skippedPages, consecutiveErrors
+    - Implement useState for all state fields
+    - Derive localStorage key: `autoscan_state_{deckId}_{sourceId}`
+    - _Requirements: 1.1, 3.1_
+  - [x] 1.2 Implement localStorage persistence layer
+    - Create `saveState()` function to persist on every change
+    - Create `loadState()` function to hydrate on mount
+    - Include `lastUpdated` timestamp
+    - Expose `hasResumableState` boolean
+    - _Requirements: 3.1, 3.2_
+  - [x] 1.3 Write property test for state persistence round-trip
+    - **Property 9: State persistence round-trip**
+    - **Validates: Requirements 3.1**
+  - [x] 1.4 Implement `startScan(startPage?: number)` function
+    - Set `isScanning = true`, `currentPage = startPage || 1`
+    - Initialize stats if fresh start
+    - Kick off first iteration via `setTimeout`
+    - _Requirements: 1.1_
+  - [x] 1.5 Write property test for start initialization
+    - **Property 1: Start initializes scanning state**
+    - **Validates: Requirements 1.1**
+  - [x] 1.6 Implement `processPage(pageNumber)` core function
+    - Guard: exit early if `!isScanning`
+    - Extract text using `extractCleanPageText` from `pdf-text-extraction.ts`
+    - If `includeNextPage` and not last page, use `combinePageTexts`
+    - Call `draftBatchMCQFromText` with aiMode
+    - Call `bulkCreateMCQV2` with sessionTagNames
+    - Update `stats.cardsCreated`
+    - Advance `currentPage++`
+    - Schedule next iteration with 1.5s delay
+    - Stop when `currentPage > totalPages`
+    - _Requirements: 1.2, 1.3, 1.4, 7.1, 7.2, 7.3_
+  - [x] 1.7 Write property test for page advancement
+    - **Property 2: Page advancement after success**
+    - **Validates: Requirements 1.3**
+  - [x] 1.8 Write property test for loop termination
+    - **Property 3: Loop termination at document end**
+    - **Validates: Requirements 1.4**
+  - [x] 1.9 Write property test for include next page
+    - **Property 15: Include next page combines text**
+    - **Validates: Requirements 7.3**
+  - [x] 1.10 Implement retry logic
+    - On failure, retry same page once
+    - Track retry attempt in local variable
+    - After retry fails, push to `skippedPages` with error reason
+    - Increment `consecutiveErrors` on failure, reset on success
+    - _Requirements: 2.1, 2.2_
+  - [x] 1.11 Write property test for single retry
+    - **Property 6: Single retry before skip**
+    - **Validates: Requirements 2.1**
+  - [x] 1.12 Write property test for skipped page recording
+    - **Property 7: Skipped page recording**
+    - **Validates: Requirements 2.2**
+  - [x] 1.13 Implement 3-consecutive-error safety stop
+    - If `consecutiveErrors >= 3`, set `isScanning = false`
+    - Call `onSafetyStop` callback
+    - Preserve all state for review
+    - _Requirements: 2.3, 2.4_
+  - [x] 1.14 Write property test for safety stop
+    - **Property 8: Three-consecutive-error safety stop**
+    - **Validates: Requirements 2.3**
+  - [x] 1.15 Implement `pauseScan()` function
+    - Set `isScanning = false`
+    - Preserve currentPage, stats, skippedPages
+    - _Requirements: 1.5_
+  - [x] 1.16 Write property test for pause
+    - **Property 4: Pause preserves state**
+    - **Validates: Requirements 1.5**
+  - [x] 1.17 Implement `stopScan()` function
+    - Set `isScanning = false`
+    - Retain all statistics
+    - _Requirements: 1.6_
+  - [x] 1.18 Write property test for stop
+    - **Property 5: Stop preserves statistics**
+    - **Validates: Requirements 1.6**
+  - [x] 1.19 Implement `resetScan()` function
+    - Clear localStorage
+    - Reset all state to initial values
+    - _Requirements: 3.5_
+  - [x] 1.20 Write property test for reset
+    - **Property 11: Reset clears all state**
+    - **Validates: Requirements 3.5**
+  - [x] 1.21 Implement `exportLog()` function
+    - Generate JSON with skippedPages, stats, timestamp
+    - Trigger browser download
+    - _Requirements: 6.3_
+  - [x] 1.22 Write property test for export
+    - **Property 12: Export produces valid JSON**
+    - **Validates: Requirements 6.3**
+  - [x] 1.23 Checkpoint - Ensure all hook tests pass
+    - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 2. UI Components
+  - [x] 2.1 Create `src/components/pdf/AutoScanControls.tsx`
+    - Floating bar at bottom of PDF container
+    - Mobile-first: stack vertically on small screens
+    - Use existing `Button` from `src/components/ui`
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 2.2 Implement control buttons in AutoScanControls
+    - ▶ Start Auto-Scan (disabled when scanning)
+    - ⏸ Pause (enabled only when scanning)
+    - ⏹ Stop (enabled only when scanning)
+    - _Requirements: 1.1, 1.5, 1.6_
+  - [x] 2.3 Implement status display in AutoScanControls
+    - Text: "Scanning page {current} of {total}..."
+    - Stats: "{cardsCreated} cards, {skipped} skipped"
+    - Progress bar: `width: (currentPage / totalPages) * 100%`
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 2.4 Create `src/components/pdf/AutoScanResumeBanner.tsx`
+    - Non-blocking banner at top of PDF area
+    - Text: "Auto-scan stopped on page X. [Resume] [Reset]"
+    - _Requirements: 3.3_
+  - [x] 2.5 Create `src/components/pdf/SkippedPagesPanel.tsx`
+    - Collapsible panel listing page numbers with error reasons
+    - "Export Log" button
+    - _Requirements: 6.1, 6.2, 6.3_
+  - [x] 2.6 Checkpoint - Ensure UI components render correctly
+    - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 3. Page Integration
+  - [x] 3.1 Wire `useAutoScan` hook into `add-bulk/page.tsx`
+    - Pass pdfDocument ref from PDFViewer
+    - Pass deckId, linkedSource.id, sessionTagNames, aiMode, includeNextPage
+    - _Requirements: 7.1, 7.2, 7.3_
+  - [x] 3.2 Write property test for session tags integration
+    - **Property 13: Session tags passed to bulk create**
+    - **Validates: Requirements 7.1**
+  - [x] 3.3 Write property test for AI mode integration
+    - **Property 14: AI mode passed to draft action**
+    - **Validates: Requirements 7.2**
+  - [x] 3.4 Add AutoScanControls to bulk import page
+    - Position below PDF viewer
+    - Connect to hook state and controls
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 3.5 Add AutoScanResumeBanner to bulk import page
+    - Show when `hasResumableState` is true
+    - Connect Resume to `startScan(savedPage)`
+    - Connect Reset to `resetScan()`
+    - _Requirements: 3.3, 3.4, 3.5_
+  - [x] 3.6 Write property test for resume
+    - **Property 10: Resume from saved position**
+    - **Validates: Requirements 3.4**
+  - [x] 3.7 Add SkippedPagesPanel to bulk import page
+    - Show count badge in AutoScanControls
+    - Connect export to `exportLog()`
+    - _Requirements: 6.1, 6.2_
+  - [x] 3.8 Disable manual controls during auto-scan
+    - Disable "Scan Page" button when isScanning
+    - Disable AI Draft buttons when isScanning
+    - Add mode indicator badge
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - [x] 3.9 Expose pdfDocument ref from PDFViewer if needed
+    - Add ref forwarding or callback prop
+    - _Requirements: 1.2_
+  - [x] 3.10 Final Checkpoint - Ensure all tests pass
+    - Ensure all tests pass, ask the user if questions arise.

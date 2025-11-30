@@ -30,6 +30,8 @@ interface PDFViewerProps {
   onAppendNextPage?: (pdfDocument: PDFDocumentProxy, nextPageNumber: number) => void
   /** V6.6: Whether append is in progress */
   isAppending?: boolean
+  /** V7.0: Callback when PDF document is loaded (exposes pdfDocument for auto-scan) */
+  onDocumentReady?: (pdfDocument: PDFDocumentProxy) => void
 }
 
 /**
@@ -51,6 +53,7 @@ export function PDFViewer({
   onIncludeNextPageChange,
   onAppendNextPage,
   isAppending = false,
+  onDocumentReady,
 }: PDFViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined)
@@ -101,7 +104,9 @@ export function PDFViewer({
     setPdfDocument(pdf)
     setIsLoading(false)
     setError(null)
-  }, [])
+    // V7.0: Expose pdfDocument for auto-scan
+    onDocumentReady?.(pdf)
+  }, [onDocumentReady])
 
   const onDocumentLoadError = useCallback((err: Error) => {
     console.error('PDF load error:', err)

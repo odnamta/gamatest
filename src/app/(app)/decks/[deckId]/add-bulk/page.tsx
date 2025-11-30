@@ -32,6 +32,11 @@ import {
 import { extractCleanPageText, combinePageTexts } from '@/lib/pdf-text-extraction'
 import type { ProcessedImage } from '@/lib/image-processing'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+// V7.0: Auto-Scan imports
+import { useAutoScan } from '@/hooks/use-auto-scan'
+import { AutoScanControls } from '@/components/pdf/AutoScanControls'
+import { AutoScanResumeBanner } from '@/components/pdf/AutoScanResumeBanner'
+import { SkippedPagesPanel } from '@/components/pdf/SkippedPagesPanel'
 
 // Dynamic import PDFViewer to avoid SSR issues with react-pdf
 const PDFViewer = dynamic(
@@ -131,6 +136,9 @@ export default function BulkImportPage() {
   // V6.6: AI-generated tags for single draft
   const [aiTagNames, setAiTagNames] = useState<string[]>([])
 
+  // V7.0: PDF document reference for auto-scan
+  const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null)
+
   // Refs for form fields
   const stemRef = useRef<HTMLTextAreaElement>(null)
   const optionRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -148,6 +156,36 @@ export default function BulkImportPage() {
     }
   }, [linkedSource?.id])
 
+  // V7.0: Auto-Scan Hook
+  const autoScan = useAutoScan({
+    pdfDocument,
+    deckId,
+    sourceId: linkedSource?.id || '',
+    sessionTagNames,
+    aiMode,
+    includeNextPage,
+    onPageComplete: (page, cardsCreated) => {
+      // Update session card count
+      if (linkedSource?.id) {
+        const newTotal = addToSessionCardCount(linkedSource.id, cardsCreated)
+        setSessionCardCount(newTotal)
+      }
+    },
+    onError: (page, error) => {
+      console.warn(`[AutoScan] Page ${page} failed:`, error)
+    },
+    onComplete: (stats) => {
+      showToast(`Auto-scan complete! Created ${stats.cardsCreated} cards.`, 'success')
+    },
+    onSafetyStop: () => {
+      showToast('Auto-scan stopped: 3 consecutive pages failed. Check skipped pages.', 'error')
+    },
+  })
+
+  // V7.0: Handle PDF document ready
+  const handleDocumentReady = useCallback((pdf: PDFDocumentProxy) => {
+    setPdfDocument(pdf)
+  }, [])
 
   // Handle successful PDF upload
   const handleUploadSuccess = useCallback((source: LinkedSource) => {
@@ -893,6 +931,16 @@ export default function BulkImportPage() {
           
           {linkedSource?.fileUrl ? (
             <>
+              {/* V7.0: Resume Banner */}
+              {autoScan.hasResumableState && !autoScan.isScanning && (
+                <AutoScanResumeBanner
+                  savedPage={autoScan.currentPage}
+                  totalPages={autoScan.totalPages}
+                  onResume={() => autoScan.startScan(autoScan.currentPage)}
+                  onReset={autoScan.resetScan}
+                />
+              )}
+              
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                 {linkedSource.fileName}
               </h2>
@@ -902,16 +950,38 @@ export default function BulkImportPage() {
                   fileId={linkedSource.id}
                   onTextSelect={handlePdfTextSelect}
                   onScanPage={handleScanPage}
-                  isScanning={isPageScanning}
+                  isScanning={isPageScanning || autoScan.isScanning}
                   includeNextPage={includeNextPage}
                   onIncludeNextPageChange={setIncludeNextPage}
                   onAppendNextPage={handleAppendNextPage}
                   isAppending={isAppending}
+                  onDocumentReady={handleDocumentReady}
                 />
               </div>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
                 Select text or click &quot;Scan Page&quot; to generate MCQs with AI.
               </p>
+              
+              {/* V7.0: Auto-Scan Controls */}
+              {pdfDocument && (
+                <>
+                  <AutoScanControls
+                    isScanning={autoScan.isScanning}
+                    currentPage={autoScan.currentPage}
+                    totalPages={autoScan.totalPages}
+                    stats={autoScan.stats}
+                    skippedCount={autoScan.skippedPages.length}
+                    onStart={() => autoScan.startScan()}
+                    onPause={autoScan.pauseScan}
+                    onStop={autoScan.stopScan}
+                    disabled={isPageScanning || isBatchGenerating}
+                  />
+                  <SkippedPagesPanel
+                    skippedPages={autoScan.skippedPages}
+                    onExport={autoScan.exportLog}
+                  />
+                </>
+              )}
             </>
           ) : (
             <>
