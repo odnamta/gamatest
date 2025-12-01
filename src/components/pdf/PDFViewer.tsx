@@ -333,7 +333,13 @@ export function PDFViewer({
                 ) : (
                   <>
                     <FileText className="w-4 h-4" />
-                    <span className="hidden sm:inline">Scan Page</span>
+                    {/* V7.1: Update button text based on includeNextPage */}
+                    <span className="hidden sm:inline">
+                      {includeNextPage && !isOnLastPage 
+                        ? `Scan Pages ${pageNumber} & ${pageNumber + 1}`
+                        : `Scan Page ${pageNumber}`
+                      }
+                    </span>
                   </>
                 )}
               </button>

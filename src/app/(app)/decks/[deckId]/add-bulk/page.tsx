@@ -180,6 +180,10 @@ export default function BulkImportPage() {
     onSafetyStop: () => {
       showToast('Auto-scan stopped: 3 consecutive pages failed. Check skipped pages.', 'error')
     },
+    // V7.1: Offline detection callback
+    onOffline: () => {
+      showToast('Connection lost, scan paused', 'error')
+    },
   })
 
   // V7.0: Handle PDF document ready
@@ -513,6 +517,7 @@ export default function BulkImportPage() {
   }, [lastBatchTime, deckId, sessionTagNames, aiMode, processedImage, includeNextPage, showToast])
 
   // V6.6: Handle "Append Next Page" button click
+  // V7.1: Fixed to use single source of truth (state only, no direct DOM writes)
   const handleAppendNextPage = useCallback(async (pdfDocument: PDFDocumentProxy, nextPageNumber: number) => {
     setIsAppending(true)
     
@@ -524,15 +529,9 @@ export default function BulkImportPage() {
         return
       }
       
-      // Append to textarea with separator
+      // V7.1: Append to state only - textarea is controlled by stitchedText
       const separator = `\n\n--- Page ${nextPageNumber} ---\n`
-      const currentText = textAreaRef.current?.value || stitchedText
-      const newText = currentText + separator + nextPageText
-      
-      setStitchedText(newText)
-      if (textAreaRef.current) {
-        textAreaRef.current.value = newText
-      }
+      setStitchedText(prev => prev + separator + nextPageText)
       
       showToast(`Appended text from page ${nextPageNumber}`, 'success')
     } catch (err) {
@@ -541,7 +540,7 @@ export default function BulkImportPage() {
     } finally {
       setIsAppending(false)
     }
-  }, [stitchedText, showToast])
+  }, [showToast])
 
 
   // V6: Hotkeys integration
@@ -975,6 +974,7 @@ export default function BulkImportPage() {
                     onPause={autoScan.pauseScan}
                     onStop={autoScan.stopScan}
                     disabled={isPageScanning || isBatchGenerating}
+                    canStart={autoScan.canStart}
                   />
                   <SkippedPagesPanel
                     skippedPages={autoScan.skippedPages}

@@ -46,6 +46,7 @@ export interface UseAutoScanOptions {
   onError?: (page: number, error: string) => void
   onComplete?: (stats: AutoScanStats) => void
   onSafetyStop?: () => void
+  onOffline?: () => void  // V7.1: Called when connection lost during scan
 }
 
 export interface UseAutoScanReturn {
@@ -56,6 +57,7 @@ export interface UseAutoScanReturn {
   stats: AutoScanStats
   skippedPages: SkippedPage[]
   hasResumableState: boolean
+  canStart: boolean  // V7.1: true only when pdfDocument && deckId && sourceId are valid
   
   // Controls
   startScan: (startPage?: number) => void
@@ -162,6 +164,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     onError,
     onComplete,
     onSafetyStop,
+    onOffline,  // V7.1: Offline callback
   } = options
 
   const totalPages = pdfDocument?.numPages ?? 0
@@ -222,6 +225,24 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     }
   }, [deckId, sourceId])
 
+  // V7.1: Offline detection - auto-pause when connection lost
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleOffline = () => {
+      if (isScanningRef.current) {
+        console.warn('[useAutoScan] Connection lost, pausing scan')
+        setIsScanning(false)
+        onOffline?.()  // V7.1: Notify page to show toast
+      }
+    }
+
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [onOffline])
+
   // Process a single page
   const processPage = useCallback(async (pageNumber: number, isRetry = false): Promise<boolean> => {
     if (!pdfDocument || !isScanningRef.current) return false
@@ -268,7 +289,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
         options: draft.options,
         correctIndex: draft.correctIndex,
         explanation: draft.explanation,
-        tagNames: draft.tagNames,
+        tagNames: draft.aiTags,  // V7.1: Fixed - MCQBatchDraftUI uses aiTags not tagNames
       }))
 
       const saveResult = await bulkCreateMCQV2({
@@ -350,23 +371,28 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
   }, [totalPages, processPage, onComplete, onSafetyStop])
 
   // Start scanning
-  const startScan = useCallback((startPage = 1) => {
+  // V7.1: Fixed to use savedState.currentPage when resuming
+  const startScan = useCallback((startPage?: number) => {
     if (!pdfDocument || totalPages === 0) return
     
+    // V7.1: If no explicit startPage and we have resumable state, use saved page
+    const effectiveStartPage = startPage ?? (hasResumableState ? currentPageRef.current : 1)
+    
     setIsScanning(true)
-    setCurrentPage(startPage)
+    setCurrentPage(effectiveStartPage)
     setHasResumableState(false)
     
-    if (startPage === 1) {
+    if (effectiveStartPage === 1) {
       // Fresh start - reset stats
       setStats(getInitialStats())
       setSkippedPages([])
       setConsecutiveErrors(0)
     }
+    // V7.1: When resuming (effectiveStartPage > 1), preserve existing stats
 
     // Kick off the loop
     setTimeout(runScanIteration, 100)
-  }, [pdfDocument, totalPages, runScanIteration])
+  }, [pdfDocument, totalPages, runScanIteration, hasResumableState])
 
   // Pause scanning (preserves state)
   const pauseScan = useCallback(() => {
@@ -411,6 +437,9 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     URL.revokeObjectURL(url)
   }, [skippedPages, stats, deckId, sourceId])
 
+  // V7.1: Compute canStart - prevents scan when IDs are missing
+  const canStart = !!(pdfDocument && deckId && sourceId)
+
   return {
     // State
     isScanning,
@@ -419,6 +448,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     stats,
     skippedPages,
     hasResumableState,
+    canStart,  // V7.1: true only when pdfDocument && deckId && sourceId are valid
     
     // Controls
     startScan,

@@ -19,6 +19,7 @@ interface AutoScanControlsProps {
   onStop: () => void
   onViewSkipped?: () => void
   disabled?: boolean
+  canStart?: boolean  // V7.1: true only when pdfDocument && deckId && sourceId are valid
 }
 
 export function AutoScanControls({
@@ -32,6 +33,7 @@ export function AutoScanControls({
   onStop,
   onViewSkipped,
   disabled = false,
+  canStart = true,  // V7.1: Default to true for backwards compatibility
 }: AutoScanControlsProps) {
   const progress = totalPages > 0 ? Math.min((currentPage / totalPages) * 100, 100) : 0
   const isComplete = currentPage > totalPages && !isScanning
@@ -59,7 +61,7 @@ export function AutoScanControls({
           {!isScanning ? (
             <Button
               onClick={onStart}
-              disabled={disabled || totalPages === 0}
+              disabled={disabled || totalPages === 0 || !canStart}
               variant="primary"
               className="flex items-center gap-2"
             >

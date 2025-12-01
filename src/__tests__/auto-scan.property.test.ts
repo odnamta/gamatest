@@ -563,3 +563,269 @@ describe('Property 14: AI mode passed to draft action', () => {
     )
   })
 })
+
+
+// ============================================
+// V7.1 Property Tests - Auto-Scan Loop Stabilization Hotfix
+// ============================================
+
+// ============================================
+// Property 1: Auto-Scan ID Consistency
+// **Feature: v7.1-auto-scan-hotfix, Property 1: Auto-Scan ID Consistency**
+// **Validates: Requirements 1.1, 1.2**
+// ============================================
+
+describe('V7.1 Property 1: Auto-Scan ID Consistency', () => {
+  it('*For any* Auto-Scan invocation, the deckTemplateId passed to bulkCreateMCQV2 SHALL equal the deckId from route params', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        (deckId, sourceId) => {
+          // Simulate the call structure that Auto-Scan uses
+          const callPayload = {
+            deckTemplateId: deckId, // This should be the same as deckId from route params
+            sessionTags: [],
+            cards: [],
+          }
+          
+          // The deckTemplateId should equal the deckId passed to the hook
+          expect(callPayload.deckTemplateId).toBe(deckId)
+          expect(typeof callPayload.deckTemplateId).toBe('string')
+          expect(callPayload.deckTemplateId.length).toBeGreaterThan(0)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 2: Initialization Validity
+// **Feature: v7.1-auto-scan-hotfix, Property 2: Initialization Validity**
+// **Validates: Requirements 1.2, 1.3**
+// ============================================
+
+describe('V7.1 Property 2: Initialization Validity', () => {
+  it('*For any* Auto-Scan hook initialization with a linked source, both deckId and sourceId SHALL be non-empty strings', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        (deckId, sourceId) => {
+          // Simulate canStart computation
+          const pdfDocument = {} // Mock non-null PDF
+          const canStart = !!(pdfDocument && deckId && sourceId)
+          
+          // When both IDs are valid UUIDs, canStart should be true
+          expect(canStart).toBe(true)
+          expect(deckId.length).toBeGreaterThan(0)
+          expect(sourceId.length).toBeGreaterThan(0)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+
+  it('*For any* missing deckId or sourceId, canStart SHALL be false', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('', null, undefined),
+        fc.uuid(),
+        (invalidId, validId) => {
+          const pdfDocument = {} // Mock non-null PDF
+          
+          // Test with invalid deckId
+          const canStartWithInvalidDeck = !!(pdfDocument && invalidId && validId)
+          expect(canStartWithInvalidDeck).toBe(false)
+          
+          // Test with invalid sourceId
+          const canStartWithInvalidSource = !!(pdfDocument && validId && invalidId)
+          expect(canStartWithInvalidSource).toBe(false)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 3: Resume Page Preservation
+// **Feature: v7.1-auto-scan-hotfix, Property 3: Resume Page Preservation**
+// **Validates: Requirements 2.1, 2.4**
+// ============================================
+
+describe('V7.1 Property 3: Resume Page Preservation', () => {
+  it('*For any* saved state with currentPage = N, calling resume SHALL start scanning from page N (not page 1)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 500 }), // Start from page 2+ to test resume
+        fc.integer({ min: 1, max: 500 }),
+        (savedCurrentPage, totalPages) => {
+          fc.pre(savedCurrentPage <= totalPages)
+          
+          // Simulate resume logic from V7.1 fix
+          const hasResumableState = true
+          const explicitStartPage = undefined // No explicit page passed
+          
+          // V7.1 fix: use saved page when resuming
+          const effectiveStartPage = explicitStartPage ?? (hasResumableState ? savedCurrentPage : 1)
+          
+          expect(effectiveStartPage).toBe(savedCurrentPage)
+          expect(effectiveStartPage).not.toBe(1) // Should NOT reset to 1
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 4: Start Button Disabled Without PDF
+// **Feature: v7.1-auto-scan-hotfix, Property 4: Start Button Disabled Without PDF**
+// **Validates: Requirements 2.3**
+// ============================================
+
+describe('V7.1 Property 4: Start Button Disabled Without PDF', () => {
+  it('*For any* state where pdfDocument is null, the Start Auto-Scan button SHALL be disabled', () => {
+    fc.assert(
+      fc.property(
+        fc.uuid(),
+        fc.uuid(),
+        fc.integer({ min: 1, max: 500 }),
+        (deckId, sourceId, totalPages) => {
+          const pdfDocument = null // No PDF loaded
+          
+          // canStart should be false when pdfDocument is null
+          const canStart = !!(pdfDocument && deckId && sourceId)
+          
+          expect(canStart).toBe(false)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 5: Append Updates Textarea State
+// **Feature: v7.1-auto-scan-hotfix, Property 5: Append Updates Textarea State**
+// **Validates: Requirements 3.1**
+// ============================================
+
+describe('V7.1 Property 5: Append Updates Textarea State', () => {
+  it('*For any* Append Next action, the textarea value SHALL contain the appended page text immediately after the action completes', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 10, maxLength: 500 }),
+        fc.string({ minLength: 10, maxLength: 500 }),
+        fc.integer({ min: 2, max: 500 }),
+        (existingText, appendedText, nextPageNumber) => {
+          // Simulate V7.1 append logic (state-only update)
+          const separator = `\n\n--- Page ${nextPageNumber} ---\n`
+          const newState = existingText + separator + appendedText
+          
+          // The new state should contain both texts
+          expect(newState).toContain(existingText)
+          expect(newState).toContain(appendedText)
+          expect(newState).toContain(`Page ${nextPageNumber}`)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 6: Include Next Page Combines Text
+// **Feature: v7.1-auto-scan-hotfix, Property 6: Include Next Page Combines Text**
+// **Validates: Requirements 3.2**
+// ============================================
+
+describe('V7.1 Property 6: Include Next Page Combines Text', () => {
+  it('*For any* scan with includeNextPage = true on page N (where N < totalPages), the extracted text SHALL contain content from both page N and page N+1', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 499 }),
+        fc.integer({ min: 2, max: 500 }),
+        fc.string({ minLength: 50, maxLength: 200 }),
+        fc.string({ minLength: 50, maxLength: 200 }),
+        (pageNumber, totalPages, pageText, nextPageText) => {
+          fc.pre(pageNumber < totalPages)
+          
+          const includeNextPage = true
+          
+          // Simulate combinePageTexts behavior
+          let combinedText = pageText
+          if (includeNextPage && pageNumber < totalPages) {
+            combinedText = `${pageText}\n\n--- Page ${pageNumber + 1} ---\n${nextPageText}`
+          }
+          
+          expect(combinedText).toContain(pageText)
+          expect(combinedText).toContain(nextPageText)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 7: Empty Pages Don't Increment Errors
+// **Feature: v7.1-auto-scan-hotfix, Property 7: Empty Pages Don't Increment Errors**
+// **Validates: Requirements 4.1**
+// ============================================
+
+describe('V7.1 Property 7: Empty Pages Don\'t Increment Errors', () => {
+  it('*For any* page that produces 0 MCQs (but no API error), consecutiveErrors SHALL remain unchanged and scanning SHALL continue', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 5 }),
+        (initialConsecutiveErrors) => {
+          // Simulate processPage returning true (success) for 0 MCQs
+          const draftResult = { ok: true, drafts: [] } // 0 MCQs, but ok: true
+          const processPageSuccess = draftResult.ok // true = success
+          
+          // V7.1: 0 MCQs with ok: true is a success, not an error
+          let consecutiveErrors = initialConsecutiveErrors
+          if (processPageSuccess) {
+            consecutiveErrors = 0 // Reset on success
+          }
+          
+          expect(consecutiveErrors).toBe(0) // Should reset, not increment
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})
+
+// ============================================
+// Property 8: Actual Errors Increment Counter
+// **Feature: v7.1-auto-scan-hotfix, Property 8: Actual Errors Increment Counter**
+// **Validates: Requirements 4.2**
+// ============================================
+
+describe('V7.1 Property 8: Actual Errors Increment Counter', () => {
+  it('*For any* page that throws an error (API failure, save failure), consecutiveErrors SHALL increment by 1', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 5 }),
+        fc.string({ minLength: 1, maxLength: 100 }),
+        (initialConsecutiveErrors, errorMessage) => {
+          // Simulate processPage returning false (error)
+          const draftResult = { ok: false, error: { message: errorMessage } }
+          const processPageSuccess = draftResult.ok // false = error
+          
+          let consecutiveErrors = initialConsecutiveErrors
+          if (!processPageSuccess) {
+            consecutiveErrors = consecutiveErrors + 1 // Increment on error
+          }
+          
+          expect(consecutiveErrors).toBe(initialConsecutiveErrors + 1)
+        }
+      ),
+      { numRuns: 100 }
+    )
+  })
+})

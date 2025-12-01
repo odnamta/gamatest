@@ -531,6 +531,13 @@ export interface BulkCreateV2Input {
  * @returns BulkCreateResult - Either { ok: true, createdCount, deckId } or { ok: false, error }
  */
 export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCreateResult> {
+  // V7.1: Instrumentation for debugging Auto-Scan wiring
+  console.log('[bulkCreateMCQV2] Called with:', {
+    deckTemplateId: input.deckTemplateId,
+    sessionTags: input.sessionTags?.length ?? 0,
+    cardsCount: input.cards?.length ?? 0,
+  })
+
   if (!USE_V2_SCHEMA) {
     // Fall back to V1 with deckId
     return bulkCreateMCQ({
@@ -558,7 +565,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     .single()
   
   if (deckError || !deckTemplate) {
-    return { ok: false, error: { message: 'Deck template not found', code: 'NOT_FOUND' } }
+    // V7.1: Include received ID in error message for debugging
+    return { ok: false, error: { message: `Deck template not found for id=${deckTemplateId}`, code: 'NOT_FOUND' } }
   }
 
   // Only author can add cards to a deck_template
