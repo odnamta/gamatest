@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Pencil, Trash2, Copy } from 'lucide-react'
 import { TagBadge } from '@/components/tags/TagBadge'
+import { sortTagsByCategory } from '@/lib/tag-sort'
 import type { Card, Tag } from '@/types/database'
 
 interface CardListItemProps {
@@ -63,11 +64,11 @@ export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, i
             {preview}
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
-            {/* Card type badge */}
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+            {/* Card type badge - V9.4: Distinct from pill-shaped tags with border + lighter bg */}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
               isMCQ 
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
             }`}>
               {typeLabel}
             </span>
@@ -76,8 +77,8 @@ export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, i
                 Has image
               </span>
             )}
-            {/* Tag badges */}
-            {tags.map((tag) => (
+            {/* Tag badges - V9.4: Sorted by category (Source → Topic → Concept) */}
+            {sortTagsByCategory(tags).map((tag) => (
               <TagBadge key={tag.id} tag={tag} size="sm" />
             ))}
           </div>

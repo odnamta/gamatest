@@ -132,14 +132,14 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
                 <ul className="list-disc list-inside space-y-1 text-amber-700 dark:text-amber-400">
                   <li>
                     Move all cards from {tagsToMerge.length === 1 ? (
-                      <span className="font-medium">"{tagsToMerge[0].name}"</span>
+                      <span className="font-medium">&quot;{tagsToMerge[0].name}&quot;</span>
                     ) : (
                       <span className="font-medium">{tagsToMerge.length} tags</span>
-                    )} to <span className="font-medium">"{targetTag.name}"</span>
+                    )} to <span className="font-medium">&quot;{targetTag.name}&quot;</span>
                   </li>
                   <li>
                     Delete {tagsToMerge.length === 1 ? (
-                      <span className="font-medium">"{tagsToMerge[0].name}"</span>
+                      <span className="font-medium">&quot;{tagsToMerge[0].name}&quot;</span>
                     ) : (
                       <span className="font-medium">{tagsToMerge.length} source tags</span>
                     )}

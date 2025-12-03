@@ -241,8 +241,8 @@ export function TagManager() {
 
       {/* Instructions */}
       <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-        <p>• Select a tag's category from the dropdown to move it between columns</p>
-        <p>• Check two or more tags and click "Merge Selected" to combine them</p>
+        <p>• Select a tag&apos;s category from the dropdown to move it between columns</p>
+        <p>• Check two or more tags and click &quot;Merge Selected&quot; to combine them</p>
         <p>• Merging transfers all card associations to the target tag you choose</p>
       </div>
 

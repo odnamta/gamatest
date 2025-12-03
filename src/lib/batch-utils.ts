@@ -1,8 +1,10 @@
 /**
  * Batch Processing Utilities
  * V9.2: Helper functions for batch operations
+ * V9.3: Added chunkArray for client-side orchestration
  * 
  * Requirements: 2.3 - Batch size limit for API calls
+ * Requirements: V9.3 1.1 - Client-side chunking
  */
 
 /**
@@ -22,6 +24,35 @@ export function batchArray<T>(items: T[], batchSize: number = 20): T[][] {
     batches.push(items.slice(i, i + batchSize))
   }
   return batches
+}
+
+/**
+ * V9.3: Split an array into chunks of a specified size.
+ * Alias for batchArray with clearer naming for client-side use.
+ * 
+ * Property 1: All chunks except possibly the last have exactly `size` elements.
+ * Property 1: The last chunk has 1 to `size` elements.
+ * 
+ * @param array - Array of items to chunk
+ * @param size - Maximum items per chunk (default: 3)
+ * @returns Array of chunks
+ * 
+ * Requirements: V9.3 1.1 - Client-side chunking
+ */
+export function chunkArray<T>(array: T[], size: number = 3): T[][] {
+  if (array.length === 0) {
+    return []
+  }
+  
+  if (size <= 0) {
+    return []
+  }
+  
+  const chunks: T[][] = []
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size))
+  }
+  return chunks
 }
 
 /**

@@ -8,6 +8,7 @@ import { resolveDeckId } from '@/lib/legacy-redirect'
 import { CleanDuplicatesButton } from '@/components/decks/CleanDuplicatesButton'
 import { EditableDeckTitle } from '@/components/decks/EditableDeckTitle'
 import { EditableDeckSubject } from '@/components/decks/EditableDeckSubject'
+import { ManageTagsButton } from '@/components/decks/ManageTagsButton'
 import type { Card, Tag } from '@/types/database'
 
 // Type for card template with nested tags from Supabase join
@@ -249,6 +250,8 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
             </Link>
             {/* V8.3: Clean Duplicates button */}
             <CleanDuplicatesButton deckId={deckId} />
+            {/* V9.4: Manage Tags button for authors */}
+            <ManageTagsButton isAuthor={isAuthor} />
           </>
         )}
       </div>
@@ -267,7 +270,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
         {cardsError ? (
           <p className="text-red-600 dark:text-red-400">Error loading cards: {cardsError.message}</p>
         ) : (
-          <CardList cards={cardList} deckId={deckId} deckTitle={deckTemplate.title} allTags={allTags} isAuthor={isAuthor} />
+          <CardList cards={cardList} deckId={deckId} deckTitle={deckTemplate.title} allTags={allTags} isAuthor={isAuthor} deckSubject={deckTemplate.subject || 'Obstetrics & Gynecology'} />
         )}
       </div>
     </div>

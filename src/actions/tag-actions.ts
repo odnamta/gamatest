@@ -491,7 +491,6 @@ export async function bulkAddTagToCards(
 
 import { openai } from '@/lib/openai-client'
 import { GOLDEN_TOPIC_TAGS, getCanonicalTopicTag } from '@/lib/golden-list'
-import { batchArray } from '@/lib/batch-utils'
 
 /**
  * V9.2: Result type for auto-tag operations
@@ -501,26 +500,31 @@ export type AutoTagResult =
   | { ok: false; error: string }
 
 /**
- * V9.2: Zod schema for AI classification response
- */
-const autoTagResponseSchema = z.object({
-  classifications: z.array(z.object({
-    cardId: z.string(),
-    topic: z.string(),
-    concepts: z.array(z.string()).min(1).max(2),
-  }))
-})
-
-/**
  * V9.2: Auto-tag cards using AI classification.
+ * V9.3: Added chunk limit (max 5), parallel processing, and subject parameter.
  * Sends card content to OpenAI for topic and concept classification.
  * 
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1
+ * V9.3 Requirements: 2.1 (chunk limit), 2.2 (parallel), 2.3 (concurrent), 2.4 (result shape), 3.4/4.1 (subject)
  * 
- * @param cardIds - Array of card_template IDs to auto-tag
+ * Property 6: Reject if cardIds.length > 5
+ * Property 7: Accept if cardIds.length 1-5
+ * Property 8: taggedCount + skippedCount = input card count
+ * Property 10: Subject included in AI prompt
+ * 
+ * @param cardIds - Array of card_template IDs to auto-tag (max 5)
+ * @param subject - Optional medical specialty for context-aware prompting
  * @returns AutoTagResult with counts of tagged and skipped cards
  */
-export async function autoTagCards(cardIds: string[]): Promise<AutoTagResult> {
+export async function autoTagCards(
+  cardIds: string[],
+  subject?: string
+): Promise<AutoTagResult> {
+  // V9.3: Chunk limit validation - reject if > 5 cards
+  if (cardIds.length > 5) {
+    return { ok: false, error: 'Maximum 5 cards per request' }
+  }
+
   if (!cardIds.length) {
     return { ok: false, error: 'No cards selected' }
   }
@@ -556,27 +560,19 @@ export async function autoTagCards(cardIds: string[]): Promise<AutoTagResult> {
     return { ok: false, error: 'Only the author can auto-tag these cards' }
   }
 
-  // Get deck subject for context (use first card's deck)
+  // V9.3: Use provided subject or fall back to deck subject or default
   const firstDeck = cardTemplates[0].deck_templates as unknown as { subject?: string }
-  const subject = firstDeck.subject || 'OBGYN'
+  const effectiveSubject = subject || firstDeck.subject || 'Obstetrics & Gynecology'
 
-  // Process in batches of 20 to prevent timeouts
-  const BATCH_SIZE = 20
-  const batches = batchArray(cardTemplates, BATCH_SIZE)
-  
-  let totalTagged = 0
-  let totalSkipped = 0
+  // V9.3: Process all cards in parallel using Promise.all
+  const results = await Promise.all(
+    cardTemplates.map(async (ct) => {
+      try {
+        const cardForPrompt = { id: ct.id, stem: ct.stem }
 
-  for (const batch of batches) {
-    try {
-      // Build prompt with card stems
-      const cardsForPrompt = batch.map(ct => ({
-        id: ct.id,
-        stem: ct.stem,
-      }))
-
-      const systemPrompt = `You are a medical education classifier for ${subject} exam preparation.
-Classify each question into:
+        // V9.3: Subject-aware system prompt
+        const systemPrompt = `You are an expert in ${effectiveSubject}. You are a medical education classifier for ${effectiveSubject} exam preparation.
+Classify this question into:
 1. ONE Topic from this Golden List: ${GOLDEN_TOPIC_TAGS.join(', ')}
 2. ONE or TWO specific Concepts (medical terms, conditions, or procedures mentioned)
 
@@ -584,65 +580,70 @@ Rules:
 - Topic MUST be from the Golden List exactly as written
 - Concepts should be specific medical terms from the question
 - Extract verbatim. Do not invent missing values.
+- Use ${effectiveSubject}-appropriate interpretation of medical terms
 
 Respond with JSON only, no markdown:
-{"classifications":[{"cardId":"uuid","topic":"Topic","concepts":["Concept1","Concept2"]}]}`
+{"cardId":"uuid","topic":"Topic","concepts":["Concept1","Concept2"]}`
 
-      const userPrompt = `Classify these ${subject} questions:\n${JSON.stringify(cardsForPrompt, null, 2)}`
+        const userPrompt = `Classify this ${effectiveSubject} question:\n${JSON.stringify(cardForPrompt, null, 2)}`
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      })
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        })
 
-      const content = response.choices[0]?.message?.content
-      if (!content) {
-        console.error('Empty AI response')
-        continue
-      }
+        const content = response.choices[0]?.message?.content
+        if (!content) {
+          console.error('Empty AI response for card:', ct.id)
+          return { cardId: ct.id, success: false }
+        }
 
-      // Parse and validate response
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(content)
-      } catch {
-        console.error('Failed to parse AI response:', content)
-        continue
-      }
+        // Parse response
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(content)
+        } catch {
+          console.error('Failed to parse AI response:', content)
+          return { cardId: ct.id, success: false }
+        }
 
-      const validated = autoTagResponseSchema.safeParse(parsed)
-      if (!validated.success) {
-        console.error('Invalid AI response schema:', validated.error)
-        continue
-      }
+        // Validate single card response
+        const singleCardSchema = z.object({
+          cardId: z.string(),
+          topic: z.string(),
+          concepts: z.array(z.string()).min(1).max(2),
+        })
 
-      // Process classifications
-      for (const classification of validated.data.classifications) {
-        const cardId = classification.cardId
-        
+        const validated = singleCardSchema.safeParse(parsed)
+        if (!validated.success) {
+          console.error('Invalid AI response schema:', validated.error)
+          return { cardId: ct.id, success: false }
+        }
+
+        const classification = validated.data
+
         // Validate topic is in Golden List
         const canonicalTopic = getCanonicalTopicTag(classification.topic)
         if (!canonicalTopic) {
-          console.warn(`Invalid topic "${classification.topic}" for card ${cardId}`)
-          totalSkipped++
-          continue
+          console.warn(`Invalid topic "${classification.topic}" for card ${ct.id}`)
+          return { cardId: ct.id, success: false }
         }
 
         // Collect all tags to apply (topic + concepts)
         const tagNames = [canonicalTopic, ...classification.concepts]
-        
+
         // Find or create tags and apply them
         for (const tagName of tagNames) {
           const trimmedName = tagName.trim()
           if (!trimmedName) continue
 
           // Find existing tag or create new one
-          let { data: existingTag } = await supabase
+          const { data: existingTag } = await supabase
             .from('tags')
             .select('id')
             .eq('user_id', user.id)
@@ -657,7 +658,7 @@ Respond with JSON only, no markdown:
             // Create new tag - topic category for Golden List, concept for others
             const category = getCanonicalTopicTag(trimmedName) ? 'topic' : 'concept'
             const color = category === 'topic' ? '#10b981' : '#6366f1'
-            
+
             const { data: newTag, error: createError } = await supabase
               .from('tags')
               .insert({
@@ -680,18 +681,22 @@ Respond with JSON only, no markdown:
           await supabase
             .from('card_template_tags')
             .upsert(
-              { card_template_id: cardId, tag_id: tagId },
+              { card_template_id: ct.id, tag_id: tagId },
               { onConflict: 'card_template_id,tag_id', ignoreDuplicates: true }
             )
         }
 
-        totalTagged++
+        return { cardId: ct.id, success: true }
+      } catch (error) {
+        console.error('Auto-tag error for card:', ct.id, error)
+        return { cardId: ct.id, success: false }
       }
-    } catch (error) {
-      console.error('Batch auto-tag error:', error)
-      // Continue with next batch instead of failing entirely
-    }
-  }
+    })
+  )
+
+  // Aggregate results
+  const totalTagged = results.filter((r) => r.success).length
+  const totalSkipped = results.filter((r) => !r.success).length
 
   if (totalTagged === 0 && totalSkipped > 0) {
     return { ok: false, error: 'AI classification failed. Please try again.' }

@@ -128,7 +128,7 @@ export async function getCustomSessionCardsV2(
 
     // Build the query for card_templates
     // We need to handle OR semantics: cards matching ANY tag OR ANY deck
-    let cardTemplateIds = new Set<string>()
+    const cardTemplateIds = new Set<string>()
 
     // If tags are specified, get card_templates with those tags
     if (tagIds.length > 0) {

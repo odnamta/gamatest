@@ -9,8 +9,9 @@ import { BulkTagModal } from './BulkTagModal'
 import { DeckSelector } from './DeckSelector'
 import { FilterBar } from '@/components/tags/FilterBar'
 import { TagSelector } from '@/components/tags/TagSelector'
+import { AutoTagProgressModal } from '@/components/tags/AutoTagProgressModal'
 import { deleteCard, duplicateCard, bulkDeleteCards, bulkMoveCards, getAllCardIdsInDeck } from '@/actions/card-actions'
-import { autoTagCards } from '@/actions/tag-actions'
+import { useAutoTag } from '@/hooks/use-auto-tag'
 import { useToast } from '@/components/ui/Toast'
 import type { Card, Tag } from '@/types/database'
 
@@ -25,13 +26,16 @@ interface CardListProps {
   deckTitle?: string
   allTags?: Tag[]
   isAuthor?: boolean
+  /** V9.3: Deck subject for context-aware AI tagging */
+  deckSubject?: string
 }
 
 /**
  * CardList - Client component wrapper for card list with bulk actions
- * Requirements: FR-1, FR-3, FR-4, C.1-C.9
+ * V9.3: Integrated useAutoTag hook for chunked auto-tagging with progress modal
+ * Requirements: FR-1, FR-3, FR-4, C.1-C.9, V9.3 1.1-1.6, 5.1-5.5
  */
-export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAuthor = true }: CardListProps) {
+export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAuthor = true, deckSubject }: CardListProps) {
   const router = useRouter()
   const { showToast } = useToast()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -45,8 +49,25 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   const [isSelectingAll, setIsSelectingAll] = useState(false)
   // V9.2: Untagged filter toggle
   const [showUntaggedOnly, setShowUntaggedOnly] = useState(false)
-  // V9.2: Auto-tag loading state
-  const [isAutoTagging, setIsAutoTagging] = useState(false)
+  // V9.3: Auto-tag progress modal state
+  const [showAutoTagModal, setShowAutoTagModal] = useState(false)
+
+  // V9.3: useAutoTag hook for chunked processing with progress
+  const autoTag = useAutoTag({
+    onComplete: (totalTagged, totalSkipped) => {
+      if (totalTagged > 0) {
+        showToast(
+          `Auto-tagged ${totalTagged} card${totalTagged !== 1 ? 's' : ''}${totalSkipped > 0 ? ` (${totalSkipped} skipped)` : ''}`,
+          'success'
+        )
+        clearSelection()
+        router.refresh()
+      }
+    },
+    onError: (error) => {
+      showToast(error || 'Auto-tagging failed', 'error')
+    },
+  })
 
   // V8.6: Helper to check if card has NeedsReview tag
   const hasNeedsReviewTag = (card: CardWithTags) => {
@@ -131,29 +152,18 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     router.refresh()
   }
 
-  // V9.2: Handle auto-tag with AI
-  const handleAutoTag = async () => {
+  // V9.3: Handle auto-tag with chunked processing and progress modal
+  const handleAutoTag = () => {
     if (selectedIds.size === 0) return
     
-    setIsAutoTagging(true)
-    try {
-      const result = await autoTagCards([...selectedIds])
-      if (result.ok) {
-        showToast(
-          `Auto-tagged ${result.taggedCount} card${result.taggedCount !== 1 ? 's' : ''}${result.skippedCount > 0 ? ` (${result.skippedCount} skipped)` : ''}`,
-          'success'
-        )
-        clearSelection()
-        router.refresh()
-      } else {
-        showToast(result.error || 'Auto-tagging failed', 'error')
-      }
-    } catch (error) {
-      console.error('Auto-tag error:', error)
-      showToast('Auto-tagging failed. Please try again.', 'error')
-    } finally {
-      setIsAutoTagging(false)
-    }
+    setShowAutoTagModal(true)
+    autoTag.startTagging([...selectedIds], deckSubject)
+  }
+
+  // V9.3: Handle closing the auto-tag modal
+  const handleAutoTagModalClose = () => {
+    setShowAutoTagModal(false)
+    autoTag.reset()
   }
 
   // Single card handlers
@@ -289,7 +299,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
           onExport={handleExport}
           onAddTag={() => setShowBulkTagModal(true)}
           onAutoTag={handleAutoTag}
-          isAutoTagging={isAutoTagging}
+          isAutoTagging={autoTag.isTagging}
           onClearSelection={clearSelection}
         />
       )}
@@ -376,6 +386,19 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         onClose={() => setShowBulkTagModal(false)}
         selectedCardIds={[...selectedIds]}
         onSuccess={handleBulkTagSuccess}
+      />
+
+      {/* V9.3: Auto-tag progress modal */}
+      <AutoTagProgressModal
+        isOpen={showAutoTagModal}
+        isProcessing={autoTag.isTagging}
+        currentChunk={autoTag.currentChunk}
+        totalChunks={autoTag.totalChunks}
+        taggedCount={autoTag.taggedCount}
+        skippedCount={autoTag.skippedCount}
+        error={autoTag.error}
+        onCancel={autoTag.cancel}
+        onClose={handleAutoTagModalClose}
       />
     </>
   )
