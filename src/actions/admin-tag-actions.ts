@@ -4,12 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { getCategoryColor } from '@/lib/tag-colors'
+import { toTitleCase } from '@/lib/string-utils'
 import type { Tag, TagCategory } from '@/types/database'
 
 /**
  * Admin Tag Server Actions
  * V9: Tag Manager functionality for category management and merging
- * Requirements: V9-3.2, V9-3.3, V9-3.4, V9-3.5
+ * V9.5: Added renameTag and autoFormatTags for data hygiene
+ * Requirements: V9-3.2, V9-3.3, V9-3.4, V9-3.5, V9.5-2.1, V9.5-4.1
  */
 
 // Validation schemas
@@ -37,6 +39,21 @@ export interface TagsByCategory {
   topic: Tag[]
   concept: Tag[]
 }
+
+// V9.5: Rename tag result types
+export type RenameTagResult =
+  | { ok: true; tag: Tag }
+  | { ok: false; error: string }
+  | { ok: false; conflict: true; existingTagId: string; existingTagName: string }
+
+// V9.5: Auto-format result types
+export interface AutoFormatTagsResult {
+  ok: true
+  updated: number
+  skipped: Array<{ tagId: string; tagName: string; reason: string }>
+}
+
+export type AutoFormatResult = AutoFormatTagsResult | { ok: false; error: string }
 
 /**
  * Update a tag's category and automatically update its color.
@@ -448,4 +465,186 @@ export async function getGoldenSources(): Promise<Tag[]> {
     .order('name')
 
   return sources || []
+}
+
+// ============================================
+// V9.5: Data Hygiene - Rename and Auto-Format
+// ============================================
+
+/**
+ * V9.5: Rename a tag with duplicate detection.
+ * Returns conflict response if new name matches existing tag (case-insensitive).
+ * 
+ * Requirements: 2.1, 2.2, 2.3, 2.4
+ * 
+ * @param tagId - The tag ID to rename
+ * @param newName - The new name for the tag
+ * @returns RenameTagResult with success, error, or conflict response
+ */
+export async function renameTag(
+  tagId: string,
+  newName: string
+): Promise<RenameTagResult> {
+  // Validate new name is non-empty after trimming
+  const trimmedName = newName.trim()
+  if (!trimmedName) {
+    return { ok: false, error: 'Tag name cannot be empty' }
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Verify the tag exists and belongs to user
+  const { data: existingTag, error: tagError } = await supabase
+    .from('tags')
+    .select('id, name')
+    .eq('id', tagId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (tagError || !existingTag) {
+    return { ok: false, error: 'Tag not found' }
+  }
+
+  // If name hasn't changed, return success
+  if (existingTag.name === trimmedName) {
+    const { data: tag } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('id', tagId)
+      .single()
+    return { ok: true, tag: tag as Tag }
+  }
+
+  // Check for existing tag with same name (case-insensitive)
+  const { data: conflictingTag } = await supabase
+    .from('tags')
+    .select('id, name')
+    .eq('user_id', user.id)
+    .ilike('name', trimmedName)
+    .neq('id', tagId)
+    .single()
+
+  if (conflictingTag) {
+    return {
+      ok: false,
+      conflict: true,
+      existingTagId: conflictingTag.id,
+      existingTagName: conflictingTag.name,
+    }
+  }
+
+  // Update the tag name
+  const { data: updatedTag, error: updateError } = await supabase
+    .from('tags')
+    .update({ name: trimmedName })
+    .eq('id', tagId)
+    .select()
+    .single()
+
+  if (updateError) {
+    return { ok: false, error: updateError.message }
+  }
+
+  revalidatePath('/admin/tags')
+  return { ok: true, tag: updatedTag as Tag }
+}
+
+/**
+ * V9.5: Auto-format all tags to Title Case.
+ * Skips tags that would create collisions.
+ * 
+ * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
+ * 
+ * @returns AutoFormatResult with counts of updated and skipped tags
+ */
+export async function autoFormatTags(): Promise<AutoFormatResult> {
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Fetch all tags for the user
+  const { data: tags, error: fetchError } = await supabase
+    .from('tags')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('name')
+
+  if (fetchError) {
+    return { ok: false, error: fetchError.message }
+  }
+
+  if (!tags || tags.length === 0) {
+    return { ok: true, updated: 0, skipped: [] }
+  }
+
+  // Build a map of formatted names to detect collisions
+  const formattedNames = new Map<string, string>() // lowercase formatted -> original tag id
+  const skipped: Array<{ tagId: string; tagName: string; reason: string }> = []
+  const toUpdate: Array<{ id: string; newName: string }> = []
+
+  // First pass: identify what needs updating and detect collisions
+  for (const tag of tags) {
+    const formatted = toTitleCase(tag.name)
+    const formattedLower = formatted.toLowerCase()
+
+    // Skip if already formatted
+    if (tag.name === formatted) {
+      formattedNames.set(formattedLower, tag.id)
+      continue
+    }
+
+    // Check if formatted name would collide with existing tag
+    const existingTagWithName = tags.find(
+      t => t.id !== tag.id && t.name.toLowerCase() === formattedLower
+    )
+
+    if (existingTagWithName) {
+      skipped.push({
+        tagId: tag.id,
+        tagName: tag.name,
+        reason: `Would collide with existing tag "${existingTagWithName.name}"`,
+      })
+      continue
+    }
+
+    // Check if formatted name would collide with another tag being formatted
+    if (formattedNames.has(formattedLower)) {
+      skipped.push({
+        tagId: tag.id,
+        tagName: tag.name,
+        reason: `Would collide after formatting`,
+      })
+      continue
+    }
+
+    formattedNames.set(formattedLower, tag.id)
+    toUpdate.push({ id: tag.id, newName: formatted })
+  }
+
+  // Second pass: update tags
+  let updated = 0
+  for (const { id, newName } of toUpdate) {
+    const { error: updateError } = await supabase
+      .from('tags')
+      .update({ name: newName })
+      .eq('id', id)
+
+    if (!updateError) {
+      updated++
+    }
+  }
+
+  if (updated > 0) {
+    revalidatePath('/admin/tags')
+  }
+
+  return { ok: true, updated, skipped }
 }
