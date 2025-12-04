@@ -42,9 +42,64 @@ import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { validatePdfFile, createSourceSchema } from '@/lib/pdf-validation'
 import type { ActionResult } from '@/types/actions'
 import type { Source } from '@/types/database'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Storage bucket name - must be created in Supabase Dashboard
 const STORAGE_BUCKET = 'sources'
+
+/**
+ * V8.2.3: Robust ID Resolution Helper
+ * Resolves a deck ID to a deck_template using 3-step lookup:
+ * 1. Direct V2 match (deck_templates.id)
+ * 2. Legacy URL match (deck_templates.legacy_id)
+ * 3. Subscription match (user_decks.id → deck_template_id)
+ */
+async function resolveDeckTemplateId(
+  supabase: SupabaseClient,
+  deckId: string,
+  userId: string
+): Promise<{ templateId: string; authorId: string } | null> {
+  // Step 1: Direct V2 Match - check deck_templates by id
+  const { data: directMatch } = await supabase
+    .from('deck_templates')
+    .select('id, author_id')
+    .eq('id', deckId)
+    .single()
+
+  if (directMatch) {
+    console.log('[resolveDeckTemplateId] Step 1 matched: Direct V2 ID')
+    return { templateId: directMatch.id, authorId: directMatch.author_id }
+  }
+
+  // Step 2: Legacy URL Match - check deck_templates by legacy_id
+  const { data: legacyMatch } = await supabase
+    .from('deck_templates')
+    .select('id, author_id')
+    .eq('legacy_id', deckId)
+    .single()
+
+  if (legacyMatch) {
+    console.log('[resolveDeckTemplateId] Step 2 matched: Legacy ID')
+    return { templateId: legacyMatch.id, authorId: legacyMatch.author_id }
+  }
+
+  // Step 3: Subscription Match - check user_decks to get deck_template_id
+  const { data: userDeckMatch } = await supabase
+    .from('user_decks')
+    .select('deck_template_id, deck_templates!inner(id, author_id)')
+    .eq('id', deckId)
+    .eq('user_id', userId)
+    .single()
+
+  if (userDeckMatch?.deck_templates) {
+    console.log('[resolveDeckTemplateId] Step 3 matched: User Deck subscription')
+    const template = userDeckMatch.deck_templates as unknown as { id: string; author_id: string }
+    return { templateId: template.id, authorId: template.author_id }
+  }
+
+  console.log('[resolveDeckTemplateId] No match found for deckId:', deckId)
+  return null
+}
 
 /**
  * Server Action for uploading a PDF source document.
@@ -99,22 +154,27 @@ export async function uploadSourceAction(
     const { title: validatedTitle, deckId: validatedDeckId } = validationResult.data
     const supabase = await createSupabaseServerClient()
 
-    // V8.2.2: If deckId provided, verify user is the author of the deck_template
+    // V8.2.3: Robust ID resolution with 3-step lookup
+    let resolvedTemplateId: string | null = null
     if (validatedDeckId) {
-      const { data: deckTemplate, error: deckError } = await supabase
-        .from('deck_templates')
-        .select('id, author_id')
-        .eq('id', validatedDeckId)
-        .single()
-
-      if (deckError || !deckTemplate) {
+      console.log('[uploadSourceAction] Received deckId:', validatedDeckId, 'User:', user.id)
+      
+      const resolved = await resolveDeckTemplateId(supabase, validatedDeckId, user.id)
+      
+      if (!resolved) {
+        console.warn('[uploadSourceAction] Deck not found after 3-step lookup:', validatedDeckId)
         return { success: false, error: 'Deck not found' }
       }
 
+      console.log('[uploadSourceAction] Resolved template:', resolved.templateId, 'from input:', validatedDeckId)
+
       // Only authors can upload PDFs to a deck
-      if (deckTemplate.author_id !== user.id) {
+      if (resolved.authorId !== user.id) {
+        console.warn('[uploadSourceAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
         return { success: false, error: 'Only the deck author can upload source materials' }
       }
+      
+      resolvedTemplateId = resolved.templateId
     }
 
     // Generate user-scoped file path
@@ -130,6 +190,8 @@ export async function uploadSourceAction(
 
     // Upload to Supabase Storage (Requirements: 9.2)
     // Uses the "sources" bucket - must be created in Supabase Dashboard
+    console.log('[uploadSourceAction] DB check passed, attempting storage upload for:', filePath)
+    
     const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(filePath, fileBuffer, {
@@ -139,7 +201,7 @@ export async function uploadSourceAction(
 
     if (uploadError) {
       // Log the full error for debugging
-      console.error('Supabase Storage upload error:', uploadError)
+      console.error('[uploadSourceAction] Storage upload error:', uploadError)
       
       // Check for common error cases and provide helpful messages
       const errorMsg = uploadError.message || String(uploadError)
@@ -152,7 +214,7 @@ export async function uploadSourceAction(
       if (errorMsg.includes('policy') || errorMsg.includes('permission') || errorMsg.includes('Unauthorized') || errorMsg.includes('row-level security')) {
         return { 
           success: false, 
-          error: `Storage permission denied. Please check RLS policies for the '${STORAGE_BUCKET}' bucket.` 
+          error: `Storage Permission Error: Check RLS policies for the '${STORAGE_BUCKET}' bucket.` 
         }
       }
       return { success: false, error: `Upload failed: ${errorMsg}` }
@@ -197,24 +259,29 @@ export async function uploadSourceAction(
     }
 
     // Optionally link to deck (Requirements: 9.3)
-    if (validatedDeckId) {
+    // Use resolved template ID for the link, not the original input ID
+    if (resolvedTemplateId) {
       const { error: linkError } = await supabase
         .from('deck_sources')
         .insert({
-          deck_id: validatedDeckId,
+          deck_id: resolvedTemplateId,
           source_id: source.id,
         })
 
       if (linkError) {
         // Don't fail the whole operation, just log the error
-        console.error('Failed to link source to deck:', linkError)
+        console.error('[uploadSourceAction] Failed to link source to deck:', linkError)
       }
     }
 
-    // Revalidate relevant paths
+    // Revalidate relevant paths - use both original and resolved IDs
     if (validatedDeckId) {
       revalidatePath(`/decks/${validatedDeckId}`)
       revalidatePath(`/decks/${validatedDeckId}/add-bulk`)
+    }
+    if (resolvedTemplateId && resolvedTemplateId !== validatedDeckId) {
+      revalidatePath(`/decks/${resolvedTemplateId}`)
+      revalidatePath(`/decks/${resolvedTemplateId}/add-bulk`)
     }
     revalidatePath('/dashboard')
 
@@ -303,26 +370,28 @@ export async function linkSourceToDeckAction(
     return { success: false, error: 'Source not found or access denied' }
   }
 
-  // V8.2.2: Verify user is the author of the deck_template
-  const { data: deckTemplate, error: deckError } = await supabase
-    .from('deck_templates')
-    .select('id, author_id')
-    .eq('id', deckId)
-    .single()
-
-  if (deckError || !deckTemplate) {
+  // V8.2.3: Robust ID resolution with 3-step lookup
+  console.log('[linkSourceToDeckAction] Received deckId:', deckId, 'User:', user.id)
+  
+  const resolved = await resolveDeckTemplateId(supabase, deckId, user.id)
+  
+  if (!resolved) {
+    console.warn('[linkSourceToDeckAction] Deck not found after 3-step lookup:', deckId)
     return { success: false, error: 'Deck not found' }
   }
 
-  if (deckTemplate.author_id !== user.id) {
+  console.log('[linkSourceToDeckAction] Resolved template:', resolved.templateId, 'from input:', deckId)
+
+  if (resolved.authorId !== user.id) {
+    console.warn('[linkSourceToDeckAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
     return { success: false, error: 'Only the deck author can link source materials' }
   }
 
-  // Create the link
+  // Create the link using resolved template ID
   const { error: linkError } = await supabase
     .from('deck_sources')
     .insert({
-      deck_id: deckId,
+      deck_id: resolved.templateId,
       source_id: sourceId,
     })
 
@@ -336,6 +405,10 @@ export async function linkSourceToDeckAction(
 
   revalidatePath(`/decks/${deckId}`)
   revalidatePath(`/decks/${deckId}/add-bulk`)
+  if (resolved.templateId !== deckId) {
+    revalidatePath(`/decks/${resolved.templateId}`)
+    revalidatePath(`/decks/${resolved.templateId}/add-bulk`)
+  }
 
   return { success: true }
 }

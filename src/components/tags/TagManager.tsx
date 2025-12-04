@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil } from 'lucide-react'
+import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil, Sparkles, Settings } from 'lucide-react'
 import { TagBadge } from './TagBadge'
 import { TagMergeModal } from './TagMergeModal'
+import { SmartCleanupTab } from './SmartCleanupTab'
 import { getCategoryColorClasses } from '@/lib/tag-colors'
 import { 
   getTagsByCategory, 
@@ -191,15 +192,20 @@ interface TagsByCategory {
   concept: Tag[]
 }
 
+// V9.6: Tab type for navigation
+type TabType = 'manage' | 'cleanup'
+
 /**
  * TagManager - Admin UI for managing tag categories and merging tags
  * V9: Three-column layout with category management and merge functionality
  * V9.2: Enhanced with multi-select and merge modal
  * V9.5: Added inline editing and auto-format
- * Requirements: V9-3.1, V9-3.2, V9-3.3, V9.2-3.1, V9.2-3.2, V9.2-3.3, V9.5-1.1, V9.5-3.1
+ * V9.6: Added Smart Cleanup tab for AI-powered tag consolidation
+ * Requirements: V9-3.1, V9-3.2, V9-3.3, V9.2-3.1, V9.2-3.2, V9.2-3.3, V9.5-1.1, V9.5-3.1, V9.6-3.1
  */
 export function TagManager() {
   const { showToast } = useToast()
+  const [activeTab, setActiveTab] = useState<TabType>('manage')
   const [tags, setTags] = useState<TagsByCategory>({ source: [], topic: [], concept: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -351,6 +357,40 @@ export function TagManager() {
 
   return (
     <div className="space-y-6">
+      {/* V9.6: Tab Navigation */}
+      <div className="flex border-b border-slate-200 dark:border-slate-700">
+        <button
+          onClick={() => setActiveTab('manage')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'manage'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          Manage Tags
+        </button>
+        <button
+          onClick={() => setActiveTab('cleanup')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'cleanup'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          Smart Cleanup
+        </button>
+      </div>
+
+      {/* V9.6: Smart Cleanup Tab */}
+      {activeTab === 'cleanup' && (
+        <SmartCleanupTab onMergeComplete={loadTags} />
+      )}
+
+      {/* Manage Tags Tab Content */}
+      {activeTab === 'manage' && (
+        <>
       {/* V9.5: Toolbar with auto-format and merge */}
       <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
         {/* V9.5: Auto-format button */}
@@ -445,6 +485,8 @@ export function TagManager() {
         sourceTags={selectedTagObjects}
         onMerge={handleMerge}
       />
+        </>
+      )}
     </div>
   )
 }

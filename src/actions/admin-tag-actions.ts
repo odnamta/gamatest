@@ -55,6 +55,29 @@ export interface AutoFormatTagsResult {
 
 export type AutoFormatResult = AutoFormatTagsResult | { ok: false; error: string }
 
+// ============================================
+// V9.6: Tag Consolidation Types
+// ============================================
+
+/**
+ * V9.6: Merge suggestion from AI analysis
+ */
+export interface MergeSuggestion {
+  masterTagId: string
+  masterTagName: string
+  variations: Array<{
+    tagId: string
+    tagName: string
+  }>
+}
+
+/**
+ * V9.6: Result type for tag consolidation analysis
+ */
+export type AnalyzeTagConsolidationResult =
+  | { ok: true; suggestions: MergeSuggestion[] }
+  | { ok: false; error: 'NOT_CONFIGURED' | 'AI_ERROR' | 'PARSE_ERROR' | 'AUTH_ERROR' }
+
 /**
  * Update a tag's category and automatically update its color.
  * V9: Category change triggers color enforcement.
@@ -647,4 +670,123 @@ export async function autoFormatTags(): Promise<AutoFormatResult> {
   }
 
   return { ok: true, updated, skipped }
+}
+
+// ============================================
+// V9.6: AI-Powered Tag Consolidation
+// ============================================
+
+import { openai } from '@/lib/openai-client'
+import {
+  batchTagsForAnalysis,
+  parseConsolidationResponse,
+  resolveTagSuggestions,
+  buildTagLookup,
+} from '@/lib/tag-consolidation'
+
+/**
+ * V9.6: Analyze tags using AI to identify typos, synonyms, and casing issues.
+ * Returns merge suggestions grouped by master tag.
+ * 
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3
+ * 
+ * @returns AnalyzeTagConsolidationResult with suggestions or error
+ */
+export async function analyzeTagConsolidation(): Promise<AnalyzeTagConsolidationResult> {
+  // Check if OpenAI API key is configured
+  if (!process.env.OPENAI_API_KEY) {
+    return { ok: false, error: 'NOT_CONFIGURED' }
+  }
+
+  const user = await getUser()
+  if (!user) {
+    return { ok: false, error: 'AUTH_ERROR' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+
+  // Fetch all tags for the user
+  const { data: tags, error: fetchError } = await supabase
+    .from('tags')
+    .select('id, name')
+    .eq('user_id', user.id)
+    .order('name')
+
+  if (fetchError) {
+    console.error('Failed to fetch tags:', fetchError)
+    return { ok: false, error: 'AI_ERROR' }
+  }
+
+  if (!tags || tags.length === 0) {
+    return { ok: true, suggestions: [] }
+  }
+
+  // Build lookup map for resolution
+  const tagLookup = buildTagLookup(tags)
+  const tagNames = tags.map(t => t.name)
+
+  // Batch tags if needed (< 200 = single batch, otherwise chunks of 100)
+  const batches = batchTagsForAnalysis(tagNames)
+
+  // Process each batch and collect suggestions
+  const allSuggestions: MergeSuggestion[] = []
+
+  for (const batch of batches) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a data cleanup assistant. Analyze the provided list of tags and identify groups that should be merged due to:
+- Typos (e.g., "Adrenalgland" should be "Adrenal Glands")
+- Synonyms (e.g., "OB" and "Obstetrics")
+- Casing inconsistencies (e.g., "adrenal glands" and "Adrenal Glands")
+- Spacing/punctuation issues (e.g., "Adrenal-gland" and "Adrenal Glands")
+
+For each group, choose the most correct/canonical form as the "master" tag.
+
+Return ONLY valid JSON in this exact format:
+{
+  "groups": [
+    {
+      "master": "Canonical Tag Name",
+      "variations": ["typo1", "synonym1", "casing-variant"]
+    }
+  ]
+}
+
+If no duplicates/synonyms are found, return: {"groups": []}`,
+          },
+          {
+            role: 'user',
+            content: `Analyze these tags for duplicates, typos, and synonyms:\n\n${batch.join('\n')}`,
+          },
+        ],
+      })
+
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        console.error('OpenAI returned empty content')
+        continue
+      }
+
+      // Parse the AI response
+      const parsed = parseConsolidationResponse(content)
+      if (!parsed) {
+        console.error('Failed to parse AI response:', content)
+        continue
+      }
+
+      // Resolve suggestions to database IDs
+      const resolved = resolveTagSuggestions(parsed, tagLookup)
+      allSuggestions.push(...resolved)
+    } catch (error) {
+      console.error('OpenAI API error:', error)
+      return { ok: false, error: 'AI_ERROR' }
+    }
+  }
+
+  return { ok: true, suggestions: allSuggestions }
 }
