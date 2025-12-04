@@ -37,6 +37,24 @@
       "autoApprove": [
         "create_directory"
       ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "disabled": true,
+      "autoApprove": []
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@jpisnice/shadcn-ui-mcp-server@latest"
+      ],
+      "disabled": false,
+      "autoApprove": []
     }
   }
 }
