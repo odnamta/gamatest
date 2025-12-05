@@ -12,7 +12,7 @@ import {
 import {
   isSupportedSpecialty,
   SUPPORTED_SPECIALTIES,
-} from '@/actions/onboarding-actions'
+} from '@/lib/onboarding-constants'
 
 describe('V10.5 Brand Unification & Starter Packs - Property Tests', () => {
   /**

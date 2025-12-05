@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { isSupportedSpecialty } from '@/lib/onboarding-constants'
 
 /**
  * Result type for enrollment actions
@@ -11,27 +12,6 @@ export interface EnrollResult {
   success: boolean
   enrolledCount: number
   error?: string
-}
-
-/**
- * Starter pack configuration by specialty.
- * For V1, we query public decks dynamically rather than hardcoding IDs.
- * This allows the starter pack to grow as more content is added.
- * 
- * Requirements: 4.1
- */
-export const SUPPORTED_SPECIALTIES = ['OBGYN'] as const
-export type SupportedSpecialty = typeof SUPPORTED_SPECIALTIES[number]
-
-/**
- * Checks if a specialty is supported for starter pack enrollment.
- * Used for property testing.
- * 
- * @param specialty - The specialty to check
- * @returns true if the specialty has a starter pack
- */
-export function isSupportedSpecialty(specialty: string): specialty is SupportedSpecialty {
-  return SUPPORTED_SPECIALTIES.includes(specialty as SupportedSpecialty)
 }
 
 /**
