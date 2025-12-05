@@ -297,6 +297,9 @@ export function GlobalStudySession({
             selectedIndex={selectedIndex}
             correctIndex={isAnswered ? currentCard.correct_index : null}
             disabled={isShowingFeedback}
+            cardTemplateId={currentCard.id}
+            isFlagged={currentCard.is_flagged}
+            notes={currentCard.notes}
           />
           {/* V8.2: Continue button or auto-advance indicator */}
           {isAnswered && (
@@ -324,6 +327,9 @@ export function GlobalStudySession({
             imageUrl={currentCard.image_url}
             isRevealed={isRevealed}
             onReveal={handleReveal}
+            cardTemplateId={currentCard.id}
+            isFlagged={currentCard.is_flagged}
+            notes={currentCard.notes}
           />
           {/* Rating buttons - only show when revealed */}
           {isRevealed && (

@@ -40,6 +40,7 @@ export default async function CustomStudyPage({ searchParams }: CustomStudyPageP
     deckIds: config.deckIds,
     mode: config.mode,
     limit: config.limit,
+    flaggedOnly: config.flaggedOnly,
   })
 
   // Fetch user stats for streak display
@@ -88,12 +89,16 @@ export default async function CustomStudyPage({ searchParams }: CustomStudyPageP
             No Cards Found
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            {config.mode === 'due' 
-              ? 'No cards are due for review with your selected filters.'
-              : 'No cards match your selected filters.'}
+            {config.flaggedOnly
+              ? 'No flagged cards match your selected filters.'
+              : config.mode === 'due' 
+                ? 'No cards are due for review with your selected filters.'
+                : 'No cards match your selected filters.'}
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Try selecting different tags or decks, or switch to &quot;Cram All&quot; mode.
+            {config.flaggedOnly
+              ? 'Try flagging some cards first, or disable the flagged-only filter.'
+              : 'Try selecting different tags or decks, or switch to "Cram All" mode.'}
           </p>
         </div>
       </div>

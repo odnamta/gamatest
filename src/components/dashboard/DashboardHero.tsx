@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Flame, Play, RotateCcw, Settings, Library, Plus } from 'lucide-react'
 import { ConfigureSessionModal } from '@/components/study/ConfigureSessionModal'
+import { SearchBar } from '@/components/search/SearchBar'
+import { SingleCardPreviewModal } from '@/components/search/SingleCardPreviewModal'
 import { shouldShowWelcomeMode } from '@/lib/onboarding-utils'
 
 /**
@@ -126,6 +128,8 @@ export function DashboardHero({
   const [hasUnfinishedSession, setHasUnfinishedSession] = useState(false)
   // V6.3: Custom session modal state
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false)
+  // V10.6: Search preview modal state
+  const [previewCardId, setPreviewCardId] = useState<string | null>(null)
 
   // Check for unfinished session on mount (client-side only)
   useEffect(() => {
@@ -159,6 +163,11 @@ export function DashboardHero({
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
         {userName ? `Hi ${userName} 👋` : 'Hey there 👋'} Ready to study?
       </h1>
+
+      {/* V10.6: Global Search Bar */}
+      <div className="mb-6">
+        <SearchBar onResultClick={(cardId) => setPreviewCardId(cardId)} />
+      </div>
 
       {/* Stats Row */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -275,6 +284,13 @@ export function DashboardHero({
       <ConfigureSessionModal
         isOpen={isCustomModalOpen}
         onClose={() => setIsCustomModalOpen(false)}
+      />
+
+      {/* V10.6: Single Card Preview Modal */}
+      <SingleCardPreviewModal
+        isOpen={previewCardId !== null}
+        onClose={() => setPreviewCardId(null)}
+        cardTemplateId={previewCardId}
       />
     </Card>
   )

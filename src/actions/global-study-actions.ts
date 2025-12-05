@@ -40,6 +40,9 @@ function templateToCard(template: CardTemplate, progress?: UserCardProgress): Ca
     ease_factor: progress?.ease_factor ?? 2.5,
     next_review: progress?.next_review ?? new Date().toISOString(),
     created_at: template.created_at,
+    // V10.6: Digital Notebook
+    is_flagged: progress?.is_flagged ?? false,
+    notes: progress?.notes ?? null,
   }
 }
 

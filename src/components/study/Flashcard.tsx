@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { MarkdownContent } from './MarkdownContent'
 import { ImageModal } from '@/components/ui/ImageModal'
+import { FlagIcon } from './FlagIcon'
+import { NotesSection } from './NotesSection'
 
 export interface FlashcardProps {
   front: string
@@ -12,6 +14,10 @@ export interface FlashcardProps {
   imageUrl?: string | null
   isRevealed: boolean
   onReveal: () => void
+  // V10.6: Digital Notebook
+  cardTemplateId?: string
+  isFlagged?: boolean
+  notes?: string | null
 }
 
 /**
@@ -24,15 +30,35 @@ export interface FlashcardProps {
  * - Back text light: slate-600 (#475569) on white = 6.08:1 ✓
  * - Back text dark: slate-300 (#cbd5e1) on slate-800 = 7.53:1 ✓
  */
-export function Flashcard({ front, back, imageUrl, isRevealed, onReveal }: FlashcardProps) {
+export function Flashcard({ 
+  front, 
+  back, 
+  imageUrl, 
+  isRevealed, 
+  onReveal,
+  cardTemplateId,
+  isFlagged = false,
+  notes = null,
+}: FlashcardProps) {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
 
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Card container - light/dark mode support (Requirements 4.4, 4.5) */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 min-h-[300px] flex flex-col shadow-sm dark:shadow-none">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 min-h-[300px] flex flex-col shadow-sm dark:shadow-none relative">
+        {/* V10.6: Flag icon - top right corner */}
+        {cardTemplateId && (
+          <div className="absolute top-4 right-4">
+            <FlagIcon
+              cardTemplateId={cardTemplateId}
+              isFlagged={isFlagged}
+              size="md"
+            />
+          </div>
+        )}
+
         {/* Front content - always visible */}
-        <div className="flex-1">
+        <div className="flex-1 pr-8">
           {/* Image if present - using Next.js Image for optimization (Requirements 6.1, 6.2, 6.3) */}
           {imageUrl && (
             <div className="mb-4 relative w-full h-48">
@@ -61,6 +87,14 @@ export function Flashcard({ front, back, imageUrl, isRevealed, onReveal }: Flash
             <div className="text-lg text-slate-600 dark:text-slate-300">
               <MarkdownContent content={back} />
             </div>
+            
+            {/* V10.6: Notes section - shown when revealed */}
+            {cardTemplateId && (
+              <NotesSection
+                cardTemplateId={cardTemplateId}
+                initialNotes={notes}
+              />
+            )}
           </>
         )}
       </div>

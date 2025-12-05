@@ -30,6 +30,8 @@ export function ConfigureSessionModal({ isOpen, onClose }: ConfigureSessionModal
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([])
   const [mode, setMode] = useState<SessionMode>('due')
   const [limit, setLimit] = useState(50)
+  // V10.6: Flagged only filter
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
   
   // Deck options
   const [decks, setDecks] = useState<DeckOption[]>([])
@@ -59,6 +61,7 @@ export function ConfigureSessionModal({ isOpen, onClose }: ConfigureSessionModal
       setSelectedDeckIds([])
       setMode('due')
       setLimit(50)
+      setFlaggedOnly(false)
     }
   }, [isOpen])
 
@@ -76,6 +79,7 @@ export function ConfigureSessionModal({ isOpen, onClose }: ConfigureSessionModal
       deckIds: selectedDeckIds,
       mode,
       limit,
+      flaggedOnly,
     }
     
     const url = buildCustomStudyUrl(config)
@@ -194,6 +198,26 @@ export function ConfigureSessionModal({ isOpen, onClose }: ConfigureSessionModal
                 </div>
               </label>
             </div>
+          </div>
+
+          {/* V10.6: Flagged Only Toggle */}
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={flaggedOnly}
+                onChange={(e) => setFlaggedOnly(e.target.checked)}
+                className="w-5 h-5 text-amber-500 rounded border-slate-300 dark:border-slate-600 focus:ring-amber-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Study Flagged Cards Only
+                </span>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Only include cards you&apos;ve bookmarked
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Limit */}

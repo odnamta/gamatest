@@ -26,6 +26,9 @@ export interface Card {
   ease_factor: number;
   next_review: string;
   created_at: string;
+  // V10.6: Digital Notebook
+  is_flagged?: boolean;
+  notes?: string | null;
 }
 
 // MCQ-specific card type with non-nullable MCQ fields
@@ -225,6 +228,9 @@ export interface UserCardProgress {
   // V10.2: Accuracy tracking
   correct_count: number;
   total_attempts: number;
+  // V10.6: Digital Notebook
+  is_flagged: boolean;
+  notes: string | null;
 }
 
 // Extended CardTemplate type with tags included

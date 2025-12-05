@@ -10,6 +10,8 @@ export interface CustomSessionConfig {
   deckIds: string[]
   mode: SessionMode
   limit: number
+  // V10.6: Flagged study mode
+  flaggedOnly?: boolean
 }
 
 const DEFAULT_LIMIT = 50
@@ -32,6 +34,11 @@ export function encodeSessionParams(config: CustomSessionConfig): string {
   params.set('mode', config.mode)
   params.set('limit', String(Math.min(config.limit, MAX_LIMIT)))
   
+  // V10.6: Flagged only filter
+  if (config.flaggedOnly) {
+    params.set('flagged', 'true')
+  }
+  
   return params.toString()
 }
 
@@ -43,6 +50,7 @@ export function decodeSessionParams(searchParams: URLSearchParams): CustomSessio
   const decksParam = searchParams.get('decks')
   const modeParam = searchParams.get('mode')
   const limitParam = searchParams.get('limit')
+  const flaggedParam = searchParams.get('flagged')
   
   return {
     tagIds: tagsParam ? tagsParam.split(',').filter(Boolean) : [],
@@ -52,6 +60,8 @@ export function decodeSessionParams(searchParams: URLSearchParams): CustomSessio
       Math.max(1, parseInt(limitParam || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT),
       MAX_LIMIT
     ),
+    // V10.6: Flagged only filter
+    flaggedOnly: flaggedParam === 'true',
   }
 }
 

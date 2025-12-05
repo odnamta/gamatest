@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { MarkdownContent } from './MarkdownContent'
 import { ImageModal } from '@/components/ui/ImageModal'
+import { FlagIcon } from './FlagIcon'
+import { NotesSection } from './NotesSection'
 import type { MCQCard } from '@/types/database'
 
 export interface MCQQuestionProps {
@@ -14,6 +16,10 @@ export interface MCQQuestionProps {
   correctIndex: number | null
   /** V8.2: External disable control for feedback phase */
   disabled?: boolean
+  // V10.6: Digital Notebook
+  cardTemplateId?: string
+  isFlagged?: boolean
+  notes?: string | null
 }
 
 /**
@@ -30,6 +36,9 @@ export function MCQQuestion({
   selectedIndex,
   correctIndex,
   disabled = false,
+  cardTemplateId,
+  isFlagged = false,
+  notes = null,
 }: MCQQuestionProps) {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
 
@@ -72,7 +81,18 @@ export function MCQQuestion({
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Card container */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm dark:shadow-none">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm dark:shadow-none relative">
+        {/* V10.6: Flag icon - top right corner */}
+        {cardTemplateId && (
+          <div className="absolute top-4 right-4">
+            <FlagIcon
+              cardTemplateId={cardTemplateId}
+              isFlagged={isFlagged}
+              size="md"
+            />
+          </div>
+        )}
+
         {/* Image if present */}
         {card.image_url && (
           <div className="mb-4 relative w-full h-48">
@@ -124,6 +144,14 @@ export function MCQQuestion({
               <MarkdownContent content={card.explanation} />
             </div>
           </div>
+        )}
+
+        {/* V10.6: Notes section - shown after answering */}
+        {isAnswered && cardTemplateId && (
+          <NotesSection
+            cardTemplateId={cardTemplateId}
+            initialNotes={notes}
+          />
         )}
       </div>
 

@@ -12,6 +12,8 @@ export interface CustomSessionInput {
   deckIds?: string[]
   mode: SessionMode
   limit: number
+  // V10.6: Flagged only filter
+  flaggedOnly?: boolean
 }
 
 /**
@@ -63,6 +65,9 @@ function templateToCard(
     ease_factor: progress?.ease_factor ?? 2.5,
     next_review: progress?.next_review ?? new Date().toISOString(),
     created_at: template.created_at,
+    // V10.6: Digital Notebook
+    is_flagged: progress?.is_flagged ?? false,
+    notes: progress?.notes ?? null,
   }
 }
 
@@ -90,7 +95,7 @@ export async function getCustomSessionCardsV2(
     }
   }
 
-  const { tagIds = [], deckIds = [], mode, limit } = input
+  const { tagIds = [], deckIds = [], mode, limit, flaggedOnly = false } = input
   const supabase = await createSupabaseServerClient()
   const now = new Date().toISOString()
 
@@ -237,6 +242,11 @@ export async function getCustomSessionCardsV2(
       cards = cards.filter(c => new Date(c.next_review) <= new Date(now))
       // Sort by next_review ascending (most overdue first)
       cards.sort((a, b) => new Date(a.next_review).getTime() - new Date(b.next_review).getTime())
+    }
+
+    // V10.6: Filter to flagged cards only if requested
+    if (flaggedOnly) {
+      cards = cards.filter(c => c.is_flagged === true)
     }
 
     const totalMatching = cards.length
