@@ -1,9 +1,63 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
 import { LegalFooter } from '@/components/auth/LegalFooter'
+
+/**
+ * Extracts OAuth error from URL (query string or hash fragment)
+ * Supabase may put errors in either location depending on the flow
+ */
+function extractOAuthError(): { error: string; description: string } | null {
+  if (typeof window === 'undefined') return null
+  
+  // Check query string first
+  const searchParams = new URLSearchParams(window.location.search)
+  let error = searchParams.get('error')
+  let description = searchParams.get('error_description')
+  
+  // If not in query string, check hash fragment
+  if (!error && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    error = hashParams.get('error')
+    description = hashParams.get('error_description')
+  }
+  
+  if (error) {
+    return {
+      error,
+      description: description ? decodeURIComponent(description.replace(/\+/g, ' ')) : error,
+    }
+  }
+  
+  return null
+}
+
+/**
+ * Clears error params from URL without triggering navigation
+ */
+function clearErrorFromUrl(): void {
+  if (typeof window === 'undefined') return
+  
+  const url = new URL(window.location.href)
+  url.searchParams.delete('error')
+  url.searchParams.delete('error_description')
+  url.searchParams.delete('error_code')
+  
+  // Clear hash if it contains error params
+  if (url.hash) {
+    const hashParams = new URLSearchParams(url.hash.substring(1))
+    if (hashParams.has('error')) {
+      hashParams.delete('error')
+      hashParams.delete('error_description')
+      hashParams.delete('error_code')
+      url.hash = hashParams.toString() ? `#${hashParams.toString()}` : ''
+    }
+  }
+  
+  window.history.replaceState({}, '', url.toString())
+}
 
 /**
  * App Logo component
@@ -75,10 +129,20 @@ function GoogleSignInButton({
 /**
  * LoginPage - Pinterest-style Google-only authentication
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6
+ * V10.5: Added OAuth error handling from URL params
  */
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+
+  // Check for OAuth errors in URL on mount
+  useEffect(() => {
+    const oauthError = extractOAuthError()
+    if (oauthError) {
+      setError(oauthError.description)
+      clearErrorFromUrl()
+    }
+  }, [])
 
   async function handleGoogleSignIn() {
     setError(null)
