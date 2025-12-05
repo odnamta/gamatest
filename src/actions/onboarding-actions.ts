@@ -80,3 +80,65 @@ export async function enrollInStarterPack(specialty: string): Promise<EnrollResu
 
   return { success: true, enrolledCount: publicDecks.length }
 }
+
+
+/**
+ * Result type for profile update actions
+ */
+export interface ProfileUpdateResult {
+  success: boolean
+  error?: string
+}
+
+/**
+ * Updates user profile metadata (specialty, name).
+ * If specialty changes, triggers re-enrollment in starter pack.
+ * 
+ * V10.5.1: Profile Settings
+ * 
+ * @param specialty - The user's selected specialty
+ * @param displayName - Optional display name
+ * @returns ProfileUpdateResult with success status
+ */
+export async function updateUserProfile(
+  specialty: string,
+  displayName?: string
+): Promise<ProfileUpdateResult> {
+  const user = await getUser()
+  if (!user) {
+    return { success: false, error: 'Authentication required' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  
+  // Get current specialty to check if it changed
+  const currentSpecialty = user.user_metadata?.specialty
+
+  // Update user metadata
+  const updateData: Record<string, unknown> = { specialty }
+  if (displayName !== undefined) {
+    updateData.full_name = displayName
+    updateData.name = displayName
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(
+    user.id,
+    { user_metadata: { ...user.user_metadata, ...updateData } }
+  )
+
+  if (updateError) {
+    // Fallback: try client-side update approach via RPC or direct metadata update
+    // For now, return error - admin API requires service role
+    return { success: false, error: 'Unable to update profile. Please try again.' }
+  }
+
+  // If specialty changed, re-enroll in starter pack
+  if (specialty !== currentSpecialty) {
+    await enrollInStarterPack(specialty)
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/dashboard')
+
+  return { success: true }
+}

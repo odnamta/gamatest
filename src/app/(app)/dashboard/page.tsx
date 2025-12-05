@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { DashboardHero } from '@/components/dashboard/DashboardHero'
 import { LibrarySection } from '@/components/dashboard/LibrarySection'
@@ -7,7 +6,7 @@ import { RepairButton } from '@/components/dashboard/RepairButton'
 import type { CourseWithProgress } from '@/components/course'
 import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
 import { getGlobalStats } from '@/actions/global-study-actions'
-import { shouldRedirectToLibrary, isUserAdmin, ADMIN_USER_IDS } from '@/lib/onboarding-utils'
+import { isUserAdmin, ADMIN_USER_IDS } from '@/lib/onboarding-utils'
 import type { DeckWithDueCount, Course, Lesson, LessonProgress } from '@/types/database'
 
 /**
@@ -128,11 +127,8 @@ export default async function DashboardPage() {
     )
   }
 
-  // V10.4: Redirect to library if user has no subscribed decks
+  // V10.5.1: Removed redirect to library - let users stay on dashboard in Welcome Mode
   const subscribedDecksCount = userDecks?.length || 0
-  if (shouldRedirectToLibrary(subscribedDecksCount)) {
-    redirect('/library')
-  }
 
   // V10.4: Check if user is admin
   const userIsAdmin = isUserAdmin(user.id, ADMIN_USER_IDS)
