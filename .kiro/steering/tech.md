@@ -4,16 +4,25 @@
 - **Next.js 16** with App Router (React 19)
 - **TypeScript** with strict mode
 - **Node.js 20+**
+- **PWA** via next-pwa (ensure `buildExcludes: [/middleware-manifest\.json$/]` in next.config.mjs)
 
 ## Database & Auth
 - **Supabase** (PostgreSQL + Auth + Row Level Security)
 - Server-side client via `@supabase/ssr`
 - RLS policies enforce data access at database level
+- **Google OAuth ONLY** - No email/password authentication
 
 ## Styling
 - **Tailwind CSS 4** with `@tailwindcss/typography` plugin
 - Dark mode support via `next-themes`
 - Geist font family (Sans + Mono)
+- **"Clinical Glass" Aesthetic**: `bg-slate-50`, `backdrop-blur-md`, `bg-white/80`
+- **Mobile-first**: Default to `flex-col` layouts, test for 375px width
+
+## UI Components
+- **Custom components only** in `src/components/ui`
+- Do NOT use Shadcn CLI or external UI libraries
+- Buttons must have `active:scale-95` micro-interaction
 
 ## Key Libraries
 - `zod` - Schema validation (forms, API inputs)
@@ -61,3 +70,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ## Path Aliases
 
 `@/*` maps to `./src/*` (configured in tsconfig.json)
+
+## MCP Integration
+
+Use the `supabase` MCP server for schema inspection before writing database queries.

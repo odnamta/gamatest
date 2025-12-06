@@ -1,31 +1,37 @@
-# Agent Steering Rules & Invariants
+# 🛡️ Agent Steering Rules: "Specialize" (V10)
 
-## 1. The "V2 Only" Law (Critical)
+## 1. Product Identity & Design
 
-- **Database:** NEVER read/write to legacy tables (`public.cards`, `public.decks`)
-- **Architecture:** ALWAYS use the Shared Library schema:
-  - Content: `deck_templates`, `card_templates` (Shared)
-  - Progress: `user_decks`, `user_card_progress` (Private)
-- **Code:** If you see `USE_V2_SCHEMA`, assume it is TRUE. Do not write fallback logic for V1.
+- **Name:** "Specialize" (Medical Board Prep).
+- **Target Audience:** Busy Medical Residents (Mobile-first, tired eyes).
+- **Aesthetic:** "Clinical Glass." Use `bg-slate-50`, `backdrop-blur-md`, and `bg-white/80`.
+- **UI System:** Do NOT use external UI libraries (Shadcn CLI). Use the custom components in `src/components/ui`.
+- **Buttons:** Must have `active:scale-95` micro-interaction.
+- **Layout:** Fixed bottom navigation on mobile (`MobileNavBar`).
 
-## 2. Medical Data Integrity
+## 2. Authentication (Strict)
 
-- **Units:** NEVER convert units (e.g., lb to kg, cm to inches). Medical thresholds are specific.
-- **Numbers:** Do not round or "clean up" clinical values.
-- **Prompting:** When writing AI prompts, always include: "Extract verbatim. Do not invent missing values."
+- **Provider:** **Google OAuth ONLY.**
+- **Prohibited:** Do NOT build Email/Password forms, Sign Up toggles, or Forgot Password flows.
+- **Onboarding:** New users must go through the "Welcome Wizard" (Specialty Selection) before accessing the Dashboard.
 
-## 3. Tech Stack Constraints
+## 3. Data Architecture (The V2 Law)
 
-- **Mutations:** ALL database writes must happen in **Server Actions** (`src/actions/`). Never call Supabase directly from Client Components.
-- **Fetching:** Use `createSupabaseServerClient` in Server Components.
-- **Styling:** Mobile-First is mandatory. Default to `flex-col` for layouts. Test for 375px width.
+- **Legacy Tables:** NEVER read/write to `public.cards` or `public.decks`. They are dead.
+- **Shared Content:** Content lives in `deck_templates` and `card_templates` (Shared).
+- **User Progress:** Study data lives in `user_decks` and `user_card_progress` (Private).
+- **Permissions:**
+  - **Students:** READ templates, WRITE progress.
+  - **Authors:** WRITE templates, WRITE progress.
 
-## 4. Study Engine Logic
+## 4. Medical Data Integrity
 
-- **Groundhog Day Prevention:** When updating a card review, you must calculate `next_review` > `now()`.
-- **Lazy Seeding:** Do NOT create `user_card_progress` rows on subscription. Only create them when the user *answers* the card (Just-in-Time).
+- **Units:** NEVER convert units (e.g., maintain `2500g`, do not change to `5.5lbs`).
+- **AI Generation:** When drafting questions, extracting text must be **verbatim**. Do not invent missing values.
+- **Tags:** Use the 3-Tier Taxonomy (Source / Topic / Concept).
 
-## 5. File Structure Enforcement
+## 5. Technical Constraints
 
-- **New Components:** Place in `src/components/[feature]/`. Do not dump in root.
-- **Tests:** Property tests (`__tests__`) are required for complex logic (SRS math, Batch parsing).
+- **PWA:** Ensure `buildExcludes: [/middleware-manifest\.json$/]` stays in `next.config.mjs` to prevent Vercel build crashes.
+- **Server Actions:** Must be `async`. Do not put synchronous helpers in `src/actions`.
+- **Database:** Use `supabase` MCP for schema inspection before writing queries.
