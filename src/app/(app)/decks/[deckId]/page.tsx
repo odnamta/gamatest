@@ -15,6 +15,7 @@ import type { Card, Tag, DeckVisibility } from '@/types/database'
 
 // Type for card template with nested tags from Supabase join
 // V9: Added category field to tags
+// V11.1: Added book_source for virtual source badge
 // Note: Supabase returns tags as single object for foreign key join
 interface CardTemplateWithNestedTags {
   id: string
@@ -23,6 +24,11 @@ interface CardTemplateWithNestedTags {
   correct_index: number
   explanation: string | null
   created_at: string
+  book_source_id: string | null
+  book_sources: {
+    id: string
+    title: string
+  } | null
   card_template_tags: Array<{
     tags: {
       id: string
@@ -34,6 +40,7 @@ interface CardTemplateWithNestedTags {
 }
 
 // Type for raw Supabase response (tags can be array due to join behavior)
+// V11.1: Added book_source for virtual source badge
 interface CardTemplateRaw {
   id: string
   stem: string
@@ -41,6 +48,11 @@ interface CardTemplateRaw {
   correct_index: number
   explanation: string | null
   created_at: string
+  book_source_id: string | null
+  book_sources: {
+    id: string
+    title: string
+  } | null
   card_template_tags: Array<{
     tags: {
       id: string
@@ -57,8 +69,13 @@ interface CardTemplateRaw {
 }
 
 // Extended Card type with tags for CardList
+// V11.1: Added book_source for virtual source badge
 interface CardWithTags extends Card {
   tags: Tag[]
+  book_source?: {
+    id: string
+    title: string
+  } | null
 }
 
 interface DeckDetailsPageProps {
@@ -120,6 +137,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
 
   // V8.0: Fetch card_templates for this deck_template
   // V8.5: Join with card_template_tags and tags to fetch associated tags
+  // V11.1: Join with book_sources for virtual source badge
   const { data: cardTemplates, error: cardsError } = await supabase
     .from('card_templates')
     .select(`
@@ -129,6 +147,11 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       correct_index,
       explanation,
       created_at,
+      book_source_id,
+      book_sources (
+        id,
+        title
+      ),
       card_template_tags (
         tags (
           id,
@@ -181,6 +204,8 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       next_review: new Date().toISOString(),
       created_at: ct.created_at,
       tags,
+      // V11.1: Include book_source for virtual source badge
+      book_source: ct.book_sources || null,
     }
   })
 

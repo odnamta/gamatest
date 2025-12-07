@@ -3,11 +3,20 @@
 import Link from 'next/link'
 import { Pencil, Trash2, Copy } from 'lucide-react'
 import { TagBadge } from '@/components/tags/TagBadge'
+import { SourceBadge } from './SourceBadge'
 import { sortTagsByCategory } from '@/lib/tag-sort'
 import type { Card, Tag } from '@/types/database'
 
+// V11.1: Extended card type with book_source for virtual source badge
+interface CardWithSource extends Card {
+  book_source?: {
+    id: string
+    title: string
+  } | null
+}
+
 interface CardListItemProps {
-  card: Card
+  card: CardWithSource
   deckId: string
   tags?: Tag[]
   onDelete?: (cardId: string, preview: string, type: string) => void
@@ -76,6 +85,10 @@ export function CardListItem({ card, deckId, tags = [], onDelete, onDuplicate, i
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                 Has image
               </span>
+            )}
+            {/* V11.1: Virtual Source badge from book_sources (NOT a real tag) */}
+            {card.book_source && (
+              <SourceBadge title={card.book_source.title} />
             )}
             {/* Tag badges - V9.4: Sorted by category (Source → Topic → Concept) */}
             {sortTagsByCategory(tags).map((tag) => (

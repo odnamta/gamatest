@@ -2,57 +2,34 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getUserTags } from '@/actions/tag-actions'
+import { getImportContext, updateImportContext } from '@/lib/import-context-storage'
 import type { Tag } from '@/types/database'
 
 /**
  * Hook for managing session tags on the Bulk Import page.
  * 
+ * V11.1: Session tags are now persisted via unified import context storage.
  * Session tags are persisted in localStorage per deck and automatically
  * applied to all cards created from the Bulk Import page.
  * 
- * Requirements: R2.1 - Session Tag Selector
+ * Requirements: R2.1 - Session Tag Selector, V11.1 5.3, 5.4
  */
 
-const STORAGE_KEY_PREFIX = 'session_tags_'
-
 /**
- * Get the localStorage key for a specific deck.
- */
-function getStorageKey(deckId: string): string {
-  return `${STORAGE_KEY_PREFIX}${deckId}`
-}
-
-/**
- * Safely read from localStorage.
+ * Safely read session tag IDs from import context storage.
+ * V11.1: Uses unified import context storage
  */
 function readFromStorage(deckId: string): string[] {
-  if (typeof window === 'undefined') return []
-  
-  try {
-    const stored = localStorage.getItem(getStorageKey(deckId))
-    if (!stored) return []
-    
-    const parsed = JSON.parse(stored)
-    if (!Array.isArray(parsed)) return []
-    
-    // Filter to only valid strings
-    return parsed.filter((item): item is string => typeof item === 'string')
-  } catch {
-    return []
-  }
+  const context = getImportContext(deckId)
+  return context.sessionTagIds
 }
 
 /**
- * Safely write to localStorage.
+ * Safely write session tag IDs to import context storage.
+ * V11.1: Uses unified import context storage
  */
 function writeToStorage(deckId: string, tagIds: string[]): void {
-  if (typeof window === 'undefined') return
-  
-  try {
-    localStorage.setItem(getStorageKey(deckId), JSON.stringify(tagIds))
-  } catch {
-    // Ignore storage errors (quota exceeded, etc.)
-  }
+  updateImportContext(deckId, { sessionTagIds: tagIds })
 }
 
 export interface UseSessionTagsReturn {

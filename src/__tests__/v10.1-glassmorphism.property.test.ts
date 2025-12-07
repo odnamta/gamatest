@@ -215,7 +215,15 @@ describe('Property 3: Onboarding Metadata Persistence', () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...SPECIALTIES),
-        fc.option(fc.date().map(d => d.toISOString())),
+        // Use integer-based date generation to avoid invalid time values
+        fc.option(
+          fc.integer({ min: 0, max: 3650 }) // Days from 2020-01-01
+            .map(days => {
+              const date = new Date('2020-01-01');
+              date.setDate(date.getDate() + days);
+              return date.toISOString();
+            })
+        ),
         (specialty, examDate) => {
           const data = {
             onboarded: true,

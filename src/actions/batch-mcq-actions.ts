@@ -338,7 +338,16 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
 // ============================================
 
 /**
+ * V11: Matching block data for automatic matching_group creation
+ */
+export interface MatchingBlockInput {
+  commonOptions: string[]      // The shared options (A, B, C, D, E texts)
+  instructionText?: string     // Optional instruction text for the matching set
+}
+
+/**
  * V8.0 Input type for bulk create with deck_template_id
+ * V11: Extended with optional book/chapter/matching group context
  */
 export interface BulkCreateV2Input {
   deckTemplateId: string
@@ -349,7 +358,14 @@ export interface BulkCreateV2Input {
     correctIndex: number
     explanation?: string
     tagNames: string[]
+    questionNumber?: number  // V11: Original question number from source
   }>
+  // V11: Structured content context (all optional for backwards compatibility)
+  bookSourceId?: string
+  chapterId?: string
+  matchingGroupId?: string
+  // V11: Matching block data - when provided, creates a matching_group and links all cards
+  matchingBlockData?: MatchingBlockInput
 }
 
 /**
@@ -360,7 +376,26 @@ export interface BulkCreateV2Input {
  * @returns BulkCreateResult
  */
 export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCreateResult> {
-  const { deckTemplateId, sessionTags = [], cards } = input
+  const { 
+    deckTemplateId, 
+    sessionTags = [], 
+    cards,
+    // V11: Structured content context
+    bookSourceId,
+    chapterId,
+    matchingGroupId,
+    matchingBlockData,
+  } = input
+  
+  // V11: Log structured content context if provided
+  if (bookSourceId || chapterId || matchingGroupId || matchingBlockData) {
+    console.log('[bulkCreateMCQV2] V11: Structured content context:', {
+      bookSourceId,
+      chapterId,
+      matchingGroupId,
+      hasMatchingBlockData: !!matchingBlockData,
+    })
+  }
   
   const user = await getUser()
   if (!user) {
@@ -386,6 +421,33 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
   }
   
   try {
+    // V11: Step 0 - Create matching_group if matchingBlockData is provided
+    // This creates the group first so we can link all cards to it
+    let effectiveMatchingGroupId = matchingGroupId || null
+    
+    if (matchingBlockData && matchingBlockData.commonOptions.length >= 2) {
+      console.log('[bulkCreateMCQV2] V11: Creating matching_group for block with', 
+        matchingBlockData.commonOptions.length, 'options')
+      
+      const { data: newGroup, error: groupError } = await supabase
+        .from('matching_groups')
+        .insert({
+          chapter_id: chapterId || null,
+          common_options: matchingBlockData.commonOptions,
+          instruction_text: matchingBlockData.instructionText || null,
+        })
+        .select('id')
+        .single()
+      
+      if (groupError) {
+        console.error('[bulkCreateMCQV2] V11: Failed to create matching_group:', groupError)
+        // Non-fatal: continue without matching group linking
+      } else if (newGroup) {
+        effectiveMatchingGroupId = newGroup.id
+        console.log('[bulkCreateMCQV2] V11: Created matching_group:', effectiveMatchingGroupId)
+      }
+    }
+    
     // Step 1: Collect all unique tag names
     // V8.4: Added defensive checks and logging for tag persistence
     const allTagNames = new Set<string>()
@@ -462,6 +524,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     }
     
     // Step 3: Insert card_templates
+    // V11: Include structured content foreign keys if provided
+    // V11.5: Use effectiveMatchingGroupId which may be auto-created from matchingBlockData
     const cardTemplateRows = cards.map((card) => ({
       deck_template_id: deckTemplateId,
       author_id: user.id,
@@ -470,6 +534,11 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       correct_index: card.correctIndex,
       explanation: card.explanation || null,
       source_meta: null,
+      // V11: Structured content fields (null if not provided for backwards compatibility)
+      book_source_id: bookSourceId || null,
+      chapter_id: chapterId || null,
+      question_number: card.questionNumber || null,
+      matching_group_id: effectiveMatchingGroupId,
     }))
     
     const { data: insertedTemplates, error: insertError } = await supabase

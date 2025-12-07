@@ -14,7 +14,9 @@
         "list_projects",
         "list_tables",
         "execute_sql",
-        "apply_migration"
+        "apply_migration",
+        "get_advisors",
+        "get_advisors"
       ]
     },
     "context7": {

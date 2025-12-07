@@ -5,6 +5,12 @@ import { TagBadge } from './TagBadge'
 import { getCategoryColorClasses } from '@/lib/tag-colors'
 import type { Tag, TagCategory } from '@/types/database'
 
+// V11.1: Source type for source filtering
+interface BookSourceFilter {
+  id: string
+  title: string
+}
+
 interface FilterBarProps {
   tags: Tag[]
   selectedTagIds: string[]
@@ -14,6 +20,10 @@ interface FilterBarProps {
   showUntaggedOnly?: boolean
   onShowUntaggedOnlyChange?: (value: boolean) => void
   untaggedCount?: number
+  // V11.1: Source filtering props
+  availableSources?: BookSourceFilter[]
+  selectedSourceIds?: string[]
+  onSourcesChange?: (sourceIds: string[]) => void
 }
 
 /**
@@ -54,16 +64,22 @@ export function FilterBar({
   showUntaggedOnly,
   onShowUntaggedOnlyChange,
   untaggedCount,
+  // V11.1: Source filtering
+  availableSources = [],
+  selectedSourceIds = [],
+  onSourcesChange,
 }: FilterBarProps) {
   // V9.2: Show untagged toggle even when no tags selected
   const hasUntaggedToggle = onShowUntaggedOnlyChange !== undefined
+  // V11.1: Check if any filters are active
+  const hasActiveFilters = selectedTagIds.length > 0 || selectedSourceIds.length > 0
   
-  if (selectedTagIds.length === 0 && !hasUntaggedToggle) {
+  if (!hasActiveFilters && !hasUntaggedToggle) {
     return null
   }
   
-  // V9.2: Show only untagged toggle when no tags selected
-  if (selectedTagIds.length === 0 && hasUntaggedToggle) {
+  // V9.2: Show only untagged toggle when no filters selected
+  if (!hasActiveFilters && hasUntaggedToggle) {
     return (
       <UntaggedToggle
         showUntaggedOnly={showUntaggedOnly ?? false}
@@ -80,9 +96,18 @@ export function FilterBar({
     onTagsChange(selectedTagIds.filter((id) => id !== tagId))
   }
 
+  // V11.1: Clear all filters including sources
+  const handleClearAll = () => {
+    onClear()
+    if (onSourcesChange) {
+      onSourcesChange([])
+    }
+  }
+
   // V9: Check if we have tags in multiple categories (show grouped view)
+  // V11.1: Also show grouped view if source filters are active
   const categoriesWithTags = CATEGORY_CONFIG.filter(c => groupedTags[c.key].length > 0)
-  const showGroupedView = categoriesWithTags.length > 1 || selectedTags.some(t => t.category !== 'concept')
+  const showGroupedView = categoriesWithTags.length > 1 || selectedTags.some(t => t.category !== 'concept') || selectedSourceIds.length > 0
 
   if (!showGroupedView) {
     // Simple flat view for backward compatibility when only concept tags
@@ -135,13 +160,37 @@ export function FilterBar({
             Active Filters
           </span>
           <button
-            onClick={onClear}
+            onClick={handleClearAll}
             className="inline-flex items-center gap-1 px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
           >
             <X className="w-3 h-3" />
             Clear all
           </button>
         </div>
+
+        {/* V11.1: Source filter section */}
+        {selectedSourceIds.length > 0 && onSourcesChange && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              <BookOpen className="w-3 h-3" />
+              By Source:
+            </span>
+            {selectedSourceIds.map((sourceId) => {
+              const source = availableSources.find(s => s.id === sourceId)
+              if (!source) return null
+              return (
+                <button
+                  key={sourceId}
+                  onClick={() => onSourcesChange(selectedSourceIds.filter(id => id !== sourceId))}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
+                >
+                  {source.title}
+                  <X className="w-3 h-3" />
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* V9: Category sections - only show non-empty categories */}
         {CATEGORY_CONFIG.map(({ key, label, icon: Icon }) => {

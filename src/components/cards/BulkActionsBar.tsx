@@ -36,8 +36,9 @@ export function BulkActionsBar({
 }: BulkActionsBarProps) {
   if (selectedCount === 0) return null
 
+  // V11.1: Floating bar at bottom of viewport for better UX
   return (
-    <div className="sticky top-0 z-10 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 shadow-lg p-3 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 max-w-4xl w-[calc(100%-2rem)]">
       <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
         {selectedCount} card{selectedCount !== 1 ? 's' : ''} selected
       </span>

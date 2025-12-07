@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Plus, Check } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { ChevronDown, Plus, Check, Search } from 'lucide-react'
 import { TagBadge } from './TagBadge'
-import { TAG_COLORS, getTagColorClasses } from '@/lib/tag-colors'
+import { getTagColorClasses } from '@/lib/tag-colors'
 import { getUserTags, createTag } from '@/actions/tag-actions'
 import { useToast } from '@/components/ui/Toast'
 import type { Tag } from '@/types/database'
@@ -16,18 +16,23 @@ interface TagSelectorProps {
 
 /**
  * TagSelector - Multi-select dropdown with inline tag creation
- * Requirements: V5 Feature Set 1 - Req 1.3
+ * V11.1: Enhanced with search input and "Create at Top" UX
+ * Requirements: V5 Feature Set 1 - Req 1.3, V11.1 - Req 2.1-2.5
  */
 export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSelectorProps) {
   const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newTagName, setNewTagName] = useState('')
-  const [newTagCategory, setNewTagCategory] = useState<'source' | 'topic' | 'concept'>('concept')
   const [isCreating, setIsCreating] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  
+  // V11.1: Search query state
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // V11.1: Keyboard navigation state
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
   // Load tags on mount
   useEffect(() => {
@@ -44,13 +49,44 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
-        setShowCreateModal(false)
+        setSearchQuery('')
+        setHighlightedIndex(-1)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isOpen])
+
+  // V11.1: Filter tags by search query (case-insensitive)
+  const filteredTags = useMemo(() => {
+    if (!searchQuery.trim()) return tags
+    const query = searchQuery.toLowerCase().trim()
+    return tags.filter(tag => tag.name.toLowerCase().includes(query))
+  }, [tags, searchQuery])
+
+  // V11.1: Determine if Create option should be shown
+  // Show when: query non-empty AND no exact match (case-insensitive)
+  const shouldShowCreateOption = useMemo(() => {
+    const query = searchQuery.trim()
+    if (!query) return false
+    const exactMatch = tags.some(tag => tag.name.toLowerCase() === query.toLowerCase())
+    return !exactMatch
+  }, [searchQuery, tags])
+
+  // V11.1: Total navigable items (Create option + filtered tags)
+  const totalItems = (shouldShowCreateOption ? 1 : 0) + filteredTags.length
+
+  // Reset highlighted index when filtered results change
+  useEffect(() => {
+    setHighlightedIndex(shouldShowCreateOption ? 0 : (filteredTags.length > 0 ? 0 : -1))
+  }, [shouldShowCreateOption, filteredTags.length])
 
   const toggleTag = (tagId: string) => {
     if (selectedTagIds.includes(tagId)) {
@@ -65,28 +101,59 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
     }
   }
 
-  const handleCreateTag = async () => {
-    if (!newTagName.trim()) return
+  // V11.1: Create tag from search query
+  const handleCreateFromSearch = async () => {
+    const tagName = searchQuery.trim()
+    if (!tagName) return
     
     setIsCreating(true)
-    const result = await createTag(newTagName.trim(), newTagCategory)
+    const result = await createTag(tagName, 'concept') // Default to concept category
     setIsCreating(false)
 
     if (result.ok && result.tag) {
       setTags((prev) => [...prev, result.tag!].sort((a, b) => a.name.localeCompare(b.name)))
       onChange([...selectedTagIds, result.tag.id])
-      setNewTagName('')
-      setShowCreateModal(false)
+      setSearchQuery('')
       showToast(`Tag "${result.tag.name}" created`, 'success')
     } else if (!result.ok) {
       showToast(result.error, 'error')
     }
   }
 
+  // V11.1: Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newTagName.trim()) {
-      e.preventDefault()
-      handleCreateTag()
+    if (!isOpen) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex(prev => Math.min(prev + 1, totalItems - 1))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex(prev => Math.max(prev - 1, 0))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (highlightedIndex === -1) return
+        
+        // If Create option is shown and highlighted (index 0)
+        if (shouldShowCreateOption && highlightedIndex === 0) {
+          handleCreateFromSearch()
+        } else {
+          // Adjust index for filtered tags (subtract 1 if Create option is shown)
+          const tagIndex = shouldShowCreateOption ? highlightedIndex - 1 : highlightedIndex
+          if (tagIndex >= 0 && tagIndex < filteredTags.length) {
+            toggleTag(filteredTags[tagIndex].id)
+          }
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setIsOpen(false)
+        setSearchQuery('')
+        setHighlightedIndex(-1)
+        break
     }
   }
 
@@ -115,96 +182,111 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-3 text-sm text-slate-500">Loading tags...</div>
-          ) : (
-            <>
-              {tags.map((tag) => {
-                const isSelected = selectedTagIds.includes(tag.id)
-                const { bgClass, textClass } = getTagColorClasses(tag.color)
-                return (
+        <div 
+          className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg"
+          onKeyDown={handleKeyDown}
+        >
+          {/* V11.1: Search input */}
+          <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search or create tag..."
+                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Scrollable options area */}
+          <div className="max-h-48 overflow-y-auto">
+            {isLoading ? (
+              <div className="p-3 text-sm text-slate-500">Loading tags...</div>
+            ) : (
+              <>
+                {/* V11.1: Create option pinned at top */}
+                {shouldShowCreateOption && (
                   <button
-                    key={tag.id}
                     type="button"
-                    onClick={() => toggleTag(tag.id)}
-                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    onClick={handleCreateFromSearch}
+                    disabled={isCreating}
+                    className={`w-full px-3 py-2 flex items-center gap-2 transition-colors border-b border-slate-100 dark:border-slate-700 ${
+                      highlightedIndex === 0
+                        ? 'bg-blue-50 dark:bg-blue-900/30'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-700'
+                    }`}
                   >
-                    <span className={`w-3 h-3 rounded-full ${bgClass}`} />
-                    <span className="flex-1 text-left text-sm text-slate-700 dark:text-slate-300">
-                      {tag.name}
+                    <Plus className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-blue-600">
+                      {isCreating ? 'Creating...' : `Create "${searchQuery.trim()}" tag`}
                     </span>
-                    {isSelected && <Check className="w-4 h-4 text-blue-600" />}
                   </button>
-                )
-              })}
-              
-              {/* Create new tag button */}
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(true)}
-                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-t border-slate-100 dark:border-slate-700"
-              >
-                <Plus className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-600">Create new tag</span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
+                )}
 
-      {/* Create tag modal */}
-      {showCreateModal && (
-        <div className="absolute z-30 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3">
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Tag name"
-              autoFocus
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            
-            {/* Category selector */}
-            <div className="flex gap-2">
-              {(['source', 'topic', 'concept'] as const).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setNewTagCategory(cat)}
-                  className={`px-3 py-1 text-xs rounded-full capitalize ${
-                    newTagCategory === cat 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateTag}
-                disabled={!newTagName.trim() || isCreating}
-                className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {isCreating ? 'Creating...' : 'Create'}
-              </button>
-            </div>
+                {/* Filtered tag list */}
+                {filteredTags.length > 0 ? (
+                  filteredTags.map((tag, index) => {
+                    const isSelected = selectedTagIds.includes(tag.id)
+                    const { bgClass } = getTagColorClasses(tag.color)
+                    const itemIndex = shouldShowCreateOption ? index + 1 : index
+                    const isHighlighted = highlightedIndex === itemIndex
+                    
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`w-full px-3 py-2 flex items-center gap-2 transition-colors ${
+                          isHighlighted
+                            ? 'bg-slate-100 dark:bg-slate-700'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className={`w-3 h-3 rounded-full ${bgClass}`} />
+                        <span className="flex-1 text-left text-sm text-slate-700 dark:text-slate-300">
+                          {tag.name}
+                        </span>
+                        {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                      </button>
+                    )
+                  })
+                ) : (
+                  !shouldShowCreateOption && (
+                    <div className="p-3 text-sm text-slate-500 text-center">
+                      {searchQuery ? 'No tags found' : 'No tags yet'}
+                    </div>
+                  )
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
     </div>
   )
+}
+
+/**
+ * V11.1: Helper function to determine if Create option should show
+ * Exported for property testing
+ */
+export function shouldShowCreateOption(searchQuery: string, existingTags: { name: string }[]): boolean {
+  const query = searchQuery.trim()
+  if (!query) return false
+  const exactMatch = existingTags.some(tag => tag.name.toLowerCase() === query.toLowerCase())
+  return !exactMatch
+}
+
+/**
+ * V11.1: Helper function to filter tags by search query
+ * Exported for property testing
+ */
+export function filterTagsByQuery<T extends { name: string }>(tags: T[], query: string): T[] {
+  if (!query.trim()) return tags
+  const normalizedQuery = query.toLowerCase().trim()
+  return tags.filter(tag => tag.name.toLowerCase().includes(normalizedQuery))
 }

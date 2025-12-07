@@ -15,9 +15,14 @@ import { useAutoTag } from '@/hooks/use-auto-tag'
 import { useToast } from '@/components/ui/Toast'
 import type { Card, Tag } from '@/types/database'
 
-// Extended card type with tags
+// Extended card type with tags and book_source
+// V11.1: Added book_source for source filtering
 interface CardWithTags extends Card {
   tags?: Tag[]
+  book_source?: {
+    id: string
+    title: string
+  } | null
 }
 
 interface CardListProps {
@@ -51,6 +56,8 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   const [showUntaggedOnly, setShowUntaggedOnly] = useState(false)
   // V9.3: Auto-tag progress modal state
   const [showAutoTagModal, setShowAutoTagModal] = useState(false)
+  // V11.1: Source filter state
+  const [filterSourceIds, setFilterSourceIds] = useState<string[]>([])
 
   // V9.3: useAutoTag hook for chunked processing with progress
   const autoTag = useAutoTag({
@@ -84,9 +91,21 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     return cards.filter(card => !card.tags || card.tags.length === 0).length
   }, [cards])
 
+  // V11.1: Extract distinct book_sources from cards for source filter
+  const availableSources = useMemo(() => {
+    const sourceMap = new Map<string, { id: string; title: string }>()
+    for (const card of cards) {
+      if (card.book_source && card.book_source.id) {
+        sourceMap.set(card.book_source.id, card.book_source)
+      }
+    }
+    return Array.from(sourceMap.values()).sort((a, b) => a.title.localeCompare(b.title))
+  }, [cards])
+
   // Filter cards by selected tags (AND logic - card must have ALL selected tags)
   // V8.6: Also filter by NeedsReview if toggle is on
   // V9.2: Also filter by untagged if toggle is on
+  // V11.1: Also filter by source (AND logic with tags)
   const filteredCards = useMemo(() => {
     let result = cards
     
@@ -94,6 +113,13 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     if (showUntaggedOnly) {
       result = result.filter(card => !card.tags || card.tags.length === 0)
       return result
+    }
+    
+    // V11.1: Apply source filter (AND logic)
+    if (filterSourceIds.length > 0) {
+      result = result.filter((card) => {
+        return card.book_source && filterSourceIds.includes(card.book_source.id)
+      })
     }
     
     // Apply tag filter
@@ -110,7 +136,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     }
     
     return result
-  }, [cards, filterTagIds, showNeedsReviewOnly, showUntaggedOnly])
+  }, [cards, filterTagIds, filterSourceIds, showNeedsReviewOnly, showUntaggedOnly])
 
   // Selection handlers
   const toggleSelection = (id: string) => {
@@ -279,7 +305,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         </div>
       )}
 
-      {/* Active filter bar - V9.2: Added untagged toggle */}
+      {/* Active filter bar - V9.2: Added untagged toggle, V11.1: Added source filter */}
       <FilterBar
         tags={allTags}
         selectedTagIds={filterTagIds}
@@ -288,6 +314,9 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         showUntaggedOnly={showUntaggedOnly}
         onShowUntaggedOnlyChange={setShowUntaggedOnly}
         untaggedCount={untaggedCount}
+        availableSources={availableSources}
+        selectedSourceIds={filterSourceIds}
+        onSourcesChange={setFilterSourceIds}
       />
 
       {/* Bulk actions bar - Author only for delete/move/tag */}

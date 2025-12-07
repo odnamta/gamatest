@@ -313,3 +313,81 @@ export interface DailyActivity {
   dayName: string     // "Mon", "Tue", etc.
   cardsReviewed: number
 }
+
+
+// ============================================
+// V11: Structured Content Engine Types
+// ============================================
+
+/**
+ * Book source representing a textbook or question bank
+ */
+export interface BookSource {
+  id: string
+  author_id: string
+  title: string
+  edition: string | null
+  specialty: string | null
+  created_at: string
+}
+
+/**
+ * Chapter within a book source
+ */
+export interface BookChapter {
+  id: string
+  book_source_id: string
+  chapter_number: number
+  title: string
+  expected_question_count: number | null
+  created_at: string
+}
+
+/**
+ * Matching group for questions sharing common options
+ */
+export interface MatchingGroup {
+  id: string
+  chapter_id: string | null
+  common_options: string[]  // JSONB array of option strings
+  instruction_text: string | null
+  created_at: string
+}
+
+/**
+ * Extended CardTemplate with V11 structured content fields
+ */
+export interface CardTemplateV11 extends CardTemplate {
+  book_source_id: string | null
+  chapter_id: string | null
+  question_number: number | null
+  matching_group_id: string | null
+}
+
+/**
+ * Import session context for bulk import with structured content
+ */
+export interface ImportSessionContext {
+  bookSourceId: string | null
+  chapterId: string | null
+  expectedQuestionCount: number | null
+  detectedQuestionNumbers: number[]
+}
+
+/**
+ * Question number detection result
+ */
+export interface QuestionNumberDetectionResult {
+  detectedNumbers: number[]
+  patterns: string[]  // Which patterns were found (e.g., "1.", "1)", "Q1")
+}
+
+/**
+ * Matching block detected in source text
+ */
+export interface MatchingBlock {
+  optionLabels: string[]      // ['A', 'B', 'C', 'D', 'E']
+  optionTexts: string[]       // The actual option content
+  questionNumbers: number[]   // Questions that reference these options
+  rawText: string            // Original text block
+}
