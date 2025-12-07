@@ -88,10 +88,12 @@ export async function createMCQAction(
   }
 
   // V8.0: Create card_template
+  // V11.2: Include author_id (required field)
   const { data: cardTemplate, error: insertError } = await supabase
     .from('card_templates')
     .insert({
       deck_template_id: deckId,
+      author_id: user.id,
       stem,
       options: validOptions,
       correct_index: correctIndex,

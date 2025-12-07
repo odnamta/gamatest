@@ -73,10 +73,12 @@ export async function createCardAction(
   }
 
   // V8.0: Create card_template (flashcards stored as MCQ with front/back as stem/explanation)
+  // V11.2: Include author_id (required field)
   const { data: cardTemplate, error: insertError } = await supabase
     .from('card_templates')
     .insert({
       deck_template_id: deckId,
+      author_id: user.id,
       stem: front,
       options: ['True', 'False'], // Flashcards use simple options
       correct_index: 0,
@@ -317,10 +319,12 @@ export async function duplicateCard(cardId: string): Promise<CardActionResult> {
   }
 
   // V8.0: Create new card_template with "(copy)" suffix
+  // V11.2: Include author_id (required field)
   const { data: newCardTemplate, error: insertError } = await supabase
     .from('card_templates')
     .insert({
       deck_template_id: cardTemplate.deck_template_id,
+      author_id: user.id,
       stem: (cardTemplate.stem || '') + ' (copy)',
       options: cardTemplate.options,
       correct_index: cardTemplate.correct_index,
