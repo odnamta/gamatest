@@ -45,7 +45,7 @@ export async function createChapter(
   // Validate input
   const validation = createChapterSchema.safeParse(input)
   if (!validation.success) {
-    return { success: false, error: validation.error.errors[0]?.message || 'Invalid input' }
+    return { success: false, error: validation.error.issues[0]?.message || 'Invalid input' }
   }
 
   const { book_source_id, chapter_number, title, expected_question_count } = validation.data
@@ -178,7 +178,7 @@ export async function updateChapter(
   // Validate input
   const validation = updateChapterSchema.safeParse(input)
   if (!validation.success) {
-    return { success: false, error: validation.error.errors[0]?.message || 'Invalid input' }
+    return { success: false, error: validation.error.issues[0]?.message || 'Invalid input' }
   }
 
   const { id, ...updates } = validation.data
@@ -283,7 +283,7 @@ export async function createMatchingGroup(
   // Validate input
   const validation = createMatchingGroupSchema.safeParse(input)
   if (!validation.success) {
-    return { success: false, error: validation.error.errors[0]?.message || 'Invalid input' }
+    return { success: false, error: validation.error.issues[0]?.message || 'Invalid input' }
   }
 
   const { chapter_id, common_options, instruction_text } = validation.data
