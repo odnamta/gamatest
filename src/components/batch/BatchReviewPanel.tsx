@@ -125,8 +125,12 @@ export function BatchReviewPanel({
       if (result.ok) {
         // V6.2: Calculate new session total and show in toast
         const newSessionTotal = sessionTotal + result.createdCount
+        // V11.6: Include skipped count in toast if duplicates were detected
+        const skippedMsg = result.skippedCount && result.skippedCount > 0
+          ? ` · ${result.skippedCount} duplicate${result.skippedCount !== 1 ? 's' : ''} skipped`
+          : ''
         showToast(
-          `Saved ${result.createdCount} card${result.createdCount !== 1 ? 's' : ''} · Session total: ${newSessionTotal}`,
+          `Saved ${result.createdCount} card${result.createdCount !== 1 ? 's' : ''} · Session total: ${newSessionTotal}${skippedMsg}`,
           'success'
         )
         onSaveSuccess(result.createdCount)

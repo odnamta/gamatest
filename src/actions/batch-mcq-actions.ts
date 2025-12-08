@@ -508,8 +508,52 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
 
   const { user, supabase } = authResult.data!
   
+  // V11.6: Import normalizeStem for duplicate detection
+  const { normalizeStem } = await import('@/lib/content-staging-metrics')
+  
   try {
-    // V11: Step 0 - Create matching_group if matchingBlockData is provided
+    // V11.6: Step 0a - Duplicate detection within same deck + session
+    // Fetch existing cards in this deck + session to check for duplicates
+    let existingStems = new Set<string>()
+    let skippedCount = 0
+    
+    if (importSessionId) {
+      const { data: existingCards } = await supabase
+        .from('card_templates')
+        .select('stem')
+        .eq('deck_template_id', deckTemplateId)
+        .eq('import_session_id', importSessionId)
+      
+      if (existingCards) {
+        existingStems = new Set(existingCards.map((c) => normalizeStem(c.stem)))
+        console.log(`[bulkCreateMCQV2] V11.6: Found ${existingStems.size} existing cards in session`)
+      }
+    }
+    
+    // V11.6: Filter out duplicates and track intra-batch duplicates
+    const batchStems = new Set<string>()
+    const cardsToCreate: typeof cards = []
+    
+    for (const card of cards) {
+      const normalized = normalizeStem(card.stem)
+      
+      if (existingStems.has(normalized) || batchStems.has(normalized)) {
+        skippedCount++
+        console.log(`[bulkCreateMCQV2] V11.6: Skipping duplicate stem`)
+      } else {
+        cardsToCreate.push(card)
+        batchStems.add(normalized)
+      }
+    }
+    
+    console.log(`[bulkCreateMCQV2] V11.6: ${cardsToCreate.length} to create, ${skippedCount} duplicates skipped`)
+    
+    // If all cards were duplicates, return early with success
+    if (cardsToCreate.length === 0) {
+      return { ok: true, createdCount: 0, skippedCount, deckId: deckTemplateId }
+    }
+    
+    // V11: Step 0b - Create matching_group if matchingBlockData is provided
     // This creates the group first so we can link all cards to it
     let effectiveMatchingGroupId = matchingGroupId || null
     
@@ -538,13 +582,14 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     
     // Step 1: Collect all unique tag names
     // V8.4: Added defensive checks and logging for tag persistence
+    // V11.6: Use cardsToCreate (filtered for duplicates)
     const allTagNames = new Set<string>()
     for (const tagName of sessionTags) {
       const trimmed = tagName.trim()
       if (trimmed) allTagNames.add(trimmed)
     }
-    for (let cardIdx = 0; cardIdx < cards.length; cardIdx++) {
-      const card = cards[cardIdx]
+    for (let cardIdx = 0; cardIdx < cardsToCreate.length; cardIdx++) {
+      const card = cardsToCreate[cardIdx]
       // V8.4: Defensive check - ensure tagNames exists and is an array
       const cardTags = Array.isArray(card.tagNames) ? card.tagNames : []
       console.log(`[bulkCreateMCQV2] Card ${cardIdx}: ${cardTags.length} AI tags received`)
@@ -613,7 +658,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     // V11: Include structured content foreign keys if provided
     // V11.3: Include status and import_session_id for draft/publish workflow
     // V11.5: Use effectiveMatchingGroupId which may be auto-created from matchingBlockData
-    const cardTemplateRows = cards.map((card) => ({
+    // V11.6: Use cardsToCreate (filtered for duplicates)
+    const cardTemplateRows = cardsToCreate.map((card) => ({
       deck_template_id: deckTemplateId,
       author_id: user.id,
       stem: card.stem,
@@ -665,7 +711,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
       }
       
       // V8.4: Defensive check - ensure tagNames exists and is an array
-      const cardTags = Array.isArray(cards[i].tagNames) ? cards[i].tagNames : []
+      // V11.6: Use cardsToCreate (filtered for duplicates)
+      const cardTags = Array.isArray(cardsToCreate[i].tagNames) ? cardsToCreate[i].tagNames : []
       
       // Link AI-generated tags
       for (const tagName of cardTags) {
@@ -710,7 +757,8 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     
     revalidatePath(`/decks/${deckTemplateId}`)
     
-    return { ok: true, createdCount: insertedTemplates.length, deckId: deckTemplateId }
+    // V11.6: Include skippedCount in result
+    return { ok: true, createdCount: insertedTemplates.length, skippedCount, deckId: deckTemplateId }
   } catch (error) {
     console.error('Bulk create V2 error:', error)
     return { ok: false, error: { message: 'Failed to create cards', code: 'DB_ERROR' } }
@@ -738,4 +786,225 @@ export async function bulkCreateMCQ(input: {
     sessionTags: input.sessionTags,
     cards: input.cards,
   })
+}
+
+
+// ============================================
+// V11.6: Drafts Workspace Server Actions
+// ============================================
+
+import type { DraftCardSummary, ActionResultV2 } from '@/types/actions'
+
+/**
+ * V11.6: Get all draft cards for a deck
+ * Returns drafts ordered by question_number ASC NULLS LAST, then created_at ASC, then id ASC
+ * 
+ * @param deckId - The deck template ID
+ * @returns ActionResultV2 with drafts array
+ * 
+ * **Feature: v11.6-bulk-import-reliability**
+ * **Validates: Requirements 1.1, 1.2, 1.4, 1.5**
+ */
+export async function getDeckDrafts(
+  deckId: string
+): Promise<ActionResultV2<{ deckId: string; deckTitle: string; drafts: DraftCardSummary[] }>> {
+  return withUser(async ({ user, supabase }) => {
+    // Verify deck exists and user is author
+    const { data: deck, error: deckError } = await supabase
+      .from('deck_templates')
+      .select('id, title, author_id')
+      .eq('id', deckId)
+      .single()
+
+    if (deckError || !deck) {
+      return { ok: false, error: 'Deck not found' }
+    }
+
+    if (deck.author_id !== user.id) {
+      return { ok: false, error: 'UNAUTHORIZED' }
+    }
+
+    // Fetch drafts with tags
+    // Order: question_number ASC NULLS LAST, created_at ASC, id ASC
+    const { data: drafts, error: draftsError } = await supabase
+      .from('card_templates')
+      .select(`
+        id,
+        question_number,
+        stem,
+        import_session_id,
+        created_at,
+        card_template_tags (
+          tags (
+            id,
+            name,
+            color,
+            category
+          )
+        )
+      `)
+      .eq('deck_template_id', deckId)
+      .eq('status', 'draft')
+      .order('question_number', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+
+    if (draftsError) {
+      console.error('[getDeckDrafts] Error fetching drafts:', draftsError)
+      return { ok: false, error: 'Failed to fetch drafts' }
+    }
+
+    // Transform to DraftCardSummary format
+    const draftSummaries: DraftCardSummary[] = (drafts || []).map((draft) => {
+      // Extract tags from nested join structure
+      const tags: Array<{ id: string; name: string; color: string; category: string }> = []
+      if (draft.card_template_tags) {
+        for (const ctt of draft.card_template_tags) {
+          if (ctt.tags && typeof ctt.tags === 'object' && !Array.isArray(ctt.tags)) {
+            const t = ctt.tags as { id: string; name: string; color: string; category: string }
+            tags.push({ id: t.id, name: t.name, color: t.color, category: t.category })
+          }
+        }
+      }
+      return {
+        id: draft.id,
+        questionNumber: draft.question_number,
+        stem: draft.stem,
+        importSessionId: draft.import_session_id,
+        createdAt: draft.created_at,
+        tags,
+      }
+    })
+
+    return {
+      ok: true,
+      data: {
+        deckId: deck.id,
+        deckTitle: deck.title,
+        drafts: draftSummaries,
+      },
+    }
+  }) as Promise<ActionResultV2<{ deckId: string; deckTitle: string; drafts: DraftCardSummary[] }>>
+}
+
+/**
+ * V11.6: Bulk publish selected draft cards
+ * Transitions all selected cards from 'draft' to 'published' status
+ * 
+ * @param cardIds - Array of card template IDs to publish
+ * @returns ActionResultV2 with updated count
+ * 
+ * **Feature: v11.6-bulk-import-reliability**
+ * **Validates: Requirements 3.1**
+ */
+export async function bulkPublishDrafts(
+  cardIds: string[]
+): Promise<ActionResultV2<{ updatedCount: number }>> {
+  if (cardIds.length === 0) {
+    return { ok: true, data: { updatedCount: 0 } }
+  }
+
+  return withUser(async ({ user, supabase }) => {
+    // Verify user owns all cards (is author)
+    const { data: cards, error: fetchError } = await supabase
+      .from('card_templates')
+      .select('id, author_id, deck_template_id')
+      .in('id', cardIds)
+
+    if (fetchError) {
+      console.error('[bulkPublishDrafts] Error fetching cards:', fetchError)
+      return { ok: false, error: 'Failed to fetch cards' }
+    }
+
+    if (!cards || cards.length !== cardIds.length) {
+      return { ok: false, error: 'Some cards not found' }
+    }
+
+    // Check all cards belong to user
+    const unauthorized = cards.some((c) => c.author_id !== user.id)
+    if (unauthorized) {
+      return { ok: false, error: 'UNAUTHORIZED' }
+    }
+
+    // Update status to published
+    const { error: updateError, count } = await supabase
+      .from('card_templates')
+      .update({ status: 'published' })
+      .in('id', cardIds)
+      .eq('author_id', user.id) // Extra safety
+
+    if (updateError) {
+      console.error('[bulkPublishDrafts] Error updating cards:', updateError)
+      return { ok: false, error: 'Failed to publish cards' }
+    }
+
+    // Revalidate deck pages
+    const deckIds = [...new Set(cards.map((c) => c.deck_template_id))]
+    for (const deckId of deckIds) {
+      revalidatePath(`/decks/${deckId}`)
+    }
+
+    return { ok: true, data: { updatedCount: count || cardIds.length } }
+  }) as Promise<ActionResultV2<{ updatedCount: number }>>
+}
+
+/**
+ * V11.6: Bulk archive selected draft cards
+ * Transitions all selected cards from 'draft' to 'archived' status
+ * 
+ * @param cardIds - Array of card template IDs to archive
+ * @returns ActionResultV2 with updated count
+ * 
+ * **Feature: v11.6-bulk-import-reliability**
+ * **Validates: Requirements 3.2**
+ */
+export async function bulkArchiveDrafts(
+  cardIds: string[]
+): Promise<ActionResultV2<{ updatedCount: number }>> {
+  if (cardIds.length === 0) {
+    return { ok: true, data: { updatedCount: 0 } }
+  }
+
+  return withUser(async ({ user, supabase }) => {
+    // Verify user owns all cards (is author)
+    const { data: cards, error: fetchError } = await supabase
+      .from('card_templates')
+      .select('id, author_id, deck_template_id')
+      .in('id', cardIds)
+
+    if (fetchError) {
+      console.error('[bulkArchiveDrafts] Error fetching cards:', fetchError)
+      return { ok: false, error: 'Failed to fetch cards' }
+    }
+
+    if (!cards || cards.length !== cardIds.length) {
+      return { ok: false, error: 'Some cards not found' }
+    }
+
+    // Check all cards belong to user
+    const unauthorized = cards.some((c) => c.author_id !== user.id)
+    if (unauthorized) {
+      return { ok: false, error: 'UNAUTHORIZED' }
+    }
+
+    // Update status to archived
+    const { error: updateError, count } = await supabase
+      .from('card_templates')
+      .update({ status: 'archived' })
+      .in('id', cardIds)
+      .eq('author_id', user.id) // Extra safety
+
+    if (updateError) {
+      console.error('[bulkArchiveDrafts] Error updating cards:', updateError)
+      return { ok: false, error: 'Failed to archive cards' }
+    }
+
+    // Revalidate deck pages
+    const deckIds = [...new Set(cards.map((c) => c.deck_template_id))]
+    for (const deckId of deckIds) {
+      revalidatePath(`/decks/${deckId}`)
+    }
+
+    return { ok: true, data: { updatedCount: count || cardIds.length } }
+  }) as Promise<ActionResultV2<{ updatedCount: number }>>
 }

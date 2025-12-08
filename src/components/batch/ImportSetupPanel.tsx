@@ -170,6 +170,13 @@ export function ImportSetupPanel({
           </p>
         </div>
       )}
+
+      {/* V11.6: Autoscan behavior hint */}
+      <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          <strong>Re-run behavior:</strong> Re-running autoscan on the same chunk will skip exact duplicate questions automatically.
+        </p>
+      </div>
     </div>
   )
 }

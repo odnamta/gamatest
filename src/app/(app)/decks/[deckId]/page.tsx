@@ -6,6 +6,7 @@ import { CardList } from '@/components/cards/CardList'
 import { Button } from '@/components/ui/Button'
 import { resolveDeckId } from '@/lib/legacy-redirect'
 import { CleanDuplicatesButton } from '@/components/decks/CleanDuplicatesButton'
+import { DeckDraftsPanel } from '@/components/decks/DeckDraftsPanel'
 import { EditableDeckTitle } from '@/components/decks/EditableDeckTitle'
 import { EditableDeckSubject } from '@/components/decks/EditableDeckSubject'
 import { ManageTagsButton } from '@/components/decks/ManageTagsButton'
@@ -302,6 +303,13 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
           </>
         )}
       </div>
+
+      {/* V11.6: Drafts Panel for authors - shows pending imports */}
+      {isAuthor && (
+        <div className="mb-8">
+          <DeckDraftsPanel deckId={deckId} isAuthor={isAuthor} />
+        </div>
+      )}
 
       {/* Add new card form with tabs for flashcard/MCQ - Author only */}
       {isAuthor && (

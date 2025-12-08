@@ -4,6 +4,9 @@
  * 
  * **Feature: v11.5-global-study-stabilization**
  * **Validates: Requirements 11.2, 11.3, 11.5**
+ * 
+ * V11.6: Added normalizeStem for duplicate detection
+ * **Feature: v11.6-bulk-import-reliability**
  */
 
 /**
@@ -90,4 +93,23 @@ export function isImportComplete(metrics: QAMetrics): boolean {
     metrics.detectedCount === metrics.createdCount &&
     metrics.detectedCount > 0
   )
+}
+
+/**
+ * V11.6: Normalizes a stem for duplicate detection.
+ * Lowercase, trim, collapse whitespace. Conservative with punctuation.
+ * 
+ * Used for duplicate detection within same deck + import_session.
+ * 
+ * @param stem - The question stem to normalize
+ * @returns Normalized stem string
+ * 
+ * **Feature: v11.6-bulk-import-reliability**
+ * **Validates: Requirements 6.1**
+ */
+export function normalizeStem(stem: string): string {
+  return stem
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ') // Collapse whitespace
 }

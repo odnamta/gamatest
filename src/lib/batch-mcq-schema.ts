@@ -107,8 +107,11 @@ export type DraftBatchResult =
   | { ok: true; drafts: MCQBatchItem[] }
   | { ok: false; error: { message: string; code?: string } }
 
+/**
+ * V11.6: Added skippedCount for duplicate detection reporting
+ */
 export type BulkCreateResult =
-  | { ok: true; createdCount: number; deckId: string }
+  | { ok: true; createdCount: number; skippedCount?: number; deckId: string }
   | { ok: false; error: { message: string; code?: string } }
 
 /**
