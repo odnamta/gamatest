@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil, Sparkles, Settings } from 'lucide-react'
+import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil, Sparkles, Settings, Plus, Trash2 } from 'lucide-react'
 import { TagBadge } from './TagBadge'
 import { TagMergeModal } from './TagMergeModal'
+import { TagCreateDialog } from './TagCreateDialog'
+import { DeleteTagConfirmDialog } from './DeleteTagConfirmDialog'
 import { SmartCleanupTab } from './SmartCleanupTab'
 import { getCategoryColorClasses } from '@/lib/tag-colors'
 import { 
@@ -13,13 +15,15 @@ import {
   renameTag,
   type RenameTagResult 
 } from '@/actions/admin-tag-actions'
+import { deleteTag } from '@/actions/tag-actions'
 import { AutoFormatButton } from './AutoFormatButton'
 import { useToast } from '@/components/ui/Toast'
 import type { Tag, TagCategory } from '@/types/database'
 
 /**
  * V9.5: EditableTagItem - Inline editing for tag names
- * Requirements: 1.1, 1.2, 1.3, 1.5
+ * V11.3: Added delete control and edit via dialog
+ * Requirements: 1.1, 1.2, 1.3, 1.5, V11.3-3.1, V11.3-3.3
  */
 interface EditableTagItemProps {
   tag: Tag
@@ -29,6 +33,8 @@ interface EditableTagItemProps {
   onCategoryChange: (category: TagCategory) => void
   onRenameSuccess: () => void
   onMergeRequest: (sourceTagId: string, targetTagId: string, targetTagName: string) => void
+  onEditClick: (tag: Tag) => void
+  onDeleteClick: (tag: Tag) => void
 }
 
 function EditableTagItem({
@@ -39,6 +45,8 @@ function EditableTagItem({
   onCategoryChange,
   onRenameSuccess,
   onMergeRequest,
+  onEditClick,
+  onDeleteClick,
 }: EditableTagItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(tag.name)
@@ -152,10 +160,11 @@ function EditableTagItem({
       ) : (
         <>
           <TagBadge tag={tag} size="md" />
+          {/* V11.3: Edit button opens dialog */}
           <button
-            onClick={handleStartEdit}
+            onClick={() => onEditClick(tag)}
             className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-            title="Edit tag name"
+            title="Edit tag"
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -179,6 +188,15 @@ function EditableTagItem({
         <option value="concept">Concept</option>
       </select>
 
+      {/* V11.3: Delete button */}
+      <button
+        onClick={() => onDeleteClick(tag)}
+        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+        title="Delete tag"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+
       {isUpdating && !isEditing && (
         <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
       )}
@@ -201,7 +219,8 @@ type TabType = 'manage' | 'cleanup'
  * V9.2: Enhanced with multi-select and merge modal
  * V9.5: Added inline editing and auto-format
  * V9.6: Added Smart Cleanup tab for AI-powered tag consolidation
- * Requirements: V9-3.1, V9-3.2, V9-3.3, V9.2-3.1, V9.2-3.2, V9.2-3.3, V9.5-1.1, V9.5-3.1, V9.6-3.1
+ * V11.3: Added Add Tag button, delete controls, and TagCreateDialog integration
+ * Requirements: V9-3.1, V9-3.2, V9-3.3, V9.2-3.1, V9.2-3.2, V9.2-3.3, V9.5-1.1, V9.5-3.1, V9.6-3.1, V11.3-1.1, V11.3-3.1
  */
 export function TagManager() {
   const { showToast } = useToast()
@@ -217,6 +236,14 @@ export function TagManager() {
     targetTagId: string
     targetTagName: string
   } | null>(null)
+  // V11.3: Create/Edit dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [createDialogCategory, setCreateDialogCategory] = useState<TagCategory>('concept')
+  const [editingTag, setEditingTag] = useState<Tag | null>(null)
+  // V11.3: Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingTag, setDeletingTag] = useState<Tag | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Load tags on mount
   useEffect(() => {
@@ -319,7 +346,48 @@ export function TagManager() {
     }
   }
 
+  // V11.3: Open create dialog for a specific category
+  function handleAddTag(category: TagCategory) {
+    setCreateDialogCategory(category)
+    setEditingTag(null)
+    setShowCreateDialog(true)
+  }
 
+  // V11.3: Open edit dialog for a tag
+  function handleEditTag(tag: Tag) {
+    setEditingTag(tag)
+    setCreateDialogCategory(tag.category)
+    setShowCreateDialog(true)
+  }
+
+  // V11.3: Handle tag creation/edit success
+  function handleTagSuccess() {
+    loadTags()
+  }
+
+  // V11.3: Open delete confirmation
+  function handleDeleteClick(tag: Tag) {
+    setDeletingTag(tag)
+    setShowDeleteConfirm(true)
+  }
+
+  // V11.3: Confirm tag deletion
+  async function handleConfirmDelete() {
+    if (!deletingTag) return
+
+    setIsDeleting(true)
+    const result = await deleteTag(deletingTag.id)
+    setIsDeleting(false)
+
+    if (result.ok) {
+      showToast(`Tag "${deletingTag.name}" deleted`, 'success')
+      setShowDeleteConfirm(false)
+      setDeletingTag(null)
+      loadTags()
+    } else {
+      showToast(result.error, 'error')
+    }
+  }
 
   const categoryConfig: Array<{
     key: TagCategory
@@ -437,9 +505,17 @@ export function TagManager() {
                 <div className="flex items-center gap-2">
                   <Icon className={`w-5 h-5 ${textClass}`} />
                   <h3 className={`font-medium ${textClass}`}>{title}</h3>
-                  <span className={`ml-auto text-sm ${textClass}`}>
+                  <span className={`text-sm ${textClass}`}>
                     {categoryTags.length}
                   </span>
+                  {/* V11.3: Add Tag button */}
+                  <button
+                    onClick={() => handleAddTag(key)}
+                    className={`ml-auto p-1 rounded-md hover:bg-white/20 transition-colors ${textClass}`}
+                    title={`Add ${title.slice(0, -1)}`}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
                 <p className={`text-xs mt-1 ${textClass} opacity-75`}>{description}</p>
               </div>
@@ -447,9 +523,19 @@ export function TagManager() {
               {/* Tag list */}
               <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
                 {categoryTags.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">
-                    No {title.toLowerCase()} yet
-                  </p>
+                  <div className="text-center py-4">
+                    <p className="text-sm text-slate-400 mb-3">
+                      No {title.toLowerCase()} yet
+                    </p>
+                    {/* V11.3: Add Tag button in empty state */}
+                    <button
+                      onClick={() => handleAddTag(key)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add {title.slice(0, -1)}
+                    </button>
+                  </div>
                 ) : (
                   categoryTags.map(tag => (
                     <EditableTagItem
@@ -461,6 +547,8 @@ export function TagManager() {
                       onCategoryChange={(category) => handleCategoryChange(tag.id, category)}
                       onRenameSuccess={loadTags}
                       onMergeRequest={handleMergeRequest}
+                      onEditClick={handleEditTag}
+                      onDeleteClick={handleDeleteClick}
                     />
                   ))
                 )}
@@ -472,7 +560,9 @@ export function TagManager() {
 
       {/* Instructions */}
       <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-        <p>• Click the pencil icon to rename a tag inline</p>
+        <p>• Click the + button in a column header to add a new tag</p>
+        <p>• Click the pencil icon to edit a tag&apos;s name and category</p>
+        <p>• Click the trash icon to delete a tag (removes from all cards)</p>
         <p>• Select a tag&apos;s category from the dropdown to move it between columns</p>
         <p>• Check two or more tags and click &quot;Merge Selected&quot; to combine them</p>
         <p>• Click &quot;Auto-Format Tags&quot; to convert all tags to Title Case</p>
@@ -484,6 +574,30 @@ export function TagManager() {
         onClose={() => setShowMergeModal(false)}
         sourceTags={selectedTagObjects}
         onMerge={handleMerge}
+      />
+
+      {/* V11.3: Create/Edit Dialog */}
+      <TagCreateDialog
+        isOpen={showCreateDialog}
+        onClose={() => {
+          setShowCreateDialog(false)
+          setEditingTag(null)
+        }}
+        onSuccess={handleTagSuccess}
+        editTag={editingTag}
+        defaultCategory={createDialogCategory}
+      />
+
+      {/* V11.3: Delete Confirmation Dialog */}
+      <DeleteTagConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setDeletingTag(null)
+        }}
+        onConfirm={handleConfirmDelete}
+        tag={deletingTag}
+        isDeleting={isDeleting}
       />
         </>
       )}

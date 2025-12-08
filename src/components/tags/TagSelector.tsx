@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ChevronDown, Plus, Check, Search } from 'lucide-react'
 import { TagBadge } from './TagBadge'
+import { TagCreateDialog } from './TagCreateDialog'
 import { getTagColorClasses } from '@/lib/tag-colors'
-import { getUserTags, createTag } from '@/actions/tag-actions'
-import { useToast } from '@/components/ui/Toast'
+import { getUserTags } from '@/actions/tag-actions'
 import type { Tag } from '@/types/database'
 
 interface TagSelectorProps {
@@ -17,14 +17,13 @@ interface TagSelectorProps {
 /**
  * TagSelector - Multi-select dropdown with inline tag creation
  * V11.1: Enhanced with search input and "Create at Top" UX
- * Requirements: V5 Feature Set 1 - Req 1.3, V11.1 - Req 2.1-2.5
+ * V11.3: Create option opens TagCreateDialog for full configuration
+ * Requirements: V5 Feature Set 1 - Req 1.3, V11.1 - Req 2.1-2.5, V11.3 - Req 4.1-4.4
  */
 export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSelectorProps) {
-  const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isCreating, setIsCreating] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   
@@ -33,6 +32,10 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
   
   // V11.1: Keyboard navigation state
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  
+  // V11.3: Create dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [pendingTagName, setPendingTagName] = useState('')
 
   // Load tags on mount
   useEffect(() => {
@@ -64,12 +67,22 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
     }
   }, [isOpen])
 
+  // V11.3: Sort tags by category (source, topic, concept) then alphabetically
+  const sortedTags = useMemo(() => {
+    const categoryOrder: Record<string, number> = { source: 0, topic: 1, concept: 2 }
+    return [...tags].sort((a, b) => {
+      const categoryDiff = (categoryOrder[a.category] ?? 3) - (categoryOrder[b.category] ?? 3)
+      if (categoryDiff !== 0) return categoryDiff
+      return a.name.localeCompare(b.name)
+    })
+  }, [tags])
+
   // V11.1: Filter tags by search query (case-insensitive)
   const filteredTags = useMemo(() => {
-    if (!searchQuery.trim()) return tags
+    if (!searchQuery.trim()) return sortedTags
     const query = searchQuery.toLowerCase().trim()
-    return tags.filter(tag => tag.name.toLowerCase().includes(query))
-  }, [tags, searchQuery])
+    return sortedTags.filter(tag => tag.name.toLowerCase().includes(query))
+  }, [sortedTags, searchQuery])
 
   // V11.1: Determine if Create option should be shown
   // Show when: query non-empty AND no exact match (case-insensitive)
@@ -101,23 +114,25 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
     }
   }
 
-  // V11.1: Create tag from search query
-  const handleCreateFromSearch = async () => {
+  // V11.3: Open create dialog instead of immediate creation
+  const handleCreateFromSearch = () => {
     const tagName = searchQuery.trim()
     if (!tagName) return
     
-    setIsCreating(true)
-    const result = await createTag(tagName, 'concept') // Default to concept category
-    setIsCreating(false)
+    setPendingTagName(tagName)
+    setShowCreateDialog(true)
+  }
 
-    if (result.ok && result.tag) {
-      setTags((prev) => [...prev, result.tag!].sort((a, b) => a.name.localeCompare(b.name)))
-      onChange([...selectedTagIds, result.tag.id])
-      setSearchQuery('')
-      showToast(`Tag "${result.tag.name}" created`, 'success')
-    } else if (!result.ok) {
-      showToast(result.error, 'error')
-    }
+  // V11.3: Handle successful tag creation from dialog
+  const handleTagCreated = (newTag: Tag) => {
+    // Add to local tags list
+    setTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)))
+    // Auto-select the newly created tag
+    onChange([...selectedTagIds, newTag.id])
+    // Clear search and close dialog
+    setSearchQuery('')
+    setShowCreateDialog(false)
+    setPendingTagName('')
   }
 
   // V11.1: Handle keyboard navigation
@@ -208,12 +223,11 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
               <div className="p-3 text-sm text-slate-500">Loading tags...</div>
             ) : (
               <>
-                {/* V11.1: Create option pinned at top */}
+                {/* V11.3: Create option pinned at top - opens dialog */}
                 {shouldShowCreateOption && (
                   <button
                     type="button"
                     onClick={handleCreateFromSearch}
-                    disabled={isCreating}
                     className={`w-full px-3 py-2 flex items-center gap-2 transition-colors border-b border-slate-100 dark:border-slate-700 ${
                       highlightedIndex === 0
                         ? 'bg-blue-50 dark:bg-blue-900/30'
@@ -222,7 +236,7 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
                   >
                     <Plus className="w-4 h-4 text-blue-600" />
                     <span className="text-sm text-blue-600">
-                      {isCreating ? 'Creating...' : `Create "${searchQuery.trim()}" tag`}
+                      Create &quot;{searchQuery.trim()}&quot; tag
                     </span>
                   </button>
                 )}
@@ -266,6 +280,18 @@ export function TagSelector({ selectedTagIds, onChange, maxSelections }: TagSele
           </div>
         </div>
       )}
+
+      {/* V11.3: Create Tag Dialog */}
+      <TagCreateDialog
+        isOpen={showCreateDialog}
+        onClose={() => {
+          setShowCreateDialog(false)
+          setPendingTagName('')
+        }}
+        onSuccess={handleTagCreated}
+        defaultName={pendingTagName}
+        defaultCategory="concept"
+      />
     </div>
   )
 }

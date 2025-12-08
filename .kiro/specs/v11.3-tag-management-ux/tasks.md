@@ -1,0 +1,116 @@
+# Implementation Plan
+
+- [x] 1. Create TagCreateDialog component
+  - [x] 1.1 Create TagCreateDialog component with form fields
+    - Create `src/components/tags/TagCreateDialog.tsx`
+    - Implement modal with name input, category select, and color preview
+    - Support both create mode (empty form) and edit mode (pre-filled values)
+    - Use existing `getCategoryColor` to enforce color based on category
+    - Wire up to existing `createTag` and `updateTag` server actions
+    - _Requirements: 1.1, 1.2, 2.1, 2.3, 4.2_
+  - [x] 1.2 Write property test for default category from context
+    - **Property 6: TagCreateDialog defaults to Concept from TagSelector**
+    - **Validates: Requirements 4.3**
+
+- [x] 2. Create DeleteTagConfirmDialog component
+  - [x] 2.1 Create DeleteTagConfirmDialog component
+    - Create `src/components/tags/DeleteTagConfirmDialog.tsx`
+    - Show tag name and warning about card associations being removed
+    - Include cancel and confirm buttons with loading state
+    - _Requirements: 3.1_
+
+- [x] 3. Update TagManager with Add Tag and Delete controls
+  - [x] 3.1 Add "Add Tag" button to each column header
+    - Add Plus icon button in each category column header
+    - On click, open TagCreateDialog with that category as default
+    - After successful creation, refresh tag list and show tag in correct column
+    - _Requirements: 1.1, 1.3, 1.4_
+  - [x] 3.2 Write property test for tag placement in correct column
+    - **Property 1: Tag creation places tag in correct category column**
+    - **Validates: Requirements 1.3, 1.4**
+  - [x] 3.3 Add delete control to each tag row
+    - Add Trash2 icon button at end of each tag row
+    - On click, open DeleteTagConfirmDialog
+    - On confirm, call existing `deleteTag` action and refresh list
+    - _Requirements: 3.1, 3.3, 3.4_
+  - [x] 3.4 Write property test for tag deletion removes from list
+    - **Property 4: Tag deletion removes tag from list**
+    - **Validates: Requirements 3.4**
+  - [x] 3.5 Update edit behavior to use TagCreateDialog
+    - Change pencil icon click to open TagCreateDialog in edit mode
+    - Pre-fill with current tag values (name, category)
+    - After save, refresh list and move tag to new column if category changed
+    - _Requirements: 2.1, 2.2_
+  - [x] 3.6 Write property test for category change moves tag
+    - **Property 2: Category change moves tag to correct column**
+    - **Validates: Requirements 2.2**
+  - [x] 3.7 Update empty state to show Add Tag button
+    - When a column has zero tags, show Add Tag button and hint text
+    - _Requirements: 7.4_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Update TagSelector with configurable tag creation
+  - [x] 5.1 Change create option to open TagCreateDialog
+    - Modify "Create [typed text] tag" click handler
+    - Instead of calling `createTag` directly, open TagCreateDialog
+    - Pre-fill name with typed search query
+    - Default category to "concept", color to "green"
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 5.2 Write property test for create option visibility
+    - **Property 5: TagSelector create option shows for non-matching queries**
+    - **Validates: Requirements 4.1**
+  - [x] 5.3 Auto-select newly created tag
+    - After TagCreateDialog success, add new tag to selectedTagIds
+    - Clear search query and close dialog
+    - _Requirements: 4.4_
+  - [x] 5.4 Write property test for auto-selection
+    - **Property 7: Created tag is auto-selected in TagSelector**
+    - **Validates: Requirements 4.4**
+
+- [x] 6. Add visual category indicators
+  - [x] 6.1 Update TagBadge to show category indicator
+    - Add small icon or label to distinguish Sources/Topics/Concepts
+    - Use existing category icons (BookOpen, FolderTree, Lightbulb)
+    - Keep indicator subtle to not clutter the UI
+    - _Requirements: 6.1_
+  - [x] 6.2 Write property test for category indicator presence
+    - **Property 9: Tags display category indicator**
+    - **Validates: Requirements 6.1**
+  - [x] 6.3 Sort tags by category in TagSelector
+    - Group tags by category (Sources first, then Topics, then Concepts)
+    - Sort alphabetically within each category group
+    - _Requirements: 6.2_
+  - [x] 6.4 Write property test for sort consistency
+    - **Property 10: Tags are sorted consistently**
+    - **Validates: Requirements 6.2**
+
+- [x] 7. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 8. Regression testing and safety checks
+  - [x] 8.1 Verify bulk tagging still works
+    - Test that existing bulk tag functionality works with TagSelector changes
+    - Ensure no regressions in card_template_tags creation
+    - _Requirements: 7.1_
+  - [x] 8.2 Write property test for bulk tagging
+    - **Property 11: Bulk tagging preserves existing functionality**
+    - **Validates: Requirements 7.1**
+  - [x] 8.3 Verify tag sync between Admin and TagSelector
+    - Test that tags created in Admin appear in TagSelector immediately
+    - Test that edits from TagSelector reflect in Admin Tags
+    - _Requirements: 7.2, 5.2_
+  - [x] 8.4 Write property test for tag sync
+    - **Property 8: Tag edits propagate to all views**
+    - **Validates: Requirements 5.2, 7.2**
+  - [x] 8.5 Verify Source tag restriction in bulk import
+    - Ensure bulk import flows do not auto-create Source tags
+    - book_sources remains the source-of-truth for textbooks
+    - _Requirements: 7.3_
+  - [x] 8.6 Write property test for Source tag restriction
+    - **Property 12: Source tags not auto-created from bulk import**
+    - **Validates: Requirements 7.3**
+
+- [x] 9. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
