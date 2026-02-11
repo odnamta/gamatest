@@ -227,16 +227,32 @@ describe('V9 Tag Category Properties', () => {
    * Validates: Requirements 5.2, 5.3
    */
   it('Property 9: Session tag category preservation', () => {
-    const sessionTagArb = fc.record({
-      name: tagNameArb,
-      category: fc.constantFrom<TagCategory>('source', 'topic'),
-    })
+    // Generate session tags with unique names to avoid dedup masking categories
+    const uniqueSessionTagsArb = fc
+      .array(
+        fc.record({
+          name: tagNameArb,
+          category: fc.constantFrom<TagCategory>('source', 'topic'),
+        }),
+        { minLength: 1, maxLength: 5 }
+      )
+      .map((tags) => {
+        // Deduplicate by lowercase name, keeping first occurrence
+        const seen = new Set<string>()
+        return tags.filter((t) => {
+          const lower = t.name.toLowerCase()
+          if (seen.has(lower)) return false
+          seen.add(lower)
+          return true
+        })
+      })
+      .filter((tags) => tags.length > 0)
 
     fc.assert(
-      fc.property(fc.array(sessionTagArb, { minLength: 1, maxLength: 5 }), (sessionTags) => {
+      fc.property(uniqueSessionTagsArb, (sessionTags) => {
         // Merge with empty AI tags
         const merged = mergeTagsWithCategories(sessionTags, [])
-        
+
         // All session tags should preserve their category
         for (const original of sessionTags) {
           const found = merged.find(t => t.name.toLowerCase() === original.name.toLowerCase())

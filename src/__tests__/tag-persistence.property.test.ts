@@ -21,11 +21,17 @@ function collectUniqueTags(
   cards: Array<{ tagNames: string[] }>
 ): Set<string> {
   const allTagNames = new Set<string>()
-  
-  // Add session tags
+
+  // Add session tags with case-insensitive deduplication
   for (const tagName of sessionTags) {
     const trimmed = tagName.trim()
-    if (trimmed) allTagNames.add(trimmed)
+    if (trimmed) {
+      const lowerTrimmed = trimmed.toLowerCase()
+      const alreadyExists = Array.from(allTagNames).some(
+        existing => existing.toLowerCase() === lowerTrimmed
+      )
+      if (!alreadyExists) allTagNames.add(trimmed)
+    }
   }
   
   // Add card tags with case-insensitive deduplication
