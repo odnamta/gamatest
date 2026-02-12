@@ -10,7 +10,7 @@ import { revalidatePath } from 'next/cache'
 import { withUser, withOrgUser } from '@/actions/_helpers'
 import { ACTIVE_ORG_COOKIE } from '@/lib/org-context'
 import type { ActionResultV2 } from '@/types/actions'
-import type { Organization, OrganizationMember, OrganizationMemberWithProfile, OrgRole } from '@/types/database'
+import type { Organization, OrganizationMember, OrganizationMemberWithProfile, OrgRole, AssessmentDefaults } from '@/types/database'
 import { createOrgSchema, updateOrgSettingsSchema } from '@/lib/validations'
 
 /**
@@ -306,6 +306,25 @@ export async function hasOrgFeature(
     const features = (org.settings?.features ?? {}) as unknown as Record<string, boolean>
     const enabled = features[featureName] ?? false
     return { ok: true, data: enabled }
+  })
+}
+
+/**
+ * Get assessment defaults for the current org.
+ * Returns stored defaults or platform defaults.
+ */
+export async function getAssessmentDefaults(): Promise<ActionResultV2<AssessmentDefaults>> {
+  return withOrgUser(async ({ org }) => {
+    const defaults: AssessmentDefaults = {
+      time_limit_minutes: 60,
+      pass_score: 70,
+      shuffle_questions: true,
+      shuffle_options: false,
+      show_results: true,
+      allow_review: true,
+      ...org.settings?.assessment_defaults,
+    }
+    return { ok: true, data: defaults }
   })
 }
 

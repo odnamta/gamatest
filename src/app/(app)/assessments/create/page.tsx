@@ -14,6 +14,7 @@ import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getUserDeckTemplates } from '@/actions/deck-actions'
 import { createAssessment } from '@/actions/assessment-actions'
+import { getAssessmentDefaults } from '@/actions/org-actions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
@@ -47,6 +48,18 @@ export default function CreateAssessmentPage() {
     getUserDeckTemplates().then((data) => {
       setDecks(data)
       setLoading(false)
+    })
+    // Pre-populate from org defaults
+    getAssessmentDefaults().then((result) => {
+      if (result.ok && result.data) {
+        const d = result.data
+        setTimeLimitMinutes(d.time_limit_minutes)
+        setPassScore(d.pass_score)
+        setShuffleQuestions(d.shuffle_questions)
+        setShuffleOptions(d.shuffle_options)
+        setShowResults(d.show_results)
+        setAllowReview(d.allow_review)
+      }
     })
   }, [])
 

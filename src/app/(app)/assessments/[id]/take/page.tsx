@@ -30,8 +30,30 @@ type QuestionData = {
   cardTemplateId: string
   stem: string
   options: string[]
+  /** Maps display index → original index (for shuffled options) */
+  optionMap: number[]
   selectedIndex: number | null
   answered: boolean
+}
+
+/**
+ * Seeded shuffle using session+card IDs for deterministic option order per session.
+ * Returns shuffled indices array (e.g., [2, 0, 3, 1]).
+ */
+function seededShuffle(seed: string, length: number): number[] {
+  const indices = Array.from({ length }, (_, i) => i)
+  // Simple hash-based seed
+  let h = 0
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) - h + seed.charCodeAt(i)) | 0
+  }
+  // Fisher-Yates with seeded random
+  for (let i = length - 1; i > 0; i--) {
+    h = ((h << 5) - h + i) | 0
+    const j = Math.abs(h) % (i + 1)
+    ;[indices[i], indices[j]] = [indices[j], indices[i]]
+  }
+  return indices
 }
 
 export default function TakeAssessmentPage() {
@@ -120,36 +142,57 @@ export default function TakeAssessmentPage() {
     setTimeRemaining(sessionData.time_remaining_seconds)
 
     // Fetch question stems and options
+    const shouldShuffleOptions = a.shuffle_options
     const qResult = await getSessionQuestions(sessionData.id)
     let qs: QuestionData[]
     if (qResult.ok && qResult.data) {
-      qs = qResult.data.map((q) => ({
-        cardTemplateId: q.cardTemplateId,
-        stem: q.stem,
-        options: q.options,
-        selectedIndex: null,
-        answered: false,
-      }))
+      qs = qResult.data.map((q) => {
+        const identity = Array.from({ length: q.options.length }, (_, i) => i)
+        if (shouldShuffleOptions && q.options.length > 1) {
+          // Deterministic shuffle based on session + card ID
+          const shuffled = seededShuffle(sessionData.id + q.cardTemplateId, q.options.length)
+          return {
+            cardTemplateId: q.cardTemplateId,
+            stem: q.stem,
+            options: shuffled.map((i) => q.options[i]),
+            optionMap: shuffled,
+            selectedIndex: null,
+            answered: false,
+          }
+        }
+        return {
+          cardTemplateId: q.cardTemplateId,
+          stem: q.stem,
+          options: q.options,
+          optionMap: identity,
+          selectedIndex: null,
+          answered: false,
+        }
+      })
     } else {
       qs = sessionData.question_order.map((cardId) => ({
         cardTemplateId: cardId,
         stem: '',
         options: [],
+        optionMap: [],
         selectedIndex: null,
         answered: false,
       }))
     }
 
     // Restore previously submitted answers (session resume)
+    // Server stores original indices, so we need to reverse-map to display indices
     const existingResult = await getExistingAnswers(sessionData.id)
     if (existingResult.ok && existingResult.data && existingResult.data.length > 0) {
       const answerMap = new Map(
         existingResult.data.map((ans) => [ans.cardTemplateId, ans.selectedIndex])
       )
       qs = qs.map((q) => {
-        const existing = answerMap.get(q.cardTemplateId)
-        if (existing !== undefined) {
-          return { ...q, selectedIndex: existing, answered: true }
+        const originalIndex = answerMap.get(q.cardTemplateId)
+        if (originalIndex !== undefined) {
+          // Find display index that maps to this original index
+          const displayIndex = q.optionMap.indexOf(originalIndex)
+          return { ...q, selectedIndex: displayIndex >= 0 ? displayIndex : originalIndex, answered: true }
         }
         return q
       })
@@ -240,19 +283,20 @@ export default function TakeAssessmentPage() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }, [])
 
-  async function handleSelectAnswer(optionIndex: number) {
+  async function handleSelectAnswer(displayIndex: number) {
     if (!session || completing) return
 
     const q = questions[currentIndex]
     if (!q) return
 
-    // Optimistic update
+    // Optimistic update (store display index locally)
     const updated = [...questions]
-    updated[currentIndex] = { ...q, selectedIndex: optionIndex, answered: true }
+    updated[currentIndex] = { ...q, selectedIndex: displayIndex, answered: true }
     setQuestions(updated)
 
-    // Submit to server (piggyback timer sync)
-    await submitAnswer(session.id, q.cardTemplateId, optionIndex, timeRemaining ?? undefined)
+    // Map display index → original index for server submission
+    const originalIndex = q.optionMap[displayIndex] ?? displayIndex
+    await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined)
   }
 
   async function handleComplete() {

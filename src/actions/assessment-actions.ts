@@ -10,6 +10,7 @@ import { withOrgUser } from '@/actions/_helpers'
 import { createAssessmentSchema, submitAnswerSchema } from '@/lib/validations'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
+import { notifyOrgCandidates } from '@/actions/notification-actions'
 import type {
   Assessment,
   AssessmentSession,
@@ -195,6 +196,19 @@ export async function publishAssessment(
       return { ok: false, error: 'Insufficient permissions' }
     }
 
+    // Get assessment title before updating
+    const { data: assessment } = await supabase
+      .from('assessments')
+      .select('title')
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .eq('status', 'draft')
+      .single()
+
+    if (!assessment) {
+      return { ok: false, error: 'Assessment not found or not in draft' }
+    }
+
     const { error } = await supabase
       .from('assessments')
       .update({ status: 'published', updated_at: new Date().toISOString() })
@@ -205,6 +219,13 @@ export async function publishAssessment(
     if (error) {
       return { ok: false, error: error.message }
     }
+
+    // Notify org members about the new assessment
+    notifyOrgCandidates(
+      'New Assessment Available',
+      `"${assessment.title}" is now available to take.`,
+      `/assessments`
+    ).catch(() => { /* fire-and-forget */ })
 
     revalidatePath('/assessments')
     return { ok: true }
@@ -1137,5 +1158,186 @@ export async function exportResultsCsv(
 
     const csv = [header, ...rows].join('\n')
     return { ok: true, data: csv }
+  })
+}
+
+/**
+ * Get all questions across org decks with difficulty stats.
+ * Creator+ only. Used for the question bank view.
+ */
+export async function getOrgQuestionBank(
+  deckTemplateId?: string
+): Promise<ActionResultV2<{
+  questions: Array<{
+    cardTemplateId: string
+    stem: string
+    deckTitle: string
+    deckTemplateId: string
+    totalAttempts: number
+    correctCount: number
+    percentCorrect: number
+  }>
+  decks: Array<{ id: string; title: string }>
+}>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Get org deck templates
+    const { data: decks } = await supabase
+      .from('deck_templates')
+      .select('id, title')
+      .eq('org_id', org.id)
+      .order('title')
+
+    if (!decks || decks.length === 0) {
+      return { ok: true, data: { questions: [], decks: [] } }
+    }
+
+    // Filter to specific deck if requested
+    const targetDeckIds = deckTemplateId
+      ? decks.filter((d) => d.id === deckTemplateId).map((d) => d.id)
+      : decks.map((d) => d.id)
+
+    if (targetDeckIds.length === 0) {
+      return { ok: true, data: { questions: [], decks } }
+    }
+
+    // Get questions from these decks
+    const { data: cards } = await supabase
+      .from('card_templates')
+      .select('id, stem, deck_template_id')
+      .in('deck_template_id', targetDeckIds)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    if (!cards || cards.length === 0) {
+      return { ok: true, data: { questions: [], decks } }
+    }
+
+    const deckMap = new Map(decks.map((d) => [d.id, d.title]))
+
+    // Get assessment answers for these cards to calculate difficulty
+    const cardIds = cards.map((c) => c.id)
+    const { data: answers } = await supabase
+      .from('assessment_answers')
+      .select('card_template_id, is_correct')
+      .in('card_template_id', cardIds)
+      .not('is_correct', 'is', null)
+
+    const statsMap = new Map<string, { total: number; correct: number }>()
+    if (answers) {
+      for (const a of answers) {
+        const entry = statsMap.get(a.card_template_id) ?? { total: 0, correct: 0 }
+        entry.total++
+        if (a.is_correct) entry.correct++
+        statsMap.set(a.card_template_id, entry)
+      }
+    }
+
+    const questions = cards.map((c) => {
+      const stats = statsMap.get(c.id) ?? { total: 0, correct: 0 }
+      return {
+        cardTemplateId: c.id,
+        stem: c.stem,
+        deckTitle: deckMap.get(c.deck_template_id) ?? 'Unknown',
+        deckTemplateId: c.deck_template_id,
+        totalAttempts: stats.total,
+        correctCount: stats.correct,
+        percentCorrect: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : -1,
+      }
+    })
+
+    return { ok: true, data: { questions, decks } }
+  })
+}
+
+/**
+ * Get topic-level weak area analysis for a completed session.
+ * Connects assessment answers to card_template_tags to show
+ * per-topic correct/total breakdown.
+ */
+export async function getSessionWeakAreas(
+  sessionId: string
+): Promise<ActionResultV2<{
+  topics: Array<{
+    tagId: string
+    tagName: string
+    tagColor: string
+    correct: number
+    total: number
+    percent: number
+  }>
+}>> {
+  return withOrgUser(async ({ user, supabase }) => {
+    // Get answers for this session
+    const { data: answers, error: aError } = await supabase
+      .from('assessment_answers')
+      .select('card_template_id, is_correct')
+      .eq('session_id', sessionId)
+
+    if (aError || !answers || answers.length === 0) {
+      return { ok: true, data: { topics: [] } }
+    }
+
+    const cardIds = answers.map((a) => a.card_template_id)
+
+    // Get tags for these cards (topic category only)
+    const { data: cardTags } = await supabase
+      .from('card_template_tags')
+      .select('card_template_id, tag_id')
+      .in('card_template_id', cardIds)
+
+    if (!cardTags || cardTags.length === 0) {
+      return { ok: true, data: { topics: [] } }
+    }
+
+    const tagIds = [...new Set(cardTags.map((ct) => ct.tag_id))]
+
+    // Fetch tag details (topic tags only)
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('id, name, color, category')
+      .in('id', tagIds)
+      .eq('category', 'topic')
+
+    if (!tags || tags.length === 0) {
+      return { ok: true, data: { topics: [] } }
+    }
+
+    const tagMap = new Map(tags.map((t) => [t.id, t]))
+
+    // Build answer map: card_template_id → is_correct
+    const answerMap = new Map(answers.map((a) => [a.card_template_id, a.is_correct === true]))
+
+    // Aggregate per topic tag
+    const topicStats = new Map<string, { correct: number; total: number }>()
+    for (const ct of cardTags) {
+      const tag = tagMap.get(ct.tag_id)
+      if (!tag) continue
+
+      const entry = topicStats.get(tag.id) ?? { correct: 0, total: 0 }
+      entry.total++
+      if (answerMap.get(ct.card_template_id)) entry.correct++
+      topicStats.set(tag.id, entry)
+    }
+
+    // Build result sorted by weakest first
+    const topics = [...topicStats.entries()]
+      .map(([tagId, stats]) => {
+        const tag = tagMap.get(tagId)!
+        return {
+          tagId,
+          tagName: tag.name,
+          tagColor: tag.color,
+          correct: stats.correct,
+          total: stats.total,
+          percent: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+        }
+      })
+      .sort((a, b) => a.percent - b.percent)
+
+    return { ok: true, data: { topics } }
   })
 }

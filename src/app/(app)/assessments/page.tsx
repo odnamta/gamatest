@@ -12,7 +12,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle,
-  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown,
+  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
@@ -36,6 +36,8 @@ export default function AssessmentsPage() {
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
 
   const isCreator = hasMinimumRole(role, 'creator')
 
@@ -102,10 +104,47 @@ export default function AssessmentsPage() {
           <p className="text-sm text-slate-600 dark:text-slate-400">{org.name}</p>
         </div>
         {isCreator && (
-          <Button onClick={() => router.push('/assessments/create')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Assessment
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => router.push('/assessments/questions')}>
+              <Database className="h-4 w-4 mr-2" />
+              Question Bank
+            </Button>
+            <Button onClick={() => router.push('/assessments/create')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Assessment
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Search & Filter */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search assessments..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {isCreator && (
+          <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+            {(['all', 'published', 'draft', 'archived'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-2 text-xs font-medium capitalize transition-colors ${
+                  statusFilter === status
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -120,7 +159,16 @@ export default function AssessmentsPage() {
         </div>
       ) : (
         <div className="space-y-3 mb-8">
-          {assessments.map((assessment) => {
+          {assessments
+          .filter((a) => {
+            if (statusFilter !== 'all' && a.status !== statusFilter) return false
+            if (searchQuery) {
+              const q = searchQuery.toLowerCase()
+              return a.title.toLowerCase().includes(q) || a.deck_title.toLowerCase().includes(q)
+            }
+            return true
+          })
+          .map((assessment) => {
             const mySessions = sessions.filter((s) => s.assessment_id === assessment.id)
             const lastSession = mySessions[0]
             const now = new Date()

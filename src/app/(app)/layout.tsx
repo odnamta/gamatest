@@ -10,6 +10,7 @@ import { MobileNavBar } from '@/components/navigation/MobileNavBar'
 import { OnboardingWrapper } from '@/components/onboarding/OnboardingWrapper'
 import { OrgProvider } from '@/components/providers/OrgProvider'
 import { OrgSwitcher } from '@/components/navigation/OrgSwitcher'
+import { NotificationBell } from '@/components/navigation/NotificationBell'
 
 export default async function AppLayout({
   children,
@@ -69,6 +70,7 @@ export default async function AppLayout({
                 </nav>
               </div>
               <div className="flex items-center gap-2">
+                <NotificationBell />
                 {/* V13: Org switcher */}
                 <OrgSwitcher />
                 <ThemeToggle />

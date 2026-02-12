@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import type { OrgFeatures } from '@/types/database'
+import type { OrgFeatures, AssessmentDefaults } from '@/types/database'
 
 const FEATURE_LABELS: Record<keyof OrgFeatures, { label: string; description: string }> = {
   study_mode: { label: 'Study Mode', description: 'Spaced repetition and self-paced learning' },
@@ -45,6 +45,16 @@ export default function OrgSettingsPage() {
       erp_integration: false,
     }
   )
+  const [assessmentDefaults, setAssessmentDefaults] = useState<AssessmentDefaults>(
+    org.settings?.assessment_defaults ?? {
+      time_limit_minutes: 60,
+      pass_score: 70,
+      shuffle_questions: true,
+      shuffle_options: false,
+      show_results: true,
+      allow_review: true,
+    }
+  )
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   if (role !== 'owner' && role !== 'admin') {
@@ -65,7 +75,7 @@ export default function OrgSettingsPage() {
     startTransition(async () => {
       const result = await updateOrgSettings(org.id, {
         name: name.trim() || org.name,
-        settings: { features },
+        settings: { features, assessment_defaults: assessmentDefaults },
       })
       if (result.ok) {
         setMessage({ type: 'success', text: 'Settings saved successfully' })
@@ -132,6 +142,95 @@ export default function OrgSettingsPage() {
           )}
         </div>
       </section>
+
+      {/* Assessment Defaults */}
+      {features.assessment_mode && (
+        <>
+          <Separator className="mb-8" />
+          <section className="space-y-4 mb-8">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Assessment Defaults</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Default values when creating new assessments. Creators can override per assessment.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="default-time">Time Limit (minutes)</Label>
+                <input
+                  id="default-time"
+                  type="number"
+                  value={assessmentDefaults.time_limit_minutes}
+                  onChange={(e) =>
+                    setAssessmentDefaults((d) => ({ ...d, time_limit_minutes: Number(e.target.value) || 60 }))
+                  }
+                  min={1}
+                  max={480}
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="default-pass">Pass Score (%)</Label>
+                <input
+                  id="default-pass"
+                  type="number"
+                  value={assessmentDefaults.pass_score}
+                  onChange={(e) =>
+                    setAssessmentDefaults((d) => ({ ...d, pass_score: Number(e.target.value) || 70 }))
+                  }
+                  min={0}
+                  max={100}
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="default-shuffle-q" className="text-sm font-medium">Shuffle Questions</Label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Randomize question order</p>
+                </div>
+                <Switch
+                  id="default-shuffle-q"
+                  checked={assessmentDefaults.shuffle_questions}
+                  onCheckedChange={(v) => setAssessmentDefaults((d) => ({ ...d, shuffle_questions: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="default-shuffle-o" className="text-sm font-medium">Shuffle Options</Label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Randomize answer option order</p>
+                </div>
+                <Switch
+                  id="default-shuffle-o"
+                  checked={assessmentDefaults.shuffle_options}
+                  onCheckedChange={(v) => setAssessmentDefaults((d) => ({ ...d, shuffle_options: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="default-results" className="text-sm font-medium">Show Results</Label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Show score and results to candidates</p>
+                </div>
+                <Switch
+                  id="default-results"
+                  checked={assessmentDefaults.show_results}
+                  onCheckedChange={(v) => setAssessmentDefaults((d) => ({ ...d, show_results: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="default-review" className="text-sm font-medium">Allow Review</Label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Allow candidates to review answers</p>
+                </div>
+                <Switch
+                  id="default-review"
+                  checked={assessmentDefaults.allow_review}
+                  onCheckedChange={(v) => setAssessmentDefaults((d) => ({ ...d, allow_review: v }))}
+                />
+              </div>
+            </div>
+          </section>
+        </>
+      )}
 
       {/* Save */}
       {message && (

@@ -30,6 +30,7 @@ import {
   getAssessmentResultsDetailed,
   getQuestionAnalytics,
   exportResultsCsv,
+  getSessionWeakAreas,
 } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
@@ -80,19 +81,30 @@ export default function AssessmentResultsPage() {
 // Candidate Results View
 // ============================================
 
+type TopicBreakdown = {
+  tagId: string
+  tagName: string
+  tagColor: string
+  correct: number
+  total: number
+  percent: number
+}
+
 function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: string; sessionId: string }) {
   const router = useRouter()
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [session, setSession] = useState<AssessmentSession | null>(null)
   const [answers, setAnswers] = useState<EnrichedAnswer[]>([])
+  const [weakAreas, setWeakAreas] = useState<TopicBreakdown[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [aResult, sResult] = await Promise.all([
+      const [aResult, sResult, wResult] = await Promise.all([
         getAssessment(assessmentId),
         getSessionResults(sessionId),
+        getSessionWeakAreas(sessionId),
       ])
 
       if (aResult.ok && aResult.data) setAssessment(aResult.data)
@@ -101,6 +113,9 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
       } else if (sResult.data) {
         setSession(sResult.data.session)
         setAnswers(sResult.data.answers)
+      }
+      if (wResult.ok && wResult.data) {
+        setWeakAreas(wResult.data.topics)
       }
       setLoading(false)
     }
@@ -211,6 +226,43 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
           )}
         </div>
       </div>
+
+      {/* Topic Breakdown (weak areas) */}
+      {weakAreas.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            Topic Breakdown
+          </h2>
+          <div className="space-y-2">
+            {weakAreas.map((topic) => {
+              const isWeak = topic.percent < 50
+              return (
+                <div
+                  key={topic.tagId}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: topic.tagColor }}
+                  />
+                  <span className="text-sm text-slate-900 dark:text-slate-100 flex-1 min-w-0 truncate">
+                    {topic.tagName}
+                  </span>
+                  <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex-shrink-0">
+                    <div
+                      className={`h-full rounded-full ${isWeak ? 'bg-red-500' : topic.percent < 75 ? 'bg-amber-500' : 'bg-green-500'}`}
+                      style={{ width: `${topic.percent}%` }}
+                    />
+                  </div>
+                  <span className={`text-sm font-medium w-16 text-right flex-shrink-0 ${isWeak ? 'text-red-500' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {topic.correct}/{topic.total}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Per-Question Review — gated by allow_review */}
       {answers.length > 0 && assessment?.allow_review && (

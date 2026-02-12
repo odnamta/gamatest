@@ -23,10 +23,20 @@ export interface OrgBranding {
   primary_color: string
 }
 
+export interface AssessmentDefaults {
+  time_limit_minutes: number
+  pass_score: number
+  shuffle_questions: boolean
+  shuffle_options: boolean
+  show_results: boolean
+  allow_review: boolean
+}
+
 export interface OrgSettings {
   features: OrgFeatures
   branding: OrgBranding
   default_language: string
+  assessment_defaults?: AssessmentDefaults
 }
 
 export interface Organization {
