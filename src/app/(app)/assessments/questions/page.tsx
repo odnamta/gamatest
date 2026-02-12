@@ -36,6 +36,7 @@ export default function QuestionBankPage() {
   const [selectedDeck, setSelectedDeck] = useState('')
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'difficulty' | 'recent'>('recent')
+  const [displayLimit, setDisplayLimit] = useState(30)
 
   useEffect(() => {
     loadData()
@@ -141,7 +142,7 @@ export default function QuestionBankPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((q) => {
+          {filtered.slice(0, displayLimit).map((q) => {
             const hasStats = q.percentCorrect >= 0
             const isHard = hasStats && q.percentCorrect < 40
             const isMedium = hasStats && q.percentCorrect >= 40 && q.percentCorrect < 70
@@ -179,6 +180,14 @@ export default function QuestionBankPage() {
               </div>
             )
           })}
+          {filtered.length > displayLimit && (
+            <button
+              onClick={() => setDisplayLimit((l) => l + 30)}
+              className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Show more ({filtered.length - displayLimit} remaining)
+            </button>
+          )}
         </div>
       )}
     </div>

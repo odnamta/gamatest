@@ -9,10 +9,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Search, TrendingUp, Target, Clock } from 'lucide-react'
+import { ArrowLeft, Users, Search, TrendingUp, Target, Clock, Download } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
-import { getOrgCandidateList } from '@/actions/assessment-actions'
+import { getOrgCandidateList, exportCandidatesCsv } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 
 type Candidate = {
@@ -32,6 +32,7 @@ export default function CandidateListPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [displayLimit, setDisplayLimit] = useState(30)
 
   useEffect(() => {
     if (!isCreator) return
@@ -67,12 +68,37 @@ export default function CandidateListPage() {
         Back to Assessments
       </button>
 
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-        Candidate Progress
-      </h1>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-        {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} in your organization
-      </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+            Candidate Progress
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} in your organization
+          </p>
+        </div>
+        {candidates.length > 0 && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={async () => {
+              const result = await exportCandidatesCsv()
+              if (result.ok && result.data) {
+                const blob = new Blob([result.data], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'candidates.csv'
+                a.click()
+                URL.revokeObjectURL(url)
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+        )}
+      </div>
 
       {/* Search */}
       <div className="relative mb-4">
@@ -99,7 +125,7 @@ export default function CandidateListPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c) => (
+          {filtered.slice(0, displayLimit).map((c) => (
             <button
               key={c.userId}
               onClick={() => router.push(`/assessments/candidates/${c.userId}`)}
@@ -135,6 +161,14 @@ export default function CandidateListPage() {
               </div>
             </button>
           ))}
+          {filtered.length > displayLimit && (
+            <button
+              onClick={() => setDisplayLimit((l) => l + 30)}
+              className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Show more ({filtered.length - displayLimit} remaining)
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -382,6 +382,7 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sessionLimit, setSessionLimit] = useState(20)
 
   useEffect(() => {
     async function load() {
@@ -575,7 +576,7 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {sessions.map((s) => (
+                {sessions.slice(0, sessionLimit).map((s) => (
                   <tr key={s.id} className="bg-white dark:bg-slate-800">
                     <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
                       {s.user_email}
@@ -625,6 +626,14 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
               </tbody>
             </table>
           </div>
+          {sessions.length > sessionLimit && (
+            <button
+              onClick={() => setSessionLimit((l) => l + 20)}
+              className="w-full py-2 mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Show more ({sessions.length - sessionLimit} remaining)
+            </button>
+          )}
         </>
       )}
     </div>

@@ -277,6 +277,62 @@ export default function TakeAssessmentPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [session, completing])
 
+  // Keyboard navigation
+  useEffect(() => {
+    if (phase !== 'exam' || !session || completing) return
+
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't intercept if a modal is open
+      if (showConfirmFinish || showTabWarning) {
+        if (e.key === 'Escape') {
+          setShowConfirmFinish(false)
+          setShowTabWarning(false)
+        }
+        return
+      }
+
+      const q = questions[currentIndex]
+      if (!q) return
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault()
+          setCurrentIndex((i) => Math.max(0, i - 1))
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))
+          break
+        case 'a': case 'A': case '1':
+          if (q.options.length > 0) handleSelectAnswer(0)
+          break
+        case 'b': case 'B': case '2':
+          if (q.options.length > 1) handleSelectAnswer(1)
+          break
+        case 'c': case 'C': case '3':
+          if (q.options.length > 2) handleSelectAnswer(2)
+          break
+        case 'd': case 'D': case '4':
+          if (q.options.length > 3) handleSelectAnswer(3)
+          break
+        case 'e': case 'E': case '5':
+          if (q.options.length > 4) handleSelectAnswer(4)
+          break
+        case 'Enter':
+          e.preventDefault()
+          if (currentIndex < questions.length - 1) {
+            setCurrentIndex((i) => i + 1)
+          } else {
+            setShowConfirmFinish(true)
+          }
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [phase, session, completing, currentIndex, questions, showConfirmFinish, showTabWarning])
+
   const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -576,7 +632,15 @@ export default function TakeAssessmentPage() {
         )}
       </div>
 
-      {/* Confirm Finish Modal */}
+      {/* Keyboard hints */}
+      <div className="mt-4 text-center text-[10px] text-slate-400 dark:text-slate-500 hidden sm:block">
+        <span className="inline-flex items-center gap-3">
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">A-E</kbd> select</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">&larr; &rarr;</kbd> navigate</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">Enter</kbd> next</span>
+        </span>
+      </div>
+
       {/* Tab Switch Warning */}
       {showTabWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

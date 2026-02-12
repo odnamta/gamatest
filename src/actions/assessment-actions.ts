@@ -1392,6 +1392,35 @@ export async function getOrgCandidateList(): Promise<ActionResultV2<
 }
 
 /**
+ * Export all org candidates with stats as CSV.
+ * Creator+ only.
+ */
+export async function exportCandidatesCsv(): Promise<ActionResultV2<string>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    const listResult = await getOrgCandidateList()
+    if (!listResult.ok) {
+      return { ok: false, error: listResult.error }
+    }
+
+    const candidates = listResult.data ?? []
+    const header = 'Name,Email,Exams Completed,Average Score,Last Active'
+    const rows = candidates.map((c) => {
+      const name = c.fullName ? `"${c.fullName}"` : ''
+      const email = `"${c.email}"`
+      const lastActive = c.lastActiveAt ? new Date(c.lastActiveAt).toISOString() : ''
+      return `${name},${email},${c.totalCompleted},${c.avgScore},${lastActive}`
+    })
+
+    const csv = [header, ...rows].join('\n')
+    return { ok: true, data: csv }
+  })
+}
+
+/**
  * Get a single candidate's assessment history across all org assessments.
  * Creator+ only.
  */

@@ -12,7 +12,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle,
-  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users,
+  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users, Bell,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
@@ -22,6 +22,7 @@ import {
   archiveAssessment,
   duplicateAssessment,
 } from '@/actions/assessment-actions'
+import { sendAssessmentReminder } from '@/actions/notification-actions'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
@@ -36,8 +37,10 @@ export default function AssessmentsPage() {
   const [loading, setLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set())
+  const [reminderSent, setReminderSent] = useState<Record<string, string>>({})
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
+  const [displayLimit, setDisplayLimit] = useState(20)
 
   const isCreator = hasMinimumRole(role, 'creator')
 
@@ -74,6 +77,19 @@ export default function AssessmentsPage() {
     startTransition(async () => {
       const result = await duplicateAssessment(assessmentId)
       if (result.ok) await loadData()
+    })
+  }
+
+  function handleReminder(assessmentId: string) {
+    startTransition(async () => {
+      const result = await sendAssessmentReminder(assessmentId)
+      if (result.ok && result.data) {
+        const count = result.data.notified
+        setReminderSent((prev) => ({
+          ...prev,
+          [assessmentId]: `Sent to ${count} candidate${count !== 1 ? 's' : ''}`,
+        }))
+      }
     })
   }
 
@@ -161,17 +177,20 @@ export default function AssessmentsPage() {
             <p className="mt-1">Create your first assessment to get started.</p>
           )}
         </div>
-      ) : (
+      ) : (() => {
+        const filtered = assessments.filter((a) => {
+          if (statusFilter !== 'all' && a.status !== statusFilter) return false
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase()
+            return a.title.toLowerCase().includes(q) || a.deck_title.toLowerCase().includes(q)
+          }
+          return true
+        })
+        const hasMore = filtered.length > displayLimit
+        return (
         <div className="space-y-3 mb-8">
-          {assessments
-          .filter((a) => {
-            if (statusFilter !== 'all' && a.status !== statusFilter) return false
-            if (searchQuery) {
-              const q = searchQuery.toLowerCase()
-              return a.title.toLowerCase().includes(q) || a.deck_title.toLowerCase().includes(q)
-            }
-            return true
-          })
+          {filtered
+          .slice(0, displayLimit)
           .map((assessment) => {
             const mySessions = sessions.filter((s) => s.assessment_id === assessment.id)
             const lastSession = mySessions[0]
@@ -298,6 +317,25 @@ export default function AssessmentsPage() {
                       </Button>
                     )}
 
+                    {/* Creator: Send reminder (published only) */}
+                    {isCreator && assessment.status === 'published' && (
+                      reminderSent[assessment.id] ? (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          {reminderSent[assessment.id]}
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleReminder(assessment.id)}
+                          disabled={isPending}
+                          title="Send reminder to candidates who haven't completed"
+                        >
+                          <Bell className="h-4 w-4" />
+                        </Button>
+                      )
+                    )}
+
                     {/* Creator: Archive published */}
                     {isCreator && assessment.status === 'published' && (
                       <Button
@@ -400,8 +438,17 @@ export default function AssessmentsPage() {
               </div>
             )
           })}
+          {hasMore && (
+            <button
+              onClick={() => setDisplayLimit((l) => l + 20)}
+              className="w-full py-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Show more ({filtered.length - displayLimit} remaining)
+            </button>
+          )}
         </div>
-      )}
+        )
+      })()}
 
       {/* My Recent Sessions */}
       {sessions.length > 0 && (

@@ -145,3 +145,77 @@ export async function notifyOrgCandidates(
     return { ok: true }
   })
 }
+
+/**
+ * Send a reminder notification for a specific assessment to candidates
+ * who haven't completed it yet. Creator+ only.
+ * Returns the number of candidates notified.
+ */
+export async function sendAssessmentReminder(
+  assessmentId: string
+): Promise<ActionResultV2<{ notified: number }>> {
+  return withOrgUser(async ({ user, supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions' }
+    }
+
+    // Get the assessment
+    const { data: assessment } = await supabase
+      .from('assessments')
+      .select('id, title, status')
+      .eq('id', assessmentId)
+      .eq('org_id', org.id)
+      .single()
+
+    if (!assessment) {
+      return { ok: false, error: 'Assessment not found' }
+    }
+
+    if (assessment.status !== 'published') {
+      return { ok: false, error: 'Can only send reminders for published assessments' }
+    }
+
+    // Get all org members except the creator
+    const { data: members } = await supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('org_id', org.id)
+      .neq('user_id', user.id)
+
+    if (!members || members.length === 0) {
+      return { ok: true, data: { notified: 0 } }
+    }
+
+    // Get users who have completed this assessment
+    const { data: completedSessions } = await supabase
+      .from('assessment_sessions')
+      .select('user_id')
+      .eq('assessment_id', assessmentId)
+      .eq('status', 'completed')
+
+    const completedUserIds = new Set((completedSessions ?? []).map((s) => s.user_id))
+
+    // Filter to only candidates who haven't completed it
+    const pendingMembers = members.filter((m) => !completedUserIds.has(m.user_id))
+
+    if (pendingMembers.length === 0) {
+      return { ok: true, data: { notified: 0 } }
+    }
+
+    const rows = pendingMembers.map((m) => ({
+      user_id: m.user_id,
+      org_id: org.id,
+      type: 'assessment_reminder',
+      title: 'Assessment Reminder',
+      body: `Don't forget to complete "${assessment.title}".`,
+      link: `/assessments`,
+    }))
+
+    const { error: insertError } = await supabase.from('notifications').insert(rows)
+    if (insertError) {
+      return { ok: false, error: insertError.message }
+    }
+
+    return { ok: true, data: { notified: pendingMembers.length } }
+  })
+}
