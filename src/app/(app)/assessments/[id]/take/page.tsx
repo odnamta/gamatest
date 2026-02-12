@@ -9,7 +9,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import {
+  Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle,
+  Target, Shuffle, RotateCcw, Eye, EyeOff, Shield,
+} from 'lucide-react'
 import {
   startAssessmentSession,
   submitAnswer,
@@ -18,6 +21,7 @@ import {
   getSessionQuestions,
   getExistingAnswers,
   reportTabSwitch,
+  getMyAssessmentSessions,
 } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import type { Assessment, AssessmentSession } from '@/types/database'
@@ -35,6 +39,7 @@ export default function TakeAssessmentPage() {
   const params = useParams()
   const assessmentId = params.id as string
 
+  const [phase, setPhase] = useState<'loading' | 'instructions' | 'exam'>('loading')
   const [assessment, setAssessment] = useState<Assessment | null>(null)
   const [session, setSession] = useState<AssessmentSession | null>(null)
   const [questions, setQuestions] = useState<QuestionData[]>([])
@@ -42,14 +47,16 @@ export default function TakeAssessmentPage() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirmFinish, setShowConfirmFinish] = useState(false)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
+  const [attemptCount, setAttemptCount] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const completingRef = useRef(false)
 
-  // Load assessment and start session
+  // Load assessment info (not session yet) for instructions
   useEffect(() => {
     async function init() {
       const aResult = await getAssessment(assessmentId)
@@ -65,64 +72,94 @@ export default function TakeAssessmentPage() {
       }
       setAssessment(aResult.data)
 
+      // Check if there's an existing in-progress session to resume
+      const sessionsResult = await getMyAssessmentSessions()
+      if (sessionsResult.ok && sessionsResult.data) {
+        const mySessions = sessionsResult.data.filter((s) => s.assessment_id === assessmentId)
+        setAttemptCount(mySessions.length)
+        const inProgress = mySessions.find((s) => s.status === 'in_progress')
+        if (inProgress) {
+          // Resume existing session directly
+          await startExam(aResult.data, inProgress as AssessmentSession)
+          return
+        }
+      }
+
+      setLoading(false)
+      setPhase('instructions')
+    }
+    init()
+  }, [assessmentId])
+
+  async function startExam(assessmentData?: Assessment, existingSession?: AssessmentSession) {
+    setStarting(true)
+    const a = assessmentData ?? assessment
+    if (!a) return
+
+    let sessionData: AssessmentSession
+    if (existingSession) {
+      sessionData = existingSession
+    } else {
       const sResult = await startAssessmentSession(assessmentId)
       if (!sResult.ok) {
         setError(sResult.error)
+        setStarting(false)
         setLoading(false)
         return
       }
       if (!sResult.data) {
         setError('Failed to start session')
+        setStarting(false)
         setLoading(false)
         return
       }
-
-      const sessionData = sResult.data
-      setSession(sessionData)
-      setTimeRemaining(sessionData.time_remaining_seconds)
-
-      // Fetch question stems and options via server action
-      const qResult = await getSessionQuestions(sessionData.id)
-      let qs: QuestionData[]
-      if (qResult.ok && qResult.data) {
-        qs = qResult.data.map((q) => ({
-          cardTemplateId: q.cardTemplateId,
-          stem: q.stem,
-          options: q.options,
-          selectedIndex: null,
-          answered: false,
-        }))
-      } else {
-        // Fallback: show placeholders
-        qs = sessionData.question_order.map((cardId) => ({
-          cardTemplateId: cardId,
-          stem: '',
-          options: [],
-          selectedIndex: null,
-          answered: false,
-        }))
-      }
-
-      // Restore previously submitted answers (session resume)
-      const existingResult = await getExistingAnswers(sessionData.id)
-      if (existingResult.ok && existingResult.data && existingResult.data.length > 0) {
-        const answerMap = new Map(
-          existingResult.data.map((a) => [a.cardTemplateId, a.selectedIndex])
-        )
-        qs = qs.map((q) => {
-          const existing = answerMap.get(q.cardTemplateId)
-          if (existing !== undefined) {
-            return { ...q, selectedIndex: existing, answered: true }
-          }
-          return q
-        })
-      }
-
-      setQuestions(qs)
-      setLoading(false)
+      sessionData = sResult.data
     }
-    init()
-  }, [assessmentId])
+
+    setSession(sessionData)
+    setTimeRemaining(sessionData.time_remaining_seconds)
+
+    // Fetch question stems and options
+    const qResult = await getSessionQuestions(sessionData.id)
+    let qs: QuestionData[]
+    if (qResult.ok && qResult.data) {
+      qs = qResult.data.map((q) => ({
+        cardTemplateId: q.cardTemplateId,
+        stem: q.stem,
+        options: q.options,
+        selectedIndex: null,
+        answered: false,
+      }))
+    } else {
+      qs = sessionData.question_order.map((cardId) => ({
+        cardTemplateId: cardId,
+        stem: '',
+        options: [],
+        selectedIndex: null,
+        answered: false,
+      }))
+    }
+
+    // Restore previously submitted answers (session resume)
+    const existingResult = await getExistingAnswers(sessionData.id)
+    if (existingResult.ok && existingResult.data && existingResult.data.length > 0) {
+      const answerMap = new Map(
+        existingResult.data.map((ans) => [ans.cardTemplateId, ans.selectedIndex])
+      )
+      qs = qs.map((q) => {
+        const existing = answerMap.get(q.cardTemplateId)
+        if (existing !== undefined) {
+          return { ...q, selectedIndex: existing, answered: true }
+        }
+        return q
+      })
+    }
+
+    setQuestions(qs)
+    setLoading(false)
+    setStarting(false)
+    setPhase('exam')
+  }
 
   // Auto-complete handler (stable ref to avoid stale closures in timer)
   const handleCompleteRef = useCallback(async () => {
@@ -247,6 +284,103 @@ export default function TakeAssessmentPage() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="h-14 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" />
           ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Pre-assessment instructions screen
+  if (phase === 'instructions' && assessment) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+          {assessment.title}
+        </h1>
+        {assessment.description && (
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+            {assessment.description}
+          </p>
+        )}
+
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 mb-6">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            Assessment Rules
+          </h2>
+          <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-3">
+              <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              <span>Time limit: <strong>{assessment.time_limit_minutes} minutes</strong></span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Target className="h-4 w-4 text-green-500 flex-shrink-0" />
+              <span>Pass score: <strong>{assessment.pass_score}%</strong> ({assessment.question_count} questions)</span>
+            </div>
+            {assessment.shuffle_questions && (
+              <div className="flex items-center gap-3">
+                <Shuffle className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                <span>Questions are presented in random order</span>
+              </div>
+            )}
+            {assessment.max_attempts && (
+              <div className="flex items-center gap-3">
+                <RotateCcw className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <span>
+                  {assessment.max_attempts - attemptCount} of {assessment.max_attempts} attempt{assessment.max_attempts !== 1 ? 's' : ''} remaining
+                </span>
+              </div>
+            )}
+            {assessment.cooldown_minutes && (
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <span>{assessment.cooldown_minutes} minute cooldown between attempts</span>
+              </div>
+            )}
+            {assessment.allow_review ? (
+              <div className="flex items-center gap-3">
+                <Eye className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                <span>You can review your answers after completion</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <EyeOff className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                <span>Answer review is not available for this assessment</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <Shield className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <span>Tab switches are monitored and recorded</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            The timer starts as soon as you click &quot;Begin Assessment&quot;. Make sure you have a stable connection and are ready to complete the exam.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => router.push('/assessments')}
+            className="flex-1"
+          >
+            Back
+          </Button>
+          <Button
+            onClick={() => startExam()}
+            loading={starting}
+            disabled={starting}
+            className="flex-1"
+          >
+            Begin Assessment
+          </Button>
         </div>
       </div>
     )

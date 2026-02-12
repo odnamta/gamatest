@@ -110,6 +110,8 @@ export interface Assessment {
   shuffle_options: boolean
   show_results: boolean
   max_attempts: number | null
+  cooldown_minutes: number | null
+  allow_review: boolean
   start_date: string | null
   end_date: string | null
   status: AssessmentStatus

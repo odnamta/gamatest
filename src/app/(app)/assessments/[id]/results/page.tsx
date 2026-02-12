@@ -131,6 +131,35 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
   const score = session.score ?? 0
   const passed = session.passed ?? false
 
+  // If show_results is false, show only basic submission confirmation
+  if (assessment && !assessment.show_results) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <button
+          onClick={() => router.push('/assessments')}
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Assessments
+        </button>
+        <div className="rounded-xl p-6 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <CheckCircle2 className="h-12 w-12 mx-auto text-blue-600 mb-3" />
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Assessment Submitted
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400">
+            Your responses have been recorded. Results are not available for this assessment.
+          </p>
+        </div>
+        <div className="mt-8 text-center">
+          <Button variant="secondary" onClick={() => router.push('/assessments')}>
+            Back to Assessments
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <button
@@ -183,8 +212,8 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
         </div>
       </div>
 
-      {/* Per-Question Review */}
-      {answers.length > 0 && (
+      {/* Per-Question Review — gated by allow_review */}
+      {answers.length > 0 && assessment?.allow_review && (
         <div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
             Question Review
@@ -250,6 +279,25 @@ function CandidateResultsView({ assessmentId, sessionId }: { assessmentId: strin
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Certificate link for passed sessions */}
+      {passed && (
+        <div className="mt-6 text-center">
+          <Button
+            variant="secondary"
+            onClick={() => router.push(`/assessments/${assessmentId}/certificate/${sessionId}`)}
+          >
+            <Trophy className="h-4 w-4 mr-2" />
+            View Certificate
+          </Button>
+        </div>
+      )}
+
+      {answers.length > 0 && assessment && !assessment.allow_review && (
+        <div className="mt-6 p-4 rounded-lg bg-slate-50 dark:bg-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+          Answer review is not available for this assessment.
         </div>
       )}
 

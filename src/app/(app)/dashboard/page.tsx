@@ -1,6 +1,7 @@
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { DashboardHero } from '@/components/dashboard/DashboardHero'
 import { OrgStatsCard } from '@/components/dashboard/OrgStatsCard'
+import { CandidateAssessmentCard } from '@/components/dashboard/CandidateAssessmentCard'
 import { LibrarySection } from '@/components/dashboard/LibrarySection'
 import { StudyHeatmap } from '@/components/dashboard/StudyHeatmap'
 import { RepairButton } from '@/components/dashboard/RepairButton'
@@ -220,6 +221,9 @@ export default async function DashboardPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* V13: Org Stats for Creators */}
       <OrgStatsCard />
+
+      {/* V13 Phase 8: Assessment Overview for Candidates */}
+      <CandidateAssessmentCard />
 
       {/* Dashboard Hero - First element (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 3.1-3.5) */}
       <DashboardHero

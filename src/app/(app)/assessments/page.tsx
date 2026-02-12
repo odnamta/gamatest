@@ -128,6 +128,19 @@ export default function AssessmentsPage() {
             const isClosed = assessment.end_date && new Date(assessment.end_date) < now
             const isScheduleBlocked = isUpcoming || isClosed
 
+            // Retake policy checks
+            const attemptCount = mySessions.length
+            const isMaxAttemptsReached = assessment.max_attempts ? attemptCount >= assessment.max_attempts : false
+            let cooldownRemaining = 0
+            if (assessment.cooldown_minutes && lastSession?.completed_at) {
+              const cooldownEnd = new Date(lastSession.completed_at)
+              cooldownEnd.setMinutes(cooldownEnd.getMinutes() + assessment.cooldown_minutes)
+              if (now < cooldownEnd) {
+                cooldownRemaining = Math.ceil((cooldownEnd.getTime() - now.getTime()) / 60000)
+              }
+            }
+            const isRetakeBlocked = isScheduleBlocked || isMaxAttemptsReached || cooldownRemaining > 0
+
             return (
               <div
                 key={assessment.id}
@@ -158,6 +171,16 @@ export default function AssessmentsPage() {
                       <span>{assessment.question_count} questions</span>
                       {isCreator && (
                         <span>{assessment.session_count} attempts</span>
+                      )}
+                      {!isCreator && assessment.max_attempts && (
+                        <span>
+                          {attemptCount}/{assessment.max_attempts} attempts
+                        </span>
+                      )}
+                      {!isCreator && cooldownRemaining > 0 && (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          Retry in {cooldownRemaining}m
+                        </span>
                       )}
                       {(assessment.start_date || assessment.end_date) && (
                         <span className="inline-flex items-center gap-1">
@@ -196,8 +219,14 @@ export default function AssessmentsPage() {
                       <Button
                         size="sm"
                         onClick={() => router.push(`/assessments/${assessment.id}/take`)}
-                        disabled={!!isScheduleBlocked}
-                        title={isUpcoming ? 'Not yet available' : isClosed ? 'Assessment closed' : undefined}
+                        disabled={!!isRetakeBlocked}
+                        title={
+                          isMaxAttemptsReached ? 'Maximum attempts reached'
+                          : cooldownRemaining > 0 ? `Wait ${cooldownRemaining} minutes`
+                          : isUpcoming ? 'Not yet available'
+                          : isClosed ? 'Assessment closed'
+                          : undefined
+                        }
                       >
                         <Play className="h-4 w-4 mr-1" />
                         {lastSession ? 'Retake' : 'Start'}

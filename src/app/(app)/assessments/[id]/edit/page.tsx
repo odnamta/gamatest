@@ -42,6 +42,8 @@ export default function EditAssessmentPage() {
   const [shuffleOptions, setShuffleOptions] = useState(false)
   const [showResults, setShowResults] = useState(true)
   const [maxAttempts, setMaxAttempts] = useState<number | undefined>(undefined)
+  const [cooldownMinutes, setCooldownMinutes] = useState<number | undefined>(undefined)
+  const [allowReview, setAllowReview] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -60,6 +62,8 @@ export default function EditAssessmentPage() {
         setShuffleOptions(a.shuffle_options)
         setShowResults(a.show_results)
         setMaxAttempts(a.max_attempts ?? undefined)
+        setCooldownMinutes(a.cooldown_minutes ?? undefined)
+        setAllowReview(a.allow_review)
         setStartDate(a.start_date ? new Date(a.start_date).toISOString().slice(0, 16) : '')
         setEndDate(a.end_date ? new Date(a.end_date).toISOString().slice(0, 16) : '')
       } else if (!result.ok) {
@@ -94,6 +98,8 @@ export default function EditAssessmentPage() {
       shuffleOptions,
       showResults,
       maxAttempts: maxAttempts ?? null,
+      cooldownMinutes: cooldownMinutes ?? null,
+      allowReview,
       startDate: startDate ? new Date(startDate).toISOString() : null,
       endDate: endDate ? new Date(endDate).toISOString() : null,
     })
@@ -227,21 +233,39 @@ export default function EditAssessmentPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Max Attempts (blank = unlimited)
-          </label>
-          <input
-            type="number"
-            value={maxAttempts ?? ''}
-            onChange={(e) =>
-              setMaxAttempts(e.target.value ? Number(e.target.value) : undefined)
-            }
-            disabled={!isDraft}
-            min={1}
-            placeholder="Unlimited"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Max Attempts (blank = unlimited)
+            </label>
+            <input
+              type="number"
+              value={maxAttempts ?? ''}
+              onChange={(e) =>
+                setMaxAttempts(e.target.value ? Number(e.target.value) : undefined)
+              }
+              disabled={!isDraft}
+              min={1}
+              placeholder="Unlimited"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Cooldown (minutes, blank = none)
+            </label>
+            <input
+              type="number"
+              value={cooldownMinutes ?? ''}
+              onChange={(e) =>
+                setCooldownMinutes(e.target.value ? Number(e.target.value) : undefined)
+              }
+              disabled={!isDraft}
+              min={1}
+              placeholder="No cooldown"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            />
+          </div>
         </div>
 
         {/* Schedule */}
@@ -307,6 +331,18 @@ export default function EditAssessmentPage() {
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
               Show results to candidates after completion
+            </span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allowReview}
+              onChange={(e) => setAllowReview(e.target.checked)}
+              disabled={!isDraft}
+              className="rounded border-slate-300"
+            />
+            <span className="text-sm text-slate-700 dark:text-slate-300">
+              Allow candidates to review answers after completion
             </span>
           </label>
         </div>

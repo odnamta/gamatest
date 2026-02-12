@@ -38,6 +38,8 @@ export async function createAssessment(
     shuffleOptions?: boolean
     showResults?: boolean
     maxAttempts?: number
+    cooldownMinutes?: number
+    allowReview?: boolean
     startDate?: string
     endDate?: string
   }
@@ -90,6 +92,8 @@ export async function createAssessment(
         shuffle_options: input.shuffleOptions ?? false,
         show_results: input.showResults ?? true,
         max_attempts: input.maxAttempts ?? null,
+        cooldown_minutes: input.cooldownMinutes ?? null,
+        allow_review: input.allowReview ?? true,
         start_date: input.startDate ?? null,
         end_date: input.endDate ?? null,
         status: 'draft',
@@ -271,6 +275,8 @@ export async function duplicateAssessment(
         shuffle_options: source.shuffle_options,
         show_results: source.show_results,
         max_attempts: source.max_attempts,
+        cooldown_minutes: source.cooldown_minutes,
+        allow_review: source.allow_review,
         start_date: null,
         end_date: null,
         status: 'draft',
@@ -304,6 +310,8 @@ export async function updateAssessment(
     shuffleOptions?: boolean
     showResults?: boolean
     maxAttempts?: number | null
+    cooldownMinutes?: number | null
+    allowReview?: boolean
     startDate?: string | null
     endDate?: string | null
   }
@@ -324,6 +332,8 @@ export async function updateAssessment(
     if (input.shuffleOptions !== undefined) updates.shuffle_options = input.shuffleOptions
     if (input.showResults !== undefined) updates.show_results = input.showResults
     if (input.maxAttempts !== undefined) updates.max_attempts = input.maxAttempts
+    if (input.cooldownMinutes !== undefined) updates.cooldown_minutes = input.cooldownMinutes
+    if (input.allowReview !== undefined) updates.allow_review = input.allowReview
     if (input.startDate !== undefined) updates.start_date = input.startDate
     if (input.endDate !== undefined) updates.end_date = input.endDate
 
@@ -379,16 +389,30 @@ export async function startAssessmentSession(
       return { ok: false, error: 'This assessment has closed' }
     }
 
-    // Check max attempts
-    if (assessment.max_attempts) {
-      const { count } = await supabase
+    // Check max attempts and cooldown
+    if (assessment.max_attempts || assessment.cooldown_minutes) {
+      const { data: pastSessions, count } = await supabase
         .from('assessment_sessions')
-        .select('*', { count: 'exact', head: true })
+        .select('completed_at', { count: 'exact' })
         .eq('assessment_id', assessmentId)
         .eq('user_id', user.id)
+        .order('completed_at', { ascending: false, nullsFirst: false })
 
-      if ((count ?? 0) >= assessment.max_attempts) {
+      if (assessment.max_attempts && (count ?? 0) >= assessment.max_attempts) {
         return { ok: false, error: 'Maximum attempts reached' }
+      }
+
+      // Check cooldown period since last completed session
+      if (assessment.cooldown_minutes && pastSessions && pastSessions.length > 0) {
+        const lastCompleted = pastSessions.find((s) => s.completed_at)
+        if (lastCompleted?.completed_at) {
+          const cooldownEnd = new Date(lastCompleted.completed_at)
+          cooldownEnd.setMinutes(cooldownEnd.getMinutes() + assessment.cooldown_minutes)
+          if (now < cooldownEnd) {
+            const minutesLeft = Math.ceil((cooldownEnd.getTime() - now.getTime()) / 60000)
+            return { ok: false, error: `Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''} before retaking` }
+          }
+        }
       }
     }
 
