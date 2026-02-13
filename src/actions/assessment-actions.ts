@@ -11,6 +11,7 @@ import { withOrgUser } from '@/actions/_helpers'
 import { createAssessmentSchema, submitAnswerSchema } from '@/lib/validations'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
+import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { notifyOrgCandidates } from '@/actions/notification-actions'
 import { logAuditEvent } from '@/actions/audit-actions'
 import type {
@@ -1264,6 +1265,7 @@ export async function getQuestionAnalytics(
     correctCount: number
     percentCorrect: number
     avgTimeSeconds: number | null
+    discriminationIndex: number | null
   }>
 }>> {
   return withOrgUser(async ({ supabase, org, role }) => {
@@ -1283,10 +1285,10 @@ export async function getQuestionAnalytics(
       return { ok: false, error: 'Assessment not found' }
     }
 
-    // Get all completed session IDs for this assessment
+    // Get all completed sessions with scores for this assessment
     const { data: sessions } = await supabase
       .from('assessment_sessions')
-      .select('id')
+      .select('id, score')
       .eq('assessment_id', assessmentId)
       .eq('status', 'completed')
 
@@ -1299,7 +1301,7 @@ export async function getQuestionAnalytics(
     // Get all answers for these sessions
     const { data: answers } = await supabase
       .from('assessment_answers')
-      .select('card_template_id, is_correct, time_spent_seconds')
+      .select('session_id, card_template_id, is_correct, time_spent_seconds')
       .in('session_id', sessionIds)
 
     if (!answers) {
@@ -1317,6 +1319,41 @@ export async function getQuestionAnalytics(
         entry.timeCount++
       }
       questionMap.set(a.card_template_id, entry)
+    }
+
+    // Compute discrimination index (top 27% vs bottom 27% correctness)
+    const discriminationMap = new Map<string, number | null>()
+    if (sessions.length >= 4) {
+      const sorted = [...sessions].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      const n27 = Math.max(1, Math.round(sorted.length * 0.27))
+      const topIds = new Set(sorted.slice(0, n27).map((s) => s.id))
+      const bottomIds = new Set(sorted.slice(-n27).map((s) => s.id))
+
+      // Per-question: count correct in top group vs bottom group
+      const perQuestion = new Map<string, { topCorrect: number; topTotal: number; bottomCorrect: number; bottomTotal: number }>()
+      for (const a of answers) {
+        const inTop = topIds.has(a.session_id)
+        const inBottom = bottomIds.has(a.session_id)
+        if (!inTop && !inBottom) continue
+        const entry = perQuestion.get(a.card_template_id) ?? { topCorrect: 0, topTotal: 0, bottomCorrect: 0, bottomTotal: 0 }
+        if (inTop) {
+          entry.topTotal++
+          if (a.is_correct) entry.topCorrect++
+        }
+        if (inBottom) {
+          entry.bottomTotal++
+          if (a.is_correct) entry.bottomCorrect++
+        }
+        perQuestion.set(a.card_template_id, entry)
+      }
+
+      for (const [cardId, d] of perQuestion) {
+        if (d.topTotal > 0 && d.bottomTotal > 0) {
+          const topRate = d.topCorrect / d.topTotal
+          const bottomRate = d.bottomCorrect / d.bottomTotal
+          discriminationMap.set(cardId, Math.round((topRate - bottomRate) * 100) / 100)
+        }
+      }
     }
 
     // Fetch question stems
@@ -1344,6 +1381,7 @@ export async function getQuestionAnalytics(
           correctCount: stats.correct,
           percentCorrect: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
           avgTimeSeconds: stats.timeCount > 0 ? Math.round(stats.timeSum / stats.timeCount) : null,
+          discriminationIndex: discriminationMap.get(id) ?? null,
         }
       })
       .sort((a, b) => a.percentCorrect - b.percentCorrect)
@@ -2483,5 +2521,73 @@ export async function importCandidatesCsv(
     }
 
     return { ok: true, data: { imported, skipped, errors } }
+  })
+}
+
+// ── Assessment Templates ───────────────────────────────────────────────────
+
+/**
+ * Save an assessment configuration as a reusable template.
+ */
+export async function saveAssessmentTemplate(
+  input: { name: string; description?: string; config: AssessmentTemplateConfig }
+): Promise<ActionResultV2<AssessmentTemplate>> {
+  return withOrgUser(async ({ user, supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Requires creator role' }
+    }
+
+    const { data, error } = await supabase
+      .from('assessment_templates')
+      .insert({
+        org_id: org.id,
+        name: input.name,
+        description: input.description ?? null,
+        config: input.config,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: data as AssessmentTemplate }
+  })
+}
+
+/**
+ * List all assessment templates for the current org.
+ */
+export async function getAssessmentTemplates(): Promise<ActionResultV2<AssessmentTemplate[]>> {
+  return withOrgUser(async ({ supabase, org }) => {
+    const { data, error } = await supabase
+      .from('assessment_templates')
+      .select('*')
+      .eq('org_id', org.id)
+      .order('created_at', { ascending: false })
+
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: (data ?? []) as AssessmentTemplate[] }
+  })
+}
+
+/**
+ * Delete an assessment template.
+ */
+export async function deleteAssessmentTemplate(
+  templateId: string
+): Promise<ActionResultV2<void>> {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Requires creator role' }
+    }
+
+    const { error } = await supabase
+      .from('assessment_templates')
+      .delete()
+      .eq('id', templateId)
+      .eq('org_id', org.id)
+
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: undefined }
   })
 }

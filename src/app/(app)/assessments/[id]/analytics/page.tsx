@@ -53,6 +53,7 @@ type QuestionStat = {
   correctCount: number
   percentCorrect: number
   avgTimeSeconds: number | null
+  discriminationIndex: number | null
 }
 
 export default function AssessmentAnalyticsPage() {
@@ -355,9 +356,15 @@ export default function AssessmentAnalyticsPage() {
       {/* Question Difficulty */}
       {questionStats.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
             Question Difficulty
           </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            DI = Discrimination Index (top 27% vs bottom 27% correct rate).{' '}
+            <span className="text-green-600">Good (&ge;0.3)</span>{' '}
+            <span className="text-amber-600">Fair (0.1-0.3)</span>{' '}
+            <span className="text-red-600">Poor (&lt;0.1)</span>
+          </p>
           <div className="space-y-2">
             {questionStats.map((q, idx) => {
               const isHard = q.percentCorrect < 40
@@ -388,6 +395,20 @@ export default function AssessmentAnalyticsPage() {
                       <span className="text-xs text-slate-400 inline-flex items-center gap-0.5">
                         <Clock className="h-3 w-3" />
                         {q.avgTimeSeconds}s
+                      </span>
+                    )}
+                    {q.discriminationIndex != null && (
+                      <span
+                        className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                          q.discriminationIndex >= 0.3
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : q.discriminationIndex >= 0.1
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}
+                        title="Discrimination index: how well this question differentiates top vs bottom performers"
+                      >
+                        DI: {q.discriminationIndex.toFixed(2)}
                       </span>
                     )}
                     <span

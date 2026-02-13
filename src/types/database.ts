@@ -199,6 +199,32 @@ export interface AssessmentAnswer {
 }
 
 /**
+ * Assessment template config (stored as JSONB)
+ */
+export interface AssessmentTemplateConfig {
+  time_limit_minutes: number
+  pass_score: number
+  question_count: number
+  shuffle_questions: boolean
+  shuffle_options: boolean
+  show_results: boolean
+  max_attempts: number | null
+  cooldown_minutes: number | null
+  allow_review: boolean
+}
+
+export interface AssessmentTemplate {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  config: AssessmentTemplateConfig
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/**
  * Assessment with deck info for list views
  */
 export interface AssessmentWithDeck extends Assessment {

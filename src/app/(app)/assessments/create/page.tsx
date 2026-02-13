@@ -9,11 +9,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, BookmarkPlus, FileDown } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getUserDeckTemplates } from '@/actions/deck-actions'
-import { createAssessment } from '@/actions/assessment-actions'
+import { createAssessment, getAssessmentTemplates, saveAssessmentTemplate } from '@/actions/assessment-actions'
+import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { getAssessmentDefaults } from '@/actions/org-actions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -24,9 +25,12 @@ export default function CreateAssessmentPage() {
   const isCreator = hasMinimumRole(role, 'creator')
 
   const [decks, setDecks] = useState<{ id: string; title: string }[]>([])
+  const [templates, setTemplates] = useState<AssessmentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saveTemplateName, setSaveTemplateName] = useState('')
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
 
   // Form state
   const [deckTemplateId, setDeckTemplateId] = useState('')
@@ -62,7 +66,47 @@ export default function CreateAssessmentPage() {
         setAllowReview(d.allow_review)
       }
     })
+    // Load templates
+    getAssessmentTemplates().then((result) => {
+      if (result.ok && result.data) setTemplates(result.data)
+    })
   }, [])
+
+  function applyTemplate(templateId: string) {
+    const tpl = templates.find((t) => t.id === templateId)
+    if (!tpl) return
+    const c = tpl.config
+    setTimeLimitMinutes(c.time_limit_minutes)
+    setPassScore(c.pass_score)
+    setQuestionCount(c.question_count)
+    setShuffleQuestions(c.shuffle_questions)
+    setShuffleOptions(c.shuffle_options)
+    setShowResults(c.show_results)
+    setMaxAttempts(c.max_attempts ?? undefined)
+    setCooldownMinutes(c.cooldown_minutes ?? undefined)
+    setAllowReview(c.allow_review)
+  }
+
+  async function handleSaveTemplate() {
+    if (!saveTemplateName.trim()) return
+    const config: AssessmentTemplateConfig = {
+      time_limit_minutes: timeLimitMinutes,
+      pass_score: passScore,
+      question_count: questionCount,
+      shuffle_questions: shuffleQuestions,
+      shuffle_options: shuffleOptions,
+      show_results: showResults,
+      max_attempts: maxAttempts ?? null,
+      cooldown_minutes: cooldownMinutes ?? null,
+      allow_review: allowReview,
+    }
+    const result = await saveAssessmentTemplate({ name: saveTemplateName.trim(), config })
+    if (result.ok && result.data) {
+      setTemplates((prev) => [result.data!, ...prev])
+      setSaveTemplateName('')
+      setShowSaveTemplate(false)
+    }
+  }
 
   if (!isCreator) {
     return (
@@ -125,6 +169,29 @@ export default function CreateAssessmentPage() {
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
           {error}
+        </div>
+      )}
+
+      {/* Template Selector */}
+      {templates.length > 0 && (
+        <div className="mb-6 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+          <div className="flex items-center gap-2 mb-2">
+            <FileDown className="h-4 w-4 text-blue-500" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Load from Template
+            </span>
+          </div>
+          <select
+            onChange={(e) => { if (e.target.value) applyTemplate(e.target.value); e.target.value = '' }}
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select a template to apply settings...</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -329,6 +396,40 @@ export default function CreateAssessmentPage() {
               Allow candidates to review answers after completion
             </span>
           </label>
+        </div>
+
+        {/* Save as Template */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+          {!showSaveTemplate ? (
+            <button
+              type="button"
+              onClick={() => setShowSaveTemplate(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              <BookmarkPlus className="h-3.5 w-3.5" />
+              Save current settings as template
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                placeholder="Template name (e.g., Quick Quiz)"
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Button type="button" size="sm" onClick={handleSaveTemplate} disabled={!saveTemplateName.trim()}>
+                Save
+              </Button>
+              <button
+                type="button"
+                onClick={() => setShowSaveTemplate(false)}
+                className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         <Button
