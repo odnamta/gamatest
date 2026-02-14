@@ -14,6 +14,7 @@ import { NotificationBell } from '@/components/navigation/NotificationBell'
 import { CommandPalette } from '@/components/navigation/CommandPalette'
 import { DesktopNavLinks } from '@/components/navigation/DesktopNavLinks'
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator'
+import { AuthGuard } from '@/components/providers/AuthGuard'
 
 export default async function AppLayout({
   children,
@@ -35,6 +36,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      <AuthGuard>
       <OrgProvider org={orgContext.org} role={orgContext.role}>
         {/* Onboarding Modal - Requirements 3.1 */}
         <OnboardingWrapper
@@ -81,6 +83,7 @@ export default async function AppLayout({
           <OfflineIndicator />
         </div>
       </OrgProvider>
+      </AuthGuard>
     </ToastProvider>
   )
 }

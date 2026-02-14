@@ -99,12 +99,20 @@ export const reorderLessonItemsSchema = z.object({
 // Organization Validation Schemas (V13)
 // ============================================
 
+const RESERVED_SLUGS = new Set([
+  'admin', 'api', 'app', 'auth', 'callback', 'dashboard', 'decks', 'help',
+  'invite', 'join', 'library', 'login', 'logout', 'notifications', 'orgs',
+  'privacy', 'profile', 'settings', 'signup', 'stats', 'study', 'support',
+  'terms', 'www',
+])
+
 export const createOrgSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
   slug: z.string()
     .min(3, 'Slug must be at least 3 characters')
     .max(50, 'Slug too long')
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must be lowercase alphanumeric with hyphens, cannot start or end with hyphen'),
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must be lowercase alphanumeric with hyphens, cannot start or end with hyphen')
+    .refine((s) => !RESERVED_SLUGS.has(s), 'This slug is reserved and cannot be used'),
 });
 
 export const updateOrgSettingsSchema = z.object({

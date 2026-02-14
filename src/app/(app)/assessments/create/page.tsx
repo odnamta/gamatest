@@ -287,6 +287,7 @@ export default function CreateAssessmentPage() {
                 setMaxAttempts(e.target.value ? Number(e.target.value) : undefined)
               }
               min={1}
+              max={99}
               placeholder="Unlimited"
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -302,6 +303,7 @@ export default function CreateAssessmentPage() {
                 setCooldownMinutes(e.target.value ? Number(e.target.value) : undefined)
               }
               min={1}
+              max={10080}
               placeholder="No cooldown"
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

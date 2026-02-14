@@ -12,6 +12,13 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { createOrganization } from '@/actions/org-actions'
 
+const RESERVED_SLUGS = new Set([
+  'admin', 'api', 'app', 'auth', 'callback', 'dashboard', 'decks', 'help',
+  'invite', 'join', 'library', 'login', 'logout', 'notifications', 'orgs',
+  'privacy', 'profile', 'settings', 'signup', 'stats', 'study', 'support',
+  'terms', 'www',
+])
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -48,6 +55,11 @@ export default function CreateOrgPage() {
 
     if (slug.length < 3) {
       setError('URL slug must be at least 3 characters')
+      return
+    }
+
+    if (RESERVED_SLUGS.has(slug)) {
+      setError('This slug is reserved and cannot be used')
       return
     }
 
