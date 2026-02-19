@@ -28,41 +28,35 @@ export async function createOrganization(
       return { ok: false, error: validation.error.issues[0]?.message ?? 'Validation failed' }
     }
 
-    // Check slug uniqueness
-    const { data: existing } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', slug)
-      .maybeSingle()
-
-    if (existing) {
-      return { ok: false, error: 'This URL slug is already taken' }
-    }
-
-    // Create the organization
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert({ name, slug })
-      .select()
-      .single()
-
-    if (orgError || !org) {
-      return { ok: false, error: orgError?.message ?? 'Failed to create organization' }
-    }
-
-    // Add creating user as owner
-    const { error: memberError } = await supabase
-      .from('organization_members')
-      .insert({
-        org_id: org.id,
-        user_id: user.id,
-        role: 'owner' as OrgRole,
+    // Use SECURITY DEFINER function to atomically create org + add owner.
+    // This avoids the RLS chicken-and-egg problem where INSERT ... RETURNING
+    // needs SELECT access, but SELECT policy requires org membership that
+    // doesn't exist yet.
+    const { data: rpcData, error: rpcError } = await supabase
+      .rpc('create_organization_with_owner', {
+        p_name: name,
+        p_slug: slug,
       })
 
-    if (memberError) {
-      // Clean up org if membership fails
-      await supabase.from('organizations').delete().eq('id', org.id)
-      return { ok: false, error: 'Failed to set up organization membership' }
+    if (rpcError) {
+      const msg = rpcError.message
+      if (msg.includes('Slug already taken')) {
+        return { ok: false, error: 'This URL slug is already taken' }
+      }
+      return { ok: false, error: msg }
+    }
+
+    const orgId = rpcData as string
+
+    // Fetch the created org (now visible via SELECT policy since user is owner)
+    const { data: org, error: fetchError } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', orgId)
+      .single()
+
+    if (fetchError || !org) {
+      return { ok: false, error: 'Organization created but failed to fetch details' }
     }
 
     revalidatePath('/dashboard')
