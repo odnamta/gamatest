@@ -2,6 +2,22 @@
 
 All notable changes to Cekatan will be documented in this file.
 
+## [v20.1] - Code Review Hardening
+
+### Fixed
+- **Missing org_id filters**: Added `org_id` constraint to UPDATE/DELETE in `updateMemberRole()`, `removeMember()`, `transferOwnership()` (defense-in-depth alongside RLS)
+- **Admin removing owners**: Admins can no longer remove owner members — only owners can remove other owners
+- **Unprotected routes**: `/skills` and `/lesson` now require authentication in middleware
+- **Cross-org deck-skill linking**: `linkDeckToSkill()` now verifies both deck template and skill domain belong to the current org before insert
+- **N+1 query**: `getEmployeeRoleGapAnalysis()` now fetches all role requirements in a single `.in()` query instead of per-role loop
+- **Unbounded pagination**: `getAuditLogs()` now caps `limit` to 100 and ensures `offset` >= 0
+
+### Changed
+- **Image hostname**: Restricted `next.config.ts` remote image pattern from wildcard (`**`) to `supabase.atmando.app`
+- **Body size limit**: Reduced server actions body size from 50MB to 10MB
+- **CSP hardening**: Removed `'unsafe-eval'` from `script-src` Content Security Policy
+- **Sanitizer docs**: Clarified `sanitizeMarkdown()` is supplementary defense-in-depth; react-markdown is the primary XSS safety layer
+
 ## [v20] - RLS Policy Fixes
 
 ### Fixed
