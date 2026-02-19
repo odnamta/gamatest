@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { generateImportSessionId } from '@/lib/import-session'
 import { getSessionStats } from '@/actions/session-actions'
 
-const STORAGE_KEY_PREFIX = 'gamatest:import-session:'
+const STORAGE_KEY_PREFIX = 'cekatan:import-session:'
 
 interface ImportSessionState {
   sessionId: string | null

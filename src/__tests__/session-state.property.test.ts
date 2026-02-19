@@ -32,7 +32,7 @@ const sessionStateArb = fc.record({
 });
 
 /**
- * **Feature: gamatest, Property 6: Session Tracking Accuracy**
+ * **Feature: cekatan, Property 6: Session Tracking Accuracy**
  * **Validates: Requirements 3.1, 3.2**
  * 
  * For any study session with a sequence of ratings, the session summary SHALL report:

@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest';
 import fc from 'fast-check';
 
 /**
- * **Feature: gamatest, Property 1: MCQ Options Round-Trip Consistency**
+ * **Feature: cekatan, Property 1: MCQ Options Round-Trip Consistency**
  * **Validates: Requirements 1.2**
  *
  * For any valid options array (array of non-empty strings with length >= 2),

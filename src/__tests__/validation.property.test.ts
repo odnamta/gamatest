@@ -9,7 +9,7 @@ import {
 } from '../lib/validations';
 
 /**
- * **Feature: gamatest, Property 13: Zod Validation Rejects Invalid Inputs**
+ * **Feature: cekatan, Property 13: Zod Validation Rejects Invalid Inputs**
  * **Validates: Requirements 1.3, 9.1, 9.2**
  *
  * For any input that violates the Zod schema constraints (invalid email format,

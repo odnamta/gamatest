@@ -32,7 +32,7 @@ export function OrgProvider({ org, role, children }: OrgProviderProps) {
   const switchOrg = useCallback((orgId: string) => {
     startTransition(async () => {
       // Set cookie and reload to pick up new org context server-side
-      document.cookie = `gamatest_active_org_id=${orgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+      document.cookie = `cekatan_active_org_id=${orgId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
       window.location.reload()
     })
   }, [startTransition])

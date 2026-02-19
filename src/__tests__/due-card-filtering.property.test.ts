@@ -5,7 +5,7 @@ import { filterDueCards, CardForDueCount } from '../lib/due-count';
 /**
  * Due Card Filtering Property-Based Tests
  * 
- * **Feature: gamatest, Property 11: Due Card Filtering Correctness**
+ * **Feature: cekatan, Property 11: Due Card Filtering Correctness**
  * **Validates: Requirements 5.1**
  * 
  * For any deck and for any current timestamp, the set of due cards returned

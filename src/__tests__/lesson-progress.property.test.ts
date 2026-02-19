@@ -8,7 +8,7 @@ import type { LessonProgress } from '../types/database';
  * These tests verify the correctness properties of lesson progress persistence
  * as specified in the design document.
  * 
- * **Feature: gamatest, Property 10: Lesson Progress Persistence**
+ * **Feature: cekatan, Property 10: Lesson Progress Persistence**
  * **Validates: Requirements 5.4, 7.1, 7.4**
  */
 

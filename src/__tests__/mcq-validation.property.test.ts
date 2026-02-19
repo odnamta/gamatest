@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { createMCQSchema } from '../lib/validations';
 
 /**
- * **Feature: gamatest, Property 2: MCQ Validation Correctness**
+ * **Feature: cekatan, Property 2: MCQ Validation Correctness**
  * **Validates: Requirements 1.4, 3.2**
  *
  * For any MCQ input data:

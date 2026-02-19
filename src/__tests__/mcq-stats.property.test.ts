@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { incrementTotalReviews, calculateStreak, updateLongestStreak } from '../lib/streak';
 
 /**
- * **Feature: gamatest, Property 5: MCQ Stats Integration**
+ * **Feature: cekatan, Property 5: MCQ Stats Integration**
  * **Validates: Requirements 2.6, 5.6**
  *
  * For any MCQ answer action:

@@ -8,7 +8,7 @@ import {
 import type { Course, Unit, Lesson, LessonItem, LessonItemType } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 7: Course Hierarchy Cascade Delete**
+ * **Feature: cekatan, Property 7: Course Hierarchy Cascade Delete**
  * **Validates: Requirements 4.5, 4.6**
  *
  * For any course deletion:

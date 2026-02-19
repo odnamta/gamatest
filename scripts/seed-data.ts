@@ -55,7 +55,7 @@ const TENANTS: TenantConfig[] = [
   {
     name: 'PT. Gama Intisamudera',
     slug: 'gis',
-    ownerEmail: 'admin@gis.gamatest.com',
+    ownerEmail: 'admin@gis.cekatan.com',
     ownerPassword: 'password123',
     decks: [
       {
@@ -132,7 +132,7 @@ const TENANTS: TenantConfig[] = [
   {
     name: 'PT. Gama Lintas Samudera',
     slug: 'gls',
-    ownerEmail: 'admin@gls.gamatest.com',
+    ownerEmail: 'admin@gls.cekatan.com',
     ownerPassword: 'password123',
     decks: [
       {

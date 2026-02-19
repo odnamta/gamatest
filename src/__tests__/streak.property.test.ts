@@ -39,7 +39,7 @@ const validLastStudyInputArb = fc.record({
 });
 
 /**
- * **Feature: gamatest, Property 1: Streak Calculation Correctness**
+ * **Feature: cekatan, Property 1: Streak Calculation Correctness**
  * **Validates: Requirements 1.2, 1.3, 1.4**
  * 
  * For any user stats state with a `last_study_date` and `current_streak`, and for any `today_date`:
@@ -121,7 +121,7 @@ describe('Property 1: Streak Calculation Correctness', () => {
 
 
 /**
- * **Feature: gamatest, Property 2: Longest Streak Invariant**
+ * **Feature: cekatan, Property 2: Longest Streak Invariant**
  * **Validates: Requirements 1.5**
  * 
  * For any user stats state, after any streak update operation,
@@ -207,7 +207,7 @@ describe('Property 2: Longest Streak Invariant', () => {
 
 
 /**
- * **Feature: gamatest, Property 3: Total Reviews Increment**
+ * **Feature: cekatan, Property 3: Total Reviews Increment**
  * **Validates: Requirements 1.6**
  * 
  * For any card rating action, the `total_reviews` count SHALL increase by exactly 1.

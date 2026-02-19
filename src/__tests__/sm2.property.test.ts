@@ -42,7 +42,7 @@ const cardStateArb: fc.Arbitrary<CardState> = fc.record({
 });
 
 /**
- * **Feature: gamatest, Property 1: SM-2 "Again" Rating Resets Interval**
+ * **Feature: cekatan, Property 1: SM-2 "Again" Rating Resets Interval**
  * **Validates: Requirements 4.1, V8.2 1.1**
  * 
  * For any card with any interval and ease factor, when rated as "Again" (1),
@@ -84,7 +84,7 @@ describe('Property 1: SM-2 "Again" Rating Resets Interval', () => {
 
 
 /**
- * **Feature: gamatest, Property 2: SM-2 "Hard" Rating Multiplies Interval**
+ * **Feature: cekatan, Property 2: SM-2 "Hard" Rating Multiplies Interval**
  * **Validates: Requirements 4.2**
  * 
  * For any card with interval > 0 and any valid ease factor, when rated as "Hard" (2),
@@ -138,7 +138,7 @@ describe('Property 2: SM-2 "Hard" Rating Multiplies Interval', () => {
 
 
 /**
- * **Feature: gamatest, Property 3: SM-2 "Good" Rating Uses Ease Factor**
+ * **Feature: cekatan, Property 3: SM-2 "Good" Rating Uses Ease Factor**
  * **Validates: Requirements 4.3**
  * 
  * For any card with interval > 0 and any valid ease factor, when rated as "Good" (3),
@@ -189,7 +189,7 @@ describe('Property 3: SM-2 "Good" Rating Uses Ease Factor', () => {
 
 
 /**
- * **Feature: gamatest, Property 4: SM-2 "Easy" Rating Increases Interval and Ease**
+ * **Feature: cekatan, Property 4: SM-2 "Easy" Rating Increases Interval and Ease**
  * **Validates: Requirements 4.4**
  * 
  * For any card with interval > 0 and any valid ease factor, when rated as "Easy" (4),
@@ -241,7 +241,7 @@ describe('Property 4: SM-2 "Easy" Rating Increases Interval and Ease', () => {
 
 
 /**
- * **Feature: gamatest, Property 5: Ease Factor Minimum Invariant**
+ * **Feature: cekatan, Property 5: Ease Factor Minimum Invariant**
  * **Validates: Requirements 4.5**
  * 
  * For any card and for any sequence of ratings applied to that card,
@@ -300,7 +300,7 @@ describe('Property 5: Ease Factor Minimum Invariant', () => {
 
 
 /**
- * **Feature: gamatest, Property 6: Card State Serialization Round-Trip**
+ * **Feature: cekatan, Property 6: Card State Serialization Round-Trip**
  * **Validates: Requirements 4.6**
  * 
  * For any valid card state (interval, ease factor, next review date),

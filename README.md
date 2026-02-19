@@ -1,4 +1,4 @@
-# GamaTest
+# Cekatan
 
 A multi-tenant assessment and study platform for organizations. Supports two modes: **Study Mode** (spaced repetition, flashcards, self-paced learning) and **Assessment Mode** (timed tests, proctoring, scoring, certification).
 
@@ -31,7 +31,7 @@ A multi-tenant assessment and study platform for organizations. Supports two mod
 ### 1. Clone and Install
 ```bash
 git clone <your-repo-url>
-cd gamatest
+cd cekatan
 npm install
 ```
 

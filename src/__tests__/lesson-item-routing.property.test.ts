@@ -8,7 +8,7 @@ import type { LessonItem, Card, LessonItemType, CardType } from '../types/databa
  * These tests verify the correctness properties of lesson item type routing
  * as specified in the design document.
  * 
- * **Feature: gamatest, Property 9: Lesson Item Type Routing**
+ * **Feature: cekatan, Property 9: Lesson Item Type Routing**
  * **Validates: Requirements 5.2, 5.3**
  */
 

@@ -67,7 +67,7 @@ export default function CreateOrgPage() {
       const result = await createOrganization(name.trim(), slug)
       if (result.ok && result.data) {
         // Set the new org as active
-        document.cookie = `gamatest_active_org_id=${result.data.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+        document.cookie = `cekatan_active_org_id=${result.data.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
         router.push('/dashboard')
       } else if (!result.ok) {
         setError(result.error)
@@ -80,7 +80,7 @@ export default function CreateOrgPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white text-2xl font-bold mb-4">
-            G
+            C
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Create your organization
@@ -119,7 +119,7 @@ export default function CreateOrgPage() {
               URL slug
             </label>
             <div className="flex items-center gap-1">
-              <span className="text-sm text-slate-500 dark:text-slate-400">gamatest.com/</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">cekatan.com/</span>
               <input
                 id="org-slug"
                 type="text"

@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { determineMCQAnswer } from '../lib/mcq-answer';
 
 /**
- * **Feature: gamatest, Property 4: MCQ Answer Correctness Mapping**
+ * **Feature: cekatan, Property 4: MCQ Answer Correctness Mapping**
  * **Validates: Requirements 2.4, 2.5**
  *
  * For any MCQ with correct_index C and for any selected_index S:

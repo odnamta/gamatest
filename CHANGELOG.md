@@ -44,9 +44,9 @@ All notable changes to Cekatan will be documented in this file.
 ## [Unreleased]
 
 ### Renamed
-- **Full rebrand from Specialize/celline-prep to GamaTest** across all production code, tests, steering rules, and seed data
+- **Full rebrand from Specialize/celline-prep to GamaTest, then to Cekatan** across all production code, tests, steering rules, and seed data
 - Default subject changed from "Obstetrics & Gynecology" to "General"
-- localStorage key prefixes changed from `specialize:` to `gamatest:`
+- localStorage key prefixes changed from `specialize:` to `gamatest:` to `cekatan:`
 - Terms of Service updated to reflect domain-agnostic platform
 
 ### Fixed

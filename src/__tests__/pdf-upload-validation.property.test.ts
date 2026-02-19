@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { validatePdfFile } from '../lib/pdf-validation';
 
 /**
- * **Feature: gamatest, Property 14: PDF Upload Validation**
+ * **Feature: cekatan, Property 14: PDF Upload Validation**
  * **Validates: Requirements 8.4**
  *
  * For any file upload:

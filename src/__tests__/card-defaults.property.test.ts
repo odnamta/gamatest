@@ -11,7 +11,7 @@ import { getCardDefaults, validateCardDefaults } from '../lib/card-defaults'
  */
 
 /**
- * **Feature: gamatest, Property 10: Card Default Values on Creation**
+ * **Feature: cekatan, Property 10: Card Default Values on Creation**
  * **Validates: Requirements 3.1**
  * 
  * For any newly created card, the initial values SHALL be:

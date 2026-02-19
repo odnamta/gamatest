@@ -10,7 +10,7 @@ import { getHeatmapIntensity, HeatmapIntensity, generateDayArray, DayData } from
  */
 
 /**
- * **Feature: gamatest, Property 5: Heatmap Color Intensity Mapping**
+ * **Feature: cekatan, Property 5: Heatmap Color Intensity Mapping**
  * **Validates: Requirements 2.3**
  * 
  * For any `cards_reviewed` count:

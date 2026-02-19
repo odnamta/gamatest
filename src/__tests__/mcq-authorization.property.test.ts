@@ -4,7 +4,7 @@ import { checkMCQDeckOwnership } from '../lib/mcq-authorization';
 import type { Deck } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 3: MCQ Deck Authorization**
+ * **Feature: cekatan, Property 3: MCQ Deck Authorization**
  * **Validates: Requirements 1.3, 3.4**
  *
  * For any user and for any deck, the user SHALL only be able to create, read,

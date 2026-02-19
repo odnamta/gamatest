@@ -9,7 +9,7 @@ import {
 import type { Course, Unit, Lesson, LessonItem, LessonItemType } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 6: Course Hierarchy RLS**
+ * **Feature: cekatan, Property 6: Course Hierarchy RLS**
  * **Validates: Requirements 4.1, 4.2, 4.3**
  *
  * For any user:

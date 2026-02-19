@@ -4,7 +4,7 @@ import { checkDeckOwnership } from '../lib/deck-authorization';
 import type { Deck } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 11: Deck Ownership Authorization**
+ * **Feature: cekatan, Property 11: Deck Ownership Authorization**
  * **Validates: Requirements 7.1**
  *
  * For any user attempting to access `/decks/[deckId]/add-bulk`, the page SHALL

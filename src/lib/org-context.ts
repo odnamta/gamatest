@@ -12,7 +12,7 @@ import { cookies } from 'next/headers'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import type { Organization, OrgRole } from '@/types/database'
 
-export const ACTIVE_ORG_COOKIE = 'gamatest_active_org_id'
+export const ACTIVE_ORG_COOKIE = 'cekatan_active_org_id'
 
 export interface OrgContext {
   org: Organization

@@ -8,7 +8,7 @@ import type { LessonItem, Card, CardType } from '../types/database';
  * These tests verify the correctness properties of lesson items ordering
  * as specified in the design document.
  * 
- * **Feature: gamatest, Property 8: Lesson Items Ordering**
+ * **Feature: cekatan, Property 8: Lesson Items Ordering**
  * **Validates: Requirements 5.1**
  */
 

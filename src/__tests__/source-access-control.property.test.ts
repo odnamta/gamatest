@@ -8,7 +8,7 @@ import {
 import type { Source, DeckSource, Deck } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 13: Source Access Control**
+ * **Feature: cekatan, Property 13: Source Access Control**
  * **Validates: Requirements 8.2, 9.5**
  *
  * For any user:

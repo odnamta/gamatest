@@ -36,7 +36,7 @@ const existingLogArb = fc.record({
 });
 
 /**
- * **Feature: gamatest, Property 4: Study Log Upsert Correctness**
+ * **Feature: cekatan, Property 4: Study Log Upsert Correctness**
  * **Validates: Requirements 2.1, 9.1, 9.4**
  * 
  * For any user and for any date, after N card ratings on that date,

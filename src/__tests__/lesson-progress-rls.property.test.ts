@@ -4,7 +4,7 @@ import { checkLessonProgressOwnership } from '../lib/course-authorization';
 import type { LessonProgress } from '@/types/database';
 
 /**
- * **Feature: gamatest, Property 12: Lesson Progress RLS**
+ * **Feature: cekatan, Property 12: Lesson Progress RLS**
  * **Validates: Requirements 7.2**
  *
  * For any user, queries against lesson_progress SHALL only return records

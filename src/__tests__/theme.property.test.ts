@@ -7,7 +7,7 @@ import fc from 'fast-check';
  * These tests verify the correctness properties of the theme persistence system
  * as specified in the design document.
  * 
- * **Feature: gamatest, Property 7: Theme State Persistence**
+ * **Feature: cekatan, Property 7: Theme State Persistence**
  * **Validates: Requirements 4.2, 4.3**
  * 
  * For any theme toggle action, the new theme value SHALL be persisted to localStorage

@@ -13,7 +13,7 @@ import { LessonProgress, LessonStatus } from '../types/database';
  * These tests verify the correctness properties of the lesson lock/unlock
  * status calculation as specified in the design document.
  * 
- * **Feature: gamatest, Property 11: Lesson Lock Status Logic**
+ * **Feature: cekatan, Property 11: Lesson Lock Status Logic**
  * **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 7.3**
  */
 

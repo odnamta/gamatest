@@ -55,7 +55,7 @@ const xssPayloadArb = fc.oneof(
 );
 
 /**
- * **Feature: gamatest, Property 8: Markdown Rendering Correctness**
+ * **Feature: cekatan, Property 8: Markdown Rendering Correctness**
  * **Validates: Requirements 5.1**
  * 
  * For any valid markdown input containing bold (**text**), italic (*text*), or code blocks,
@@ -131,7 +131,7 @@ describe('Property 8: Markdown Rendering Correctness', () => {
 
 
 /**
- * **Feature: gamatest, Property 9: Markdown XSS Sanitization**
+ * **Feature: cekatan, Property 9: Markdown XSS Sanitization**
  * **Validates: Requirements 5.4**
  * 
  * For any input containing <script> tags, javascript: URLs, or on* event handlers,
@@ -220,7 +220,7 @@ describe('Property 9: Markdown XSS Sanitization', () => {
 
 
 /**
- * **Feature: gamatest, Property 10: Markdown Round-Trip Consistency**
+ * **Feature: cekatan, Property 10: Markdown Round-Trip Consistency**
  * **Validates: Requirements 5.5**
  * 
  * For any markdown string, parsing and re-serializing (where applicable)
