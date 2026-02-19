@@ -14,6 +14,9 @@ All notable changes to Cekatan will be documented in this file.
 ### Added
 - DB migration: `scripts/migrate-v20-rls-fixes.sql` — 3 new/replaced RLS policies
 
+### Chore
+- Gitignored `public/sw.js` and `public/workbox-*.js` (next-pwa build artifacts)
+
 ## [v19.1] - Role-Based Competency Framework
 
 ### Added
