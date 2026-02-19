@@ -55,8 +55,8 @@ export default async function AppLayout({
           <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg pt-safe" role="banner">
             <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100" aria-label="GamaTest — Go to dashboard">
-                  GamaTest
+                <a href="/dashboard" className="text-xl font-semibold text-slate-900 dark:text-slate-100" aria-label="Cekatan — Go to dashboard">
+                  Cekatan
                 </a>
                 <DesktopNavLinks />
               </div>

@@ -53,7 +53,7 @@ export type MCQBatchDraft = z.infer<typeof mcqBatchDraftSchema>
  * Input schema for draftBatchMCQFromText server action.
  * Validates deckId, text (50-10000 chars), and optional defaultTags.
  * V6.2: Added mode for Brain Toggle, imageBase64/imageUrl for Vision MVP
- * V9.1: Added subject for multi-specialty AI support
+ * V9.1: Added subject for multi-domain AI support
  */
 export const draftBatchInputSchema = z.object({
   deckId: z.string().uuid('Invalid deck ID'),
@@ -63,7 +63,7 @@ export const draftBatchInputSchema = z.object({
     .max(10000, 'Text must be at most 10000 characters'),
   defaultTags: z.array(z.string()).optional(),
   mode: aiModeSchema.optional(),
-  subject: z.string().optional(),  // V9.1: Medical specialty for AI prompt
+  subject: z.string().optional(),  // V9.1: Subject area for AI prompt
   imageBase64: z.string().optional(),
   imageUrl: z.string().url().optional(),
 })

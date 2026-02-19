@@ -23,7 +23,7 @@ export type AIMode = z.infer<typeof aiModeSchema>
  * Input schema for draftMCQFromText server action.
  * Validates the source text and deck information.
  * V6.2: Added mode for Brain Toggle, imageBase64/imageUrl for Vision MVP
- * V9.1: Added subject for multi-specialty AI support
+ * V9.1: Added subject for multi-domain AI support
  */
 export const draftMCQInputSchema = z.object({
   sourceText: z
@@ -32,7 +32,7 @@ export const draftMCQInputSchema = z.object({
   deckId: z.string().uuid('Invalid deck ID'),
   deckName: z.string().optional(),
   mode: aiModeSchema.optional(),
-  subject: z.string().optional(),  // V9.1: Medical specialty for AI prompt
+  subject: z.string().optional(),  // V9.1: Subject area for AI prompt
   imageBase64: z.string().optional(),
   imageUrl: z.string().url().optional(),
 })

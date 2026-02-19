@@ -8,6 +8,7 @@ import { LibrarySection } from '@/components/dashboard/LibrarySection'
 import { StudyHeatmap } from '@/components/dashboard/StudyHeatmap'
 import { RepairButton } from '@/components/dashboard/RepairButton'
 import { WeakestConceptsCard } from '@/components/dashboard/WeakestConceptsCard'
+import { MySkillProfile } from '@/components/skills/MySkillProfile'
 import type { CourseWithProgress } from '@/components/course'
 import { getStudyLogs, getUserStats } from '@/actions/stats-actions'
 import { getGlobalStats } from '@/actions/global-study-actions'
@@ -226,6 +227,9 @@ export default async function DashboardPage() {
 
       {/* V13 Phase 8: Assessment Overview for Candidates */}
       <CandidateAssessmentCard />
+
+      {/* V19: My Skills Radar Chart */}
+      <MySkillProfile />
 
       {/* Dashboard Hero - First element (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 3.1-3.5) */}
       <DashboardHero

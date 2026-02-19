@@ -471,7 +471,7 @@ export async function updateDeckTitle(
  * Requirements: V9.1 3.2
  * 
  * @param deckId - The deck_template ID to update
- * @param newSubject - The new subject (medical specialty)
+ * @param newSubject - The new subject area
  * @returns ActionResult with success/error
  */
 export async function updateDeckSubject(

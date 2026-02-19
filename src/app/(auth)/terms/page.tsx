@@ -21,7 +21,7 @@ export default function TermsPage() {
             1. Acceptance of Terms
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            By accessing and using GamaTest, you accept and agree to be bound by the terms
+            By accessing and using Cekatan, you accept and agree to be bound by the terms
             and provision of this agreement. If you do not agree to abide by these terms,
             please do not use this service.
           </p>
@@ -30,7 +30,7 @@ export default function TermsPage() {
             2. Description of Service
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            GamaTest is an assessment and study platform designed for organizational
+            Cekatan is an assessment and study platform designed for organizational
             learning. The service provides flashcards, multiple choice questions, and
             study tracking features.
           </p>
@@ -45,10 +45,10 @@ export default function TermsPage() {
           </p>
 
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3">
-            4. Medical Disclaimer
+            4. Content Disclaimer
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            The content provided through GamaTest is for educational purposes only and
+            The content provided through Cekatan is for educational purposes only and
             should not be considered professional advice. Always consult with qualified
             professionals for domain-specific decisions.
           </p>
@@ -57,7 +57,7 @@ export default function TermsPage() {
             5. Intellectual Property
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            All content, features, and functionality of GamaTest are owned by us and are
+            All content, features, and functionality of Cekatan are owned by us and are
             protected by international copyright, trademark, and other intellectual property laws.
           </p>
 

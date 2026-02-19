@@ -1,7 +1,11 @@
 /**
+ * @deprecated This file is effectively unused in production code.
+ * Only referenced by onboarding-v10.5.property.test.ts.
+ * Safe to remove once that test file is cleaned up.
+ *
  * Onboarding Constants and Helpers
  * V10.5: Brand Unification & Starter Packs
- * 
+ *
  * Separated from server actions to avoid Next.js build errors.
  * Server Actions must be async, so synchronous helpers live here.
  */

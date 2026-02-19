@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { ArrowDown } from 'lucide-react'
 
 /**
- * Target fields for text selection copy (A-E options for medical exams)
+ * Target fields for text selection copy (A-E options for multiple choice)
  * V6.6: Added optionE support
  */
 export type TargetField = 'stem' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'optionE' | 'explanation'

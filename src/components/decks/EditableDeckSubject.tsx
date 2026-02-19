@@ -6,19 +6,19 @@ import { updateDeckSubject } from '@/actions/deck-actions'
 import { useToast } from '@/components/ui/Toast'
 
 /**
- * V9.1: Common medical specialties for subject dropdown
+ * V9.1: Common subject areas for subject dropdown
  */
 const COMMON_SUBJECTS = [
   'General',
-  'Internal Medicine',
-  'Pediatrics',
-  'Surgery',
-  'Family Medicine',
-  'Emergency Medicine',
-  'Psychiatry',
-  'Neurology',
-  'Cardiology',
-  'Dermatology',
+  'Safety',
+  'Operations',
+  'Management',
+  'Technical',
+  'Compliance',
+  'Customer Service',
+  'Logistics',
+  'Finance',
+  'Human Resources',
 ]
 
 interface EditableDeckSubjectProps {
@@ -31,11 +31,11 @@ type EditState = 'viewing' | 'editing' | 'saving'
 /**
  * V9.1: EditableDeckSubject Component
  * 
- * Allows deck authors to change the subject/specialty for AI prompts.
- * 
+ * Allows deck authors to change the subject for AI prompts.
+ *
  * Requirements: V9.1 3.2
  * - Displays current subject with edit icon
- * - Dropdown with common medical specialties
+ * - Dropdown with common subject areas
  * - Optimistic UI feedback before server confirmation
  */
 export function EditableDeckSubject({ deckId, initialSubject }: EditableDeckSubjectProps) {

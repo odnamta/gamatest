@@ -785,6 +785,55 @@ export async function completeSession(
       return { ok: false, error: error.message }
     }
 
+    // V19: Update skill scores if skills_mapping is enabled
+    try {
+      const { data: assessment } = await supabase
+        .from('assessments')
+        .select('deck_template_id, org_id')
+        .eq('id', session.assessment_id)
+        .single()
+
+      if (assessment) {
+        // Look up deck → skill_domains via deck_skill_mappings
+        const { data: skillMappings } = await supabase
+          .from('deck_skill_mappings')
+          .select('skill_domain_id')
+          .eq('deck_template_id', assessment.deck_template_id)
+
+        if (skillMappings && skillMappings.length > 0) {
+          for (const mapping of skillMappings) {
+            // Upsert employee_skill_scores: running average
+            const { data: existing } = await supabase
+              .from('employee_skill_scores')
+              .select('score, assessments_taken')
+              .eq('org_id', assessment.org_id)
+              .eq('user_id', user.id)
+              .eq('skill_domain_id', mapping.skill_domain_id)
+              .single()
+
+            const oldScore = existing?.score ?? 0
+            const oldCount = existing?.assessments_taken ?? 0
+            const newScore = (oldScore * oldCount + score) / (oldCount + 1)
+
+            await supabase.from('employee_skill_scores').upsert({
+              org_id: assessment.org_id,
+              user_id: user.id,
+              skill_domain_id: mapping.skill_domain_id,
+              score: Math.round(newScore * 10) / 10,
+              assessments_taken: oldCount + 1,
+              last_assessed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'org_id,user_id,skill_domain_id',
+            })
+          }
+        }
+      }
+    } catch (skillError) {
+      // Non-fatal: log but don't fail the session completion
+      console.warn('[completeSession] V19: Skill score update failed:', skillError)
+    }
+
     revalidatePath('/assessments')
     return { ok: true, data: { score, passed, total, correct } }
   })

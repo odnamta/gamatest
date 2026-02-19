@@ -4,32 +4,33 @@ import { NAV_ITEMS, isNavItemActive, getNavItemClasses } from '../components/nav
 
 /**
  * **Feature: v10, Property 8: MobileNavBar Items**
- * *For any* rendered MobileNavBar, it should contain exactly four navigation items: 
- * Home, Library, Stats, and Profile.
- * **Validates: Requirements 4.3, V10.2 2.2**
+ * For any rendered MobileNavBar, the core items should contain
+ * Home, Assess, Library, and Profile.
+ * Skills and Study are conditionally added based on feature flags.
+ * **Validates: Requirements 4.3, V19**
  */
 describe('Property 8: MobileNavBar Items', () => {
-  it('has exactly four navigation items', () => {
+  it('has exactly four core navigation items', () => {
     expect(NAV_ITEMS).toHaveLength(4);
   });
 
-  it('contains Home, Library, Stats, and Profile items', () => {
+  it('contains Home, Assess, Library, and Profile items', () => {
     const labels = NAV_ITEMS.map(item => item.label);
     expect(labels).toContain('Home');
+    expect(labels).toContain('Assess');
     expect(labels).toContain('Library');
-    expect(labels).toContain('Stats');
     expect(labels).toContain('Profile');
   });
 
   it('has correct hrefs for each item', () => {
     const homeItem = NAV_ITEMS.find(item => item.label === 'Home');
+    const assessItem = NAV_ITEMS.find(item => item.label === 'Assess');
     const libraryItem = NAV_ITEMS.find(item => item.label === 'Library');
-    const statsItem = NAV_ITEMS.find(item => item.label === 'Stats');
     const profileItem = NAV_ITEMS.find(item => item.label === 'Profile');
 
     expect(homeItem?.href).toBe('/dashboard');
+    expect(assessItem?.href).toBe('/assessments');
     expect(libraryItem?.href).toBe('/library');
-    expect(statsItem?.href).toBe('/stats');
     expect(profileItem?.href).toBe('/profile');
   });
 
@@ -43,7 +44,7 @@ describe('Property 8: MobileNavBar Items', () => {
 
 /**
  * **Feature: v10, Property 9: MobileNavBar Active State**
- * *For any* navigation item where the href matches the current pathname, 
+ * For any navigation item where the href matches the current pathname,
  * the item should have active styling (blue color).
  * **Validates: Requirements 4.4**
  */
@@ -73,6 +74,10 @@ describe('Property 9: MobileNavBar Active State', () => {
     );
   });
 
+  it('assessments is active for /assessments pathname', () => {
+    expect(isNavItemActive('/assessments', '/assessments')).toBe(true);
+  });
+
   it('profile is active for /profile pathname', () => {
     expect(isNavItemActive('/profile', '/profile')).toBe(true);
   });
@@ -96,7 +101,7 @@ describe('Property 9: MobileNavBar Active State', () => {
 
 /**
  * **Feature: v10, Property 10: MobileNavBar Navigation**
- * *For any* click on a navigation item, the router should navigate to the item's href.
+ * For any click on a navigation item, the router should navigate to the item's href.
  * **Validates: Requirements 4.5**
  */
 describe('Property 10: MobileNavBar Navigation', () => {
@@ -115,7 +120,7 @@ describe('Property 10: MobileNavBar Navigation', () => {
   it('nav items have minimum touch target height in classes', () => {
     const activeClasses = getNavItemClasses(true);
     const inactiveClasses = getNavItemClasses(false);
-    
+
     expect(activeClasses).toContain('min-h-[48px]');
     expect(inactiveClasses).toContain('min-h-[48px]');
   });

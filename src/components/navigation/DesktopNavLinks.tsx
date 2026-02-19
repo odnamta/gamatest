@@ -2,8 +2,7 @@
 
 /**
  * V17: Desktop navigation links with badge counts.
- *
- * Shows unread notification count on Assessments link for candidates.
+ * V19: Assessment-first navigation. Assessments + Skills always visible.
  */
 
 import { useState, useEffect } from 'react'
@@ -14,7 +13,8 @@ import { getUnreadNotificationCount } from '@/actions/notification-actions'
 export function DesktopNavLinks() {
   const pathname = usePathname()
   const { org } = useOrg()
-  const isAssessmentMode = org.settings?.features?.assessment_mode
+  const isStudyMode = org.settings?.features?.study_mode
+  const isSkillsMapping = org.settings?.features?.skills_mapping
   const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
@@ -24,9 +24,10 @@ export function DesktopNavLinks() {
   }, [])
 
   const links = [
+    { href: '/assessments', label: 'Assessments' },
+    ...(isSkillsMapping ? [{ href: '/skills', label: 'Skills' }] : []),
     { href: '/library', label: 'Library' },
-    { href: '/library/my', label: 'My Library' },
-    ...(isAssessmentMode ? [{ href: '/assessments', label: 'Assessments' }] : []),
+    ...(isStudyMode ? [{ href: '/library/my', label: 'My Library' }] : []),
   ]
 
   return (

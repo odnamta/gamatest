@@ -9,7 +9,7 @@
 
 /**
  * OpenAI model to use for MCQ generation.
- * Default: gpt-4o (best quality for medical content)
+ * Default: gpt-4o (best quality for assessment content)
  * Can be overridden with MCQ_MODEL env var (e.g., gpt-4o-mini for cost savings)
  */
 export const MCQ_MODEL = process.env.MCQ_MODEL ?? 'gpt-4o'

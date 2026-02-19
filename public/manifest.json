@@ -1,7 +1,7 @@
 {
-  "name": "GamaTest",
-  "short_name": "GamaTest",
-  "description": "Assessment and study platform for organizations",
+  "name": "Cekatan",
+  "short_name": "Cekatan",
+  "description": "Platform asesmen & pemetaan kompetensi",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

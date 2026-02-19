@@ -99,7 +99,7 @@ export function useAutoTag(options: UseAutoTagOptions = {}): UseAutoTagReturn {
    * Processes sequentially with progress updates.
    * 
    * @param cardIds - Array of card IDs to tag
-   * @param subject - Optional medical specialty for context
+   * @param subject - Optional subject area for context
    */
   const startTagging = useCallback(
     async (cardIds: string[], subject?: string) => {

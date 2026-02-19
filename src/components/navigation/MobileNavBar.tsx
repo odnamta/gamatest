@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Library, User, BarChart3, ClipboardCheck } from 'lucide-react';
+import { Home, Library, User, BarChart3, ClipboardCheck, Target } from 'lucide-react';
 import { ReactNode, useState, useEffect } from 'react';
 import { useOrg } from '@/components/providers/OrgProvider';
 import { getUnreadNotificationCount } from '@/actions/notification-actions';
@@ -14,12 +14,12 @@ export interface NavItem {
 }
 
 /**
- * Navigation items for the mobile nav bar
+ * Core navigation items for the mobile nav bar
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', icon: <Home className="h-5 w-5" />, label: 'Home' },
+  { href: '/assessments', icon: <ClipboardCheck className="h-5 w-5" />, label: 'Assess' },
   { href: '/library', icon: <Library className="h-5 w-5" />, label: 'Library' },
-  { href: '/stats', icon: <BarChart3 className="h-5 w-5" />, label: 'Stats' },
   { href: '/profile', icon: <User className="h-5 w-5" />, label: 'Profile' },
 ];
 
@@ -40,7 +40,7 @@ export function getNavItemClasses(isActive: boolean): string {
   const baseClasses = 'flex flex-col items-center justify-center py-2 px-3 transition-colors min-h-[48px]';
   const activeClasses = 'text-blue-600';
   const inactiveClasses = 'text-slate-500 hover:text-slate-700';
-  
+
   return `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`;
 }
 
@@ -49,12 +49,7 @@ export interface MobileNavBarProps {
 }
 
 /**
- * MobileNavBar component - Fixed bottom navigation for mobile devices
- * Requirements: 4.1, 4.3, 4.4, 4.5 - Mobile bottom nav with Home, Library, Profile
- */
-/**
  * Glassmorphic navigation classes for property testing
- * Requirements: 4.1, 4.3 - bg-white/80 backdrop-blur-lg border-white/20
  */
 export const GLASS_NAV_CLASSES = 'bg-white/80 backdrop-blur-lg border-t border-white/20';
 
@@ -70,11 +65,22 @@ export function MobileNavBar({ className = '' }: MobileNavBarProps) {
   }, []);
 
   const items = [...NAV_ITEMS];
-  if (org.settings?.features?.assessment_mode) {
+
+  // Add Skills nav if feature is enabled
+  if (org.settings?.features?.skills_mapping) {
     items.splice(2, 0, {
-      href: '/assessments',
-      icon: <ClipboardCheck className="h-5 w-5" />,
-      label: 'Assess',
+      href: '/skills',
+      icon: <Target className="h-5 w-5" />,
+      label: 'Skills',
+    });
+  }
+
+  // Add Study nav if study mode is enabled
+  if (org.settings?.features?.study_mode) {
+    items.splice(items.length - 1, 0, {
+      href: '/stats',
+      icon: <BarChart3 className="h-5 w-5" />,
+      label: 'Study',
     });
   }
 

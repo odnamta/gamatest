@@ -63,7 +63,7 @@ export default function AcceptInvitationPage() {
             Organization Invitation
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            You have been invited to join an organization on GamaTest.
+            You have been invited to join an organization on Cekatan.
           </p>
 
           {error && (

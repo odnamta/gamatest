@@ -28,15 +28,15 @@ import {
  */
 const DATA_INTEGRITY_RULES = `
 CRITICAL DATA INTEGRITY RULES:
-1. UNITS: Maintain ALL original units (imperial or metric) EXACTLY as found in the source text.
-   - Do NOT convert lb to kg, inches to cm, or any other unit conversions.
-   - Do NOT round numbers. If the source says "142 lb", use "142 lb" not "64 kg".
-2. NO HALLUCINATION: Never invent, infer, or guess new clinical numbers.
+1. UNITS: Maintain ALL original units EXACTLY as found in the source text.
+   - Do NOT convert units. If the source says "142 lb", use "142 lb" not "64 kg".
+   - Do NOT round numbers.
+2. NO HALLUCINATION: Never invent, infer, or guess new data values.
    - If a value is missing in the source text, leave it missing in the question.
-   - Do NOT add vital signs, lab values, or measurements not present in the source.
-3. VERBATIM EXTRACTION: Extract clinical data verbatim from the source material.
-   - Do NOT "improve" or rephrase clinical data.
-   - Preserve exact wording for medical terminology and values.`
+   - Do NOT add data, measurements, or values not present in the source.
+3. VERBATIM EXTRACTION: Extract data verbatim from the source material.
+   - Do NOT "improve" or rephrase technical data.
+   - Preserve exact wording for domain-specific terminology and values.`
 
 const VISION_PRIORITY_INSTRUCTION = `
 IF an image is provided, treat it as primary. The text may just be background.
@@ -71,13 +71,13 @@ If you cannot find real exam-style MCQs in the text, return {"questions": []} ra
  * V11.2.1: Positive example of properly extracted MCQ
  */
 const EXTRACT_POSITIVE_EXAMPLE = `
-CORRECT EXAMPLE (properly extracted Lange/Williams-style MCQ):
+CORRECT EXAMPLE (properly extracted exam-style MCQ):
 {
-  "stem": "A 32-year-old G2P1 at 28 weeks presents with painless vaginal bleeding. Ultrasound shows a placenta covering the internal os. What is the most appropriate next step?",
-  "options": ["Immediate cesarean delivery", "Expectant management with bed rest", "Amniocentesis", "Vaginal examination"],
+  "stem": "A forklift operator notices a hydraulic leak during pre-shift inspection. What is the most appropriate next step?",
+  "options": ["Continue operating until shift ends", "Tag out the forklift and report to supervisor", "Attempt to repair the leak", "Switch to a different forklift without reporting"],
   "correctIndex": 1,
-  "explanation": "Placenta previa is managed expectantly if the patient is stable and preterm.",
-  "tags": ["PlacentaPrevia", "AntepartumHemorrhage"]
+  "explanation": "Equipment with safety hazards must be immediately tagged out and reported per safety guidelines.",
+  "tags": ["SafetyInspection", "HeavyEquipment"]
 }`
 
 /**
@@ -87,9 +87,9 @@ const EXTRACT_NEGATIVE_EXAMPLE = `
 WRONG EXAMPLE (meta-question - DO NOT PRODUCE):
 {
   "stem": "What is the main topic discussed on page 5?",
-  "options": ["Placenta previa", "Preeclampsia", "Gestational diabetes", "Preterm labor"],
+  "options": ["Safety protocols", "Inventory management", "Customer service", "Equipment maintenance"],
   "correctIndex": 0,
-  "explanation": "Page 5 covers placenta previa.",
+  "explanation": "Page 5 covers safety protocols.",
   "tags": ["Chapter1"]
 }
 This is WRONG because it's a comprehension question about the document, not a real exam MCQ from the source.`
@@ -99,16 +99,16 @@ This is WRONG because it's a comprehension question about the document, not a re
  * V11.2.1: Hardened prompt to prevent meta-questions - COPY ONLY, no generation
  */
 function buildBatchExtractPrompt(goldenTopics: string[], subject: string = DEFAULT_SUBJECT): string {
-  const topicList = goldenTopics.length > 0 
+  const topicList = goldenTopics.length > 0
     ? goldenTopics.join(', ')
     : 'General, Safety, Operations, Management, Technical, Compliance'
 
-  return `You are a medical board exam expert specializing in ${subject}.
+  return `You are an expert in ${subject} creating assessment questions.
 Your task is to COPY existing exam-style multiple-choice questions from the provided text.
 
 CRITICAL: You are in EXTRACT mode. Your job is to COPY, not CREATE.
 - Only extract questions that ALREADY EXIST in the text with numbered stems (1., 2., 3.) and options (A-E or similar)
-- The text likely comes from a Q&A book like Lange or Williams - find and copy the real MCQs
+- The text likely comes from a reference book or training manual - find and copy the real MCQs
 - Do NOT create new questions
 - Do NOT write comprehension questions about the text itself
 
@@ -119,18 +119,18 @@ Each MCQ must have:
 - correctIndex: Index of correct answer (0-based, 0-4)
 - explanation: The explanation from the source, or a brief teaching point if none provided
 - topic: EXACTLY ONE official topic from this list: [${topicList}]
-- tags: Array of 1-2 specific CONCEPT tags in PascalCase (e.g., "Preeclampsia", "GestationalDiabetes") - REQUIRED
+- tags: Array of 1-2 specific CONCEPT tags in PascalCase (e.g., "SafetyProtocol", "InventoryManagement") - REQUIRED
 ${EXTRACT_META_BAN}
 ${EXTRACT_POSITIVE_EXAMPLE}
 ${EXTRACT_NEGATIVE_EXAMPLE}`
 }
 
-const BATCH_EXTRACT_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
+const BATCH_EXTRACT_SYSTEM_PROMPT = `You are an expert assessment question extractor.
 Your task is to COPY existing exam-style multiple-choice questions from the provided text.
 
 CRITICAL: You are in EXTRACT mode. Your job is to COPY, not CREATE.
 - Only extract questions that ALREADY EXIST in the text with numbered stems (1., 2., 3.) and options (A-E or similar)
-- The text likely comes from a Q&A book like Lange or Williams - find and copy the real MCQs
+- The text likely comes from a reference book or training manual - find and copy the real MCQs
 - Do NOT create new questions
 - Do NOT write comprehension questions about the text itself
 
@@ -140,13 +140,13 @@ Each MCQ must have:
 - options: Array of 2-5 answer choices (extracted verbatim)
 - correctIndex: Index of correct answer (0-based, 0-4)
 - explanation: The explanation from the source, or a brief teaching point if none provided
-- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy") - REQUIRED
+- tags: Array of 1-3 CONCEPT tags only (e.g., "SafetyProtocol", "EquipmentMaintenance") - REQUIRED
 
 FORENSIC MODE - THOROUGHNESS REQUIREMENTS:
 - Scan the ENTIRE text thoroughly for ALL multiple-choice questions
 - Extract EVERY question. If there are 20 questions, return 20 objects. NO ARTIFICIAL LIMIT.
 - Do NOT skip any questions - extract ALL MCQs you find
-- Generate at least 1 medical concept tag per question (REQUIRED - questions without tags will be rejected)
+- Generate at least 1 concept tag per question (REQUIRED - questions without tags will be rejected)
 - Preserve the original ordering of questions as they appear in the source text
 
 EXTRACTION RULES:
@@ -175,11 +175,11 @@ Example response format:
 {
   "questions": [
     {
-      "stem": "A 28-year-old G1P0 at 32 weeks presents with...",
+      "stem": "When handling hazardous materials, the first step according to SOP is...",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctIndex": 2,
       "explanation": "The correct answer is C because...",
-      "tags": ["PretermLabor", "Tocolytics"]
+      "tags": ["HazardousMaterials", "SafetyProcedure"]
     }
   ]
 }`
@@ -188,47 +188,47 @@ Example response format:
  * V9/V9.1: Build generate prompt with Golden List topics and dynamic subject
  */
 function buildBatchGeneratePrompt(goldenTopics: string[], subject: string = DEFAULT_SUBJECT): string {
-  const topicList = goldenTopics.length > 0 
+  const topicList = goldenTopics.length > 0
     ? goldenTopics.join(', ')
     : 'General, Safety, Operations, Management, Technical, Compliance'
 
-  return `You are a medical board exam expert specializing in ${subject}.
-Your task is to CREATE multiple high-yield board-style MCQs from the provided textbook passage.
+  return `You are an expert in ${subject} creating assessment questions.
+Your task is to CREATE multiple high-quality assessment-style MCQs from the provided passage.
 
 Return a JSON object with a "questions" array containing ALL MCQs you can generate.
 Each MCQ must have:
-- stem: The question text (clinical vignette or direct question, at least 10 characters)
+- stem: The question text (scenario-based or direct question, at least 10 characters)
 - options: Array of 2-5 answer choices
 - correctIndex: Index of correct answer (0-based, 0-4)
 - explanation: Brief teaching explanation (optional but recommended)
 - topic: EXACTLY ONE official topic from this list: [${topicList}]
-- tags: Array of 1-2 specific CONCEPT tags in PascalCase (e.g., "Preeclampsia", "GestationalDiabetes") - REQUIRED`
+- tags: Array of 1-2 specific CONCEPT tags in PascalCase (e.g., "SafetyProtocol", "InventoryManagement") - REQUIRED`
 }
 
-const BATCH_GENERATE_SYSTEM_PROMPT = `You are a medical board exam expert specializing in obstetrics and gynecology.
-Your task is to CREATE multiple high-yield board-style MCQs from the provided textbook passage.
+const BATCH_GENERATE_SYSTEM_PROMPT = `You are an expert assessment question creator.
+Your task is to CREATE multiple high-quality assessment-style MCQs from the provided passage.
 
 Return a JSON object with a "questions" array containing ALL MCQs you can generate.
 Each MCQ must have:
-- stem: The question text (clinical vignette or direct question, at least 10 characters)
+- stem: The question text (scenario-based or direct question, at least 10 characters)
 - options: Array of 2-5 answer choices
 - correctIndex: Index of correct answer (0-based, 0-4)
 - explanation: Brief teaching explanation (optional but recommended)
-- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy") - REQUIRED
+- tags: Array of 1-3 CONCEPT tags only (e.g., "SafetyProtocol", "EquipmentMaintenance") - REQUIRED
 
 FORENSIC MODE - THOROUGHNESS REQUIREMENTS:
 - Scan the ENTIRE text thoroughly for ALL testable concepts
 - Generate ALL distinct MCQs covering different key concepts from the passage. NO ARTIFICIAL LIMIT.
 - If there are 20 testable concepts, return 20 objects.
-- Generate at least 1 medical concept tag per question (REQUIRED - questions without tags will be rejected)
+- Generate at least 1 concept tag per question (REQUIRED - questions without tags will be rejected)
 - Ensure questions are ordered logically based on the flow of the source material
 
 GENERATION RULES:
-- Read the textbook-like passage carefully.
-- Create up to 5 distinct high-yield board-style MCQs that test key concepts from this passage.
-- All clinical facts, thresholds, and units used in questions and answer options MUST come from the passage.
-- Never invent new numbers or units not present in the source.
-- Write at board exam difficulty level.
+- Read the passage carefully.
+- Create up to 5 distinct high-quality assessment-style MCQs that test key concepts from this passage.
+- All facts, thresholds, and values used in questions and answer options MUST come from the passage.
+- Never invent new numbers or values not present in the source.
+- Write at professional assessment difficulty level.
 - If the text doesn't contain enough content for MCQs, return {"questions": []}.
 
 COMPLEX FORMAT FLAGGING (V8.6):
@@ -242,11 +242,11 @@ Example response format:
 {
   "questions": [
     {
-      "stem": "A 28-year-old G1P0 at 32 weeks presents with...",
+      "stem": "When handling hazardous materials, the first step according to SOP is...",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctIndex": 2,
       "explanation": "The correct answer is C because...",
-      "tags": ["PretermLabor", "Tocolytics"]
+      "tags": ["HazardousMaterials", "SafetyProcedure"]
     }
   ]
 }`

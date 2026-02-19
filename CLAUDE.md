@@ -1,8 +1,8 @@
-# CLAUDE.md — GamaTest Platform
+# CLAUDE.md — Cekatan Platform
 
 ## Project Overview
 
-**GamaTest** is a domain-agnostic organizational assessment and study platform.
+**Cekatan** is a domain-agnostic organizational assessment, study, and skills mapping platform.
 
 **Architecture:** ONE platform, TWO modes (Study Mode + Assessment Mode).
 **Multi-tenant:** Each organization is a tenant with its own content, users, and configuration.

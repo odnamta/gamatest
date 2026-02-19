@@ -250,22 +250,22 @@ describe('Property 5: Golden List Validation', () => {
    */
   it('should validate that Golden List contains expected topics', () => {
     const expectedTopics = [
-      'Anatomy',
-      'Physiology',
-      'Pharmacology',
-      'Pathology',
-      'Obstetrics',
-      'Gynecology',
-      'Embryology',
-      'Genetics',
-      'Immunology',
-      'Microbiology',
-      'Biochemistry',
-      'Epidemiology',
-      'Biostatistics',
-      'Ethics',
+      'General',
+      'Safety',
+      'Operations',
+      'Management',
+      'Technical',
+      'Compliance',
+      'Customer Service',
+      'Logistics',
+      'Finance',
+      'Human Resources',
+      'Quality Control',
+      'IT Systems',
+      'Leadership',
+      'Communication',
     ]
-    
+
     expect(GOLDEN_TOPIC_TAGS).toEqual(expectedTopics)
     expect(GOLDEN_TOPIC_TAGS.length).toBe(14)
   })

@@ -16,26 +16,26 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "GamaTest",
-    template: "%s - GamaTest",
+    default: "Cekatan",
+    template: "%s - Cekatan",
   },
-  description: "Assessment and study platform for organizations",
+  description: "Platform asesmen & pemetaan kompetensi",
   manifest: "/manifest.json",
   openGraph: {
     type: "website",
-    siteName: "GamaTest",
-    title: "GamaTest",
-    description: "Assessment and study platform for organizations",
+    siteName: "Cekatan",
+    title: "Cekatan",
+    description: "Platform asesmen & pemetaan kompetensi",
   },
   twitter: {
     card: "summary",
-    title: "GamaTest",
-    description: "Assessment and study platform for organizations",
+    title: "Cekatan",
+    description: "Platform asesmen & pemetaan kompetensi",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "GamaTest",
+    title: "Cekatan",
   },
   other: {
     "mobile-web-app-capable": "yes",

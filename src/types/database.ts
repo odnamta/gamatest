@@ -11,6 +11,7 @@ export type OrgRole = 'owner' | 'admin' | 'creator' | 'candidate';
 export interface OrgFeatures {
   study_mode: boolean
   assessment_mode: boolean
+  skills_mapping: boolean
   proctoring: boolean
   certification: boolean
   ai_generation: boolean
@@ -38,6 +39,7 @@ export interface OrgSettings {
   branding: OrgBranding
   default_language: string
   assessment_defaults?: AssessmentDefaults
+  skills_visible_to_candidates?: boolean
 }
 
 export interface Organization {
@@ -394,9 +396,9 @@ export interface DeckSource {
 
 /**
  * V9: Tag category for 3-tier taxonomy
- * - source: Textbook/reference origin (e.g., "Williams", "Lange")
- * - topic: Medical chapter/domain (e.g., "Anatomy", "Endocrinology")
- * - concept: Specific medical concept (e.g., "Preeclampsia", "GestationalDiabetes")
+ * - source: Reference origin (e.g., "Training Manual", "SOP Guide")
+ * - topic: Domain/category (e.g., "Safety", "Operations")
+ * - concept: Specific concept (e.g., "FireSafety", "InventoryManagement")
  */
 export type TagCategory = 'source' | 'topic' | 'concept';
 
@@ -644,4 +646,45 @@ export interface MatchingBlock {
   optionTexts: string[]       // The actual option content
   questionNumbers: number[]   // Questions that reference these options
   rawText: string            // Original text block
+}
+
+
+// ============================================
+// V19: Skills Mapping Types
+// ============================================
+
+/**
+ * Skill domain defined per organization
+ */
+export interface SkillDomain {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  color: string
+  sort_order: number
+  created_at: string
+}
+
+/**
+ * Link between a deck template and a skill domain
+ */
+export interface DeckSkillMapping {
+  id: string
+  deck_template_id: string
+  skill_domain_id: string
+}
+
+/**
+ * Computed skill score per employee per skill domain
+ */
+export interface EmployeeSkillScore {
+  id: string
+  org_id: string
+  user_id: string
+  skill_domain_id: string
+  score: number | null
+  assessments_taken: number
+  last_assessed_at: string | null
+  updated_at: string
 }

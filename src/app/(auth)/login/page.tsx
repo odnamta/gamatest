@@ -59,13 +59,13 @@ function AppLogo() {
   return (
     <div className="flex flex-col items-center mb-8">
       <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-        <span className="text-4xl font-bold text-white">G</span>
+        <span className="text-4xl font-bold text-white">C</span>
       </div>
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-        Welcome to GamaTest
+        Welcome to Cekatan
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-        Assessment and study platform
+        Platform asesmen & pemetaan kompetensi
       </p>
     </div>
   )

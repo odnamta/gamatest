@@ -85,7 +85,7 @@ function WelcomeMode({ isAdmin }: { isAdmin: boolean }) {
       </div>
       
       <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        Welcome to GamaTest
+        Welcome to Cekatan
       </h2>
       <p className="text-slate-600 dark:text-slate-400 mb-6">
         Let&apos;s find your first study deck.

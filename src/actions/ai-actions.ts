@@ -15,23 +15,23 @@ import {
  */
 const DATA_INTEGRITY_RULES = `
 CRITICAL DATA INTEGRITY RULES:
-1. UNITS: Maintain ALL original units (imperial or metric) EXACTLY as found in the source text.
-   - Do NOT convert lb to kg, inches to cm, or any other unit conversions.
-   - Do NOT round numbers. If the source says "142 lb", use "142 lb" not "64 kg".
-2. NO HALLUCINATION: Never invent, infer, or guess new clinical numbers.
+1. UNITS: Maintain ALL original units EXACTLY as found in the source text.
+   - Do NOT convert units. If the source says "142 lb", use "142 lb" not "64 kg".
+   - Do NOT round numbers.
+2. NO HALLUCINATION: Never invent, infer, or guess new data values.
    - If a value is missing in the source text, leave it missing in the question.
-   - Do NOT add vital signs, lab values, or measurements not present in the source.
-3. VERBATIM EXTRACTION: Extract clinical data verbatim from the source material.
-   - Do NOT "improve" or rephrase clinical data.
-   - Preserve exact wording for medical terminology and values.`
+   - Do NOT add data, measurements, or values not present in the source.
+3. VERBATIM EXTRACTION: Extract data verbatim from the source material.
+   - Do NOT "improve" or rephrase technical data.
+   - Preserve exact wording for domain-specific terminology and values.`
 
 /**
  * V6.6: Tag generation instruction - shared across modes
  */
 const TAG_GENERATION_INSTRUCTION = `
-- tags: Array of 1-3 MEDICAL CONCEPT tags only (e.g., "Preeclampsia", "PelvicAnatomy")
-  - Format: Use PascalCase without spaces (e.g., GestationalDiabetes, PregnancyInducedHypertension)
-  - Do NOT generate structural tags (e.g., Chapter1, Lange, Section2) - these are handled separately`
+- tags: Array of 1-3 CONCEPT tags only (e.g., "SafetyProtocol", "InventoryManagement")
+  - Format: Use PascalCase without spaces (e.g., HeavyEquipment, CustomerService)
+  - Do NOT generate structural tags (e.g., Chapter1, Section2) - these are handled separately`
 
 /**
  * V6.6: Vision priority instruction - when image is provided
@@ -65,13 +65,13 @@ If you cannot find a real exam-style MCQ in the text, return an empty response r
  * V11.2.1: Positive example of properly extracted MCQ
  */
 const EXTRACT_POSITIVE_EXAMPLE = `
-CORRECT EXAMPLE (properly extracted Lange/Williams-style MCQ):
+CORRECT EXAMPLE (properly extracted exam-style MCQ):
 {
-  "stem": "A 32-year-old G2P1 at 28 weeks presents with painless vaginal bleeding. Ultrasound shows a placenta covering the internal os. What is the most appropriate next step?",
-  "options": ["Immediate cesarean delivery", "Expectant management with bed rest", "Amniocentesis", "Vaginal examination"],
+  "stem": "A forklift operator notices a hydraulic leak while performing a pre-shift inspection. What is the most appropriate next step?",
+  "options": ["Continue operating until the shift ends", "Tag out the forklift and report to supervisor", "Attempt to repair the leak", "Switch to a different forklift without reporting"],
   "correct_index": 1,
-  "explanation": "Placenta previa is managed expectantly if the patient is stable and preterm.",
-  "tags": ["PlacentaPrevia", "AntepartumHemorrhage"]
+  "explanation": "Equipment with safety hazards must be immediately tagged out and reported per OSHA guidelines.",
+  "tags": ["SafetyInspection", "HeavyEquipment"]
 }`
 
 /**
@@ -81,9 +81,9 @@ const EXTRACT_NEGATIVE_EXAMPLE = `
 WRONG EXAMPLE (meta-question - DO NOT PRODUCE):
 {
   "stem": "What is the main topic discussed on page 5?",
-  "options": ["Placenta previa", "Preeclampsia", "Gestational diabetes", "Preterm labor"],
+  "options": ["Safety protocols", "Inventory management", "Customer service", "Equipment maintenance"],
   "correct_index": 0,
-  "explanation": "Page 5 covers placenta previa.",
+  "explanation": "Page 5 covers safety protocols.",
   "tags": ["Chapter1"]
 }
 This is WRONG because it's a comprehension question about the document, not a real exam MCQ.`
@@ -95,12 +95,12 @@ This is WRONG because it's a comprehension question about the document, not a re
  * V11.2.1: Hardened prompt to prevent meta-questions - COPY ONLY, no generation
  */
 function buildExtractSystemPrompt(subject: string = DEFAULT_SUBJECT): string {
-  return `You are a medical board exam expert specializing in ${subject}.
+  return `You are an expert in ${subject} creating assessment questions.
 Your task is to COPY existing exam-style multiple-choice questions from the provided text.
 
 CRITICAL: You are in EXTRACT mode. Your job is to COPY, not CREATE.
 - Only extract questions that ALREADY EXIST in the text with numbered stems (1., 2., 3.) and options (A-E or similar)
-- The text likely comes from a Q&A book like Lange or Williams - find and copy the real MCQs
+- The text likely comes from a reference book or training manual - find and copy the real MCQs
 - Do NOT create new questions
 - Do NOT write comprehension questions about the text itself
 
@@ -130,8 +130,8 @@ ${DATA_INTEGRITY_RULES}`
  * V6.6: Added tags field and Vision priority
  */
 function buildGenerateSystemPrompt(subject: string = DEFAULT_SUBJECT): string {
-  return `You are a medical board exam expert specializing in ${subject}.
-Your task is to CREATE ONE new high-yield board-style MCQ from the provided textbook passage.
+  return `You are an expert in ${subject} creating assessment questions.
+Your task is to CREATE ONE new high-quality assessment-style MCQ from the provided passage.
 
 Return valid JSON with these exact fields:
 - stem: The question text (clinical vignette or direct question)
@@ -143,11 +143,11 @@ ${TAG_GENERATION_INSTRUCTION}
 GENERATION RULES:
 - Read the textbook-like passage carefully.
 - Create ONE new high-yield board-style MCQ that tests a key concept from this passage.
-- All clinical facts, thresholds, and units used in the question and answer options MUST come from the passage.
-- Never invent new numbers or units not present in the source.
+- All facts, thresholds, and values used in the question and answer options MUST come from the passage.
+- Never invent new numbers or values not present in the source.
 - Invent plausible distractors (wrong answers), but they must still be conceptually related to the passage.
-- Distractors must not contradict medical facts stated in the passage.
-- Write at board exam difficulty level.
+- Distractors must not contradict facts stated in the passage.
+- Write at professional assessment difficulty level.
 ${VISION_PRIORITY_INSTRUCTION}
 ${DATA_INTEGRITY_RULES}`
 }

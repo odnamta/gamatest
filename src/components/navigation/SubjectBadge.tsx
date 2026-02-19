@@ -5,7 +5,7 @@ interface SubjectBadgeProps {
 }
 
 /**
- * SubjectBadge displays the current medical specialty in a pill-shaped badge.
+ * SubjectBadge displays the current subject in a pill-shaped badge.
  * 
  * Requirements: 2.1, 2.4
  */

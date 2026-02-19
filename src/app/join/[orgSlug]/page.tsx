@@ -64,7 +64,7 @@ export default function JoinOrgPage() {
             Join Organization
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            Join <span className="font-semibold">{orgSlug}</span> on GamaTest as a candidate.
+            Join <span className="font-semibold">{orgSlug}</span> on Cekatan as a candidate.
           </p>
 
           {error && (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Share, Download } from 'lucide-react';
 
-const STORAGE_KEY = 'gamatest-install-banner-dismissed';
+const STORAGE_KEY = 'cekatan-install-banner-dismissed';
 
 interface InstallBannerProps {
   className?: string;
@@ -65,7 +65,7 @@ export function InstallBanner({ className = '' }: InstallBannerProps) {
             <Download className="h-5 w-5 text-blue-600 flex-shrink-0" />
           )}
           <div className="text-sm">
-            <p className="font-medium text-slate-900">Install GamaTest</p>
+            <p className="font-medium text-slate-900">Install Cekatan</p>
             <p className="text-slate-500 text-xs">
               {isIOS 
                 ? "Tap the Share icon, then 'Add to Home Screen'" 

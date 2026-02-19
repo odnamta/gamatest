@@ -496,7 +496,7 @@ export type AutoTagResult = ActionResultV2<{ taggedCount: number; skippedCount: 
  * Property 10: Subject included in AI prompt
  * 
  * @param cardIds - Array of card_template IDs to auto-tag (max 5)
- * @param subject - Optional medical specialty for context-aware prompting
+ * @param subject - Optional subject area for context-aware prompting
  * @returns AutoTagResult with counts of tagged and skipped cards
  */
 export async function autoTagCards(
@@ -568,16 +568,16 @@ export async function autoTagCards(
         const cardForPrompt = { id: ct.id, stem: ct.stem }
 
         // V9.3: Subject-aware system prompt
-        const systemPrompt = `You are an expert in ${effectiveSubject}. You are a medical education classifier for ${effectiveSubject} exam preparation.
+        const systemPrompt = `You are an expert in ${effectiveSubject}. You are an assessment content classifier for ${effectiveSubject} exam preparation.
 Classify this question into:
 1. ONE Topic from this Golden List: ${GOLDEN_TOPIC_TAGS.join(', ')}
-2. ONE or TWO specific Concepts (medical terms, conditions, or procedures mentioned)
+2. ONE or TWO specific Concepts (key terms, topics, or procedures mentioned)
 
 Rules:
 - Topic MUST be from the Golden List exactly as written
-- Concepts should be specific medical terms from the question
+- Concepts should be specific domain terms from the question
 - Extract verbatim. Do not invent missing values.
-- Use ${effectiveSubject}-appropriate interpretation of medical terms
+- Use ${effectiveSubject}-appropriate interpretation of domain terms
 
 Respond with JSON only, no markdown:
 {"cardId":"uuid","topic":"Topic","concepts":["Concept1","Concept2"]}`

@@ -17,7 +17,7 @@ export interface TagColor {
 /**
  * V9: Category to color mapping (enforced)
  * - source → blue (textbook origin)
- * - topic → purple (medical domain)
+ * - topic → purple (domain category)
  * - concept → green (specific concept)
  */
 export const CATEGORY_COLORS: Record<TagCategory, string> = {

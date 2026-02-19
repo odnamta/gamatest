@@ -120,16 +120,16 @@ describe('Tag Resolver Property Tests', () => {
     })
 
     it('should return null for partial matches', () => {
-      // "Anat" should not match "Anatomy"
-      expect(resolveTopicTag('Anat')).toBeNull()
-      expect(resolveTopicTag('Physio')).toBeNull()
-      expect(resolveTopicTag('Pharma')).toBeNull()
+      // "Safe" should not match "Safety"
+      expect(resolveTopicTag('Safe')).toBeNull()
+      expect(resolveTopicTag('Oper')).toBeNull()
+      expect(resolveTopicTag('Manag')).toBeNull()
     })
 
     it('should return null for topics with extra characters', () => {
-      expect(resolveTopicTag('Anatomy!')).toBeNull()
-      expect(resolveTopicTag('Anatomy123')).toBeNull()
-      expect(resolveTopicTag('_Anatomy')).toBeNull()
+      expect(resolveTopicTag('Safety!')).toBeNull()
+      expect(resolveTopicTag('Safety123')).toBeNull()
+      expect(resolveTopicTag('_Safety')).toBeNull()
     })
   })
 
@@ -163,9 +163,9 @@ describe('Tag Resolver Property Tests', () => {
    */
   describe('resolveConceptTag', () => {
     it('should convert to PascalCase', () => {
-      expect(resolveConceptTag('gestational diabetes')).toBe('GestationalDiabetes')
-      expect(resolveConceptTag('preeclampsia')).toBe('Preeclampsia')
-      expect(resolveConceptTag('PLACENTA PREVIA')).toBe('PlacentaPrevia')
+      expect(resolveConceptTag('fire safety')).toBe('FireSafety')
+      expect(resolveConceptTag('forklift')).toBe('Forklift')
+      expect(resolveConceptTag('INVENTORY MANAGEMENT')).toBe('InventoryManagement')
     })
 
     it('should handle single words', () => {
@@ -191,7 +191,7 @@ describe('Tag Resolver Property Tests', () => {
     })
 
     it('should trim whitespace', () => {
-      expect(resolveConceptTag('  preeclampsia  ')).toBe('Preeclampsia')
+      expect(resolveConceptTag('  forklift  ')).toBe('Forklift')
     })
   })
 
@@ -200,20 +200,20 @@ describe('Tag Resolver Property Tests', () => {
    */
   describe('Known Golden List topics', () => {
     const knownTopics = [
-      'Anatomy',
-      'Physiology',
-      'Pharmacology',
-      'Pathology',
-      'Obstetrics',
-      'Gynecology',
-      'Embryology',
-      'Genetics',
-      'Immunology',
-      'Microbiology',
-      'Biochemistry',
-      'Epidemiology',
-      'Biostatistics',
-      'Ethics',
+      'General',
+      'Safety',
+      'Operations',
+      'Management',
+      'Technical',
+      'Compliance',
+      'Customer Service',
+      'Logistics',
+      'Finance',
+      'Human Resources',
+      'Quality Control',
+      'IT Systems',
+      'Leadership',
+      'Communication',
     ]
 
     it('should resolve all known topics', () => {

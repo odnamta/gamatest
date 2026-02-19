@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import type { ActionResult } from '@/types/actions'
 
 /**
- * V9.1: Common medical specialties for subject dropdown
+ * V9.1: Common subject areas for subject dropdown
  */
 const COMMON_SUBJECTS = [
   'General',

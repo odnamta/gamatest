@@ -20,7 +20,7 @@ interface CreateMCQFormProps {
 const initialState: ActionResult = { success: true }
 
 const MIN_OPTIONS = 2
-const MAX_OPTIONS = 5  // A-E for standard medical exams
+const MAX_OPTIONS = 5  // A-E for standard multiple choice
 const DEFAULT_OPTIONS = 4
 
 /**

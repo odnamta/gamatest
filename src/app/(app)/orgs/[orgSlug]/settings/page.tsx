@@ -22,6 +22,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 const FEATURE_LABELS: Record<keyof OrgFeatures, { label: string; description: string }> = {
   study_mode: { label: 'Study Mode', description: 'Spaced repetition and self-paced learning' },
   assessment_mode: { label: 'Assessment Mode', description: 'Timed exams with scoring and certification' },
+  skills_mapping: { label: 'Skills Mapping', description: 'Track employee competencies across skill domains' },
   proctoring: { label: 'Proctoring', description: 'Anti-cheat monitoring during assessments' },
   certification: { label: 'Certification', description: 'Generate certificates upon completion' },
   ai_generation: { label: 'AI Content Generation', description: 'Auto-generate questions from documents' },
@@ -38,13 +39,14 @@ export default function OrgSettingsPage() {
   const [name, setName] = useState(org.name)
   const [features, setFeatures] = useState<OrgFeatures>(
     org.settings?.features ?? {
-      study_mode: true,
-      assessment_mode: false,
+      study_mode: false,
+      assessment_mode: true,
+      skills_mapping: true,
       proctoring: false,
       certification: false,
       ai_generation: true,
       pdf_extraction: true,
-      flashcards: true,
+      flashcards: false,
       erp_integration: false,
     }
   )

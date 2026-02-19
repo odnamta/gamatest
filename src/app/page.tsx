@@ -18,16 +18,16 @@ function HeroSection() {
   return (
     <section className="relative z-10 pt-20 pb-16 px-4 text-center">
       <div className="mb-6">
-        <span className="text-6xl font-bold text-blue-600">G</span>
+        <span className="text-6xl font-bold text-blue-600">C</span>
       </div>
       <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 tracking-tight">
-        GamaTest
+        Cekatan
       </h1>
       <p className="text-xl md:text-2xl text-slate-600 mb-2">
-        Assess. Study. Certify.
+        Asesmen. Kompetensi. Sertifikasi.
       </p>
       <p className="text-lg text-slate-500 mb-8 max-w-xl mx-auto">
-        Multi-tenant assessment and study platform for organizations
+        Platform asesmen & pemetaan kompetensi untuk organisasi
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <Link

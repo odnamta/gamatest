@@ -1,4 +1,4 @@
--- Celline's OBGYN Prep Database Schema
+-- Cekatan Assessment Platform Database Schema
 -- Spaced Repetition System with SM-2 Algorithm
 
 -- Enable UUID extension

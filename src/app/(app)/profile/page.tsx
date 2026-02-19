@@ -6,10 +6,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { SPECIALTIES } from '@/components/onboarding/OnboardingModal'
-import { enrollInStarterPack } from '@/actions/onboarding-actions'
 import { getMyAssessmentSessions } from '@/actions/assessment-actions'
-import { User, Mail, Stethoscope, LogOut, Trophy, Clock, Bell, BellOff, Globe, Lock } from 'lucide-react'
+import { User, Mail, Briefcase, LogOut, Trophy, Clock, Bell, BellOff, Globe, Lock } from 'lucide-react'
 import type { SessionWithAssessment } from '@/types/database'
 
 const COMMON_TIMEZONES = [
@@ -22,7 +20,7 @@ const COMMON_TIMEZONES = [
 
 /**
  * Profile Settings Page
- * Allows users to view/update profile, timezone, notification prefs, and exam history.
+ * Allows users to view/update profile, timezone, notification prefs, and assessment history.
  */
 export default function ProfilePage() {
   usePageTitle('Profile')
@@ -31,17 +29,16 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  
+
   // User data
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [specialty, setSpecialty] = useState('')
-  const [originalSpecialty, setOriginalSpecialty] = useState('')
+  const [department, setDepartment] = useState('')
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [examReminders, setExamReminders] = useState(true)
 
-  // Exam history
+  // Assessment history
   const [completedSessions, setCompletedSessions] = useState<SessionWithAssessment[]>([])
 
   useEffect(() => {
@@ -52,14 +49,13 @@ export default function ProfilePage() {
       if (user) {
         setEmail(user.email || '')
         setDisplayName(user.user_metadata?.full_name || user.user_metadata?.name || '')
-        setSpecialty(user.user_metadata?.specialty || '')
-        setOriginalSpecialty(user.user_metadata?.specialty || '')
+        setDepartment(user.user_metadata?.department || '')
         setTimezone(user.user_metadata?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
         setEmailNotifications(user.user_metadata?.email_notifications !== false)
         setExamReminders(user.user_metadata?.exam_reminders !== false)
       }
 
-      // Load exam history
+      // Load assessment history
       const sessResult = await getMyAssessmentSessions()
       if (sessResult.ok && sessResult.data) {
         setCompletedSessions(sessResult.data.filter((s) => s.status === 'completed'))
@@ -77,13 +73,12 @@ export default function ProfilePage() {
 
     try {
       const supabase = createSupabaseBrowserClient()
-      
-      // Update user metadata via Supabase Auth
+
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
           full_name: displayName,
           name: displayName,
-          specialty,
+          department: department || null,
           timezone,
           email_notifications: emailNotifications,
           exam_reminders: examReminders,
@@ -96,18 +91,7 @@ export default function ProfilePage() {
         return
       }
 
-      // If specialty changed, re-enroll in starter pack
-      if (specialty !== originalSpecialty && specialty) {
-        const enrollResult = await enrollInStarterPack(specialty)
-        if (enrollResult.success && enrollResult.enrolledCount > 0) {
-          setSuccess(`Profile updated! Added ${enrollResult.enrolledCount} starter deck(s) for ${specialty}.`)
-        } else {
-          setSuccess('Profile updated successfully!')
-        }
-        setOriginalSpecialty(specialty)
-      } else {
-        setSuccess('Profile updated successfully!')
-      }
+      setSuccess('Profile updated successfully!')
     } catch {
       setError('Failed to update profile. Please try again.')
     } finally {
@@ -137,8 +121,6 @@ export default function ProfilePage() {
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
         Profile Settings
       </h1>
-
-      {/* Profile-level messages */}
 
       <Card variant="elevated" padding="lg" className="mb-6">
         {error && (
@@ -179,32 +161,25 @@ export default function ProfilePage() {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Dr. Smith"
+              placeholder="John Doe"
               className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Specialty */}
+          {/* Department (optional) */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              <Stethoscope className="h-4 w-4" />
-              Specialty
+              <Briefcase className="h-4 w-4" />
+              Department
             </label>
-            <select
-              value={specialty}
-              onChange={(e) => setSpecialty(e.target.value)}
+            <input
+              type="text"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              placeholder="e.g., Operations, Logistics, HR"
               className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select specialty...</option>
-              {SPECIALTIES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            {specialty !== originalSpecialty && specialty && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                Changing specialty will add new starter decks
-              </p>
-            )}
+            />
+            <p className="text-xs text-slate-500 mt-1">Optional — helps admins organize assessments</p>
           </div>
         </div>
 
@@ -262,7 +237,7 @@ export default function ProfilePage() {
           <label className="flex items-center justify-between cursor-pointer">
             <div className="flex items-center gap-2">
               {examReminders ? <Bell className="h-4 w-4 text-slate-400" /> : <BellOff className="h-4 w-4 text-slate-400" />}
-              <span className="text-sm text-slate-700 dark:text-slate-300">Exam reminders</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">Assessment reminders</span>
             </div>
             <button
               type="button"
@@ -282,12 +257,12 @@ export default function ProfilePage() {
       {/* Change Password */}
       <ChangePasswordCard />
 
-      {/* Exam History Summary */}
+      {/* Assessment History Summary */}
       {completedSessions.length > 0 && (
         <Card variant="elevated" padding="lg" className="mb-6">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-green-500" />
-            Exam History
+            Assessment History
           </h2>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="text-center">

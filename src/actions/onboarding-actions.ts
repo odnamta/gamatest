@@ -2,85 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
-import { isSupportedSpecialty } from '@/lib/onboarding-constants'
-
-/**
- * Result type for enrollment actions
- * Requirements: 4.1, 4.2
- */
-export interface EnrollResult {
-  success: boolean
-  enrolledCount: number
-  error?: string
-}
-
-/**
- * Enrolls a user in the starter pack for their selected specialty.
- * Creates user_decks subscription records for all public decks.
- * Uses upsert to prevent duplicate subscriptions.
- * 
- * Requirements: 4.1, 4.2, 4.4, 4.5
- * 
- * @param specialty - The user's selected specialty (e.g., 'General')
- * @returns EnrollResult with success status and count of enrolled decks
- */
-export async function enrollInStarterPack(specialty: string): Promise<EnrollResult> {
-  const user = await getUser()
-  if (!user) {
-    return { success: false, enrolledCount: 0, error: 'Authentication required' }
-  }
-
-  // For V1, only General is supported
-  if (!isSupportedSpecialty(specialty)) {
-    // Gracefully handle unsupported specialties - just return success with 0 enrollments
-    return { success: true, enrolledCount: 0 }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // Get all public deck templates for the starter pack
-  // For V1, we enroll users in ALL public decks
-  const { data: publicDecks, error: decksError } = await supabase
-    .from('deck_templates')
-    .select('id')
-    .eq('visibility', 'public')
-
-  if (decksError) {
-    return { success: false, enrolledCount: 0, error: decksError.message }
-  }
-
-  if (!publicDecks || publicDecks.length === 0) {
-    // No public decks available - still success, just nothing to enroll
-    return { success: true, enrolledCount: 0 }
-  }
-
-  // Upsert subscriptions for each deck (prevents duplicates)
-  // Requirements: 4.2 - is_active = true, 4.4 - upsert logic
-  const subscriptions = publicDecks.map(deck => ({
-    user_id: user.id,
-    deck_template_id: deck.id,
-    is_active: true,
-  }))
-
-  const { error: upsertError } = await supabase
-    .from('user_decks')
-    .upsert(subscriptions, {
-      onConflict: 'user_id,deck_template_id',
-    })
-
-  if (upsertError) {
-    return { success: false, enrolledCount: 0, error: upsertError.message }
-  }
-
-  // Revalidate paths so dashboard shows enrolled decks
-  // Requirements: 4.5
-  revalidatePath('/dashboard')
-  revalidatePath('/library')
-  revalidatePath('/library/my')
-
-  return { success: true, enrolledCount: publicDecks.length }
-}
-
 
 /**
  * Result type for profile update actions
@@ -91,18 +12,13 @@ export interface ProfileUpdateResult {
 }
 
 /**
- * Updates user profile metadata (specialty, name).
- * If specialty changes, triggers re-enrollment in starter pack.
- * 
- * V10.5.1: Profile Settings
- * 
- * @param specialty - The user's selected specialty
- * @param displayName - Optional display name
+ * Updates user profile metadata (display name).
+ *
+ * @param displayName - The user's display name
  * @returns ProfileUpdateResult with success status
  */
 export async function updateUserProfile(
-  specialty: string,
-  displayName?: string
+  displayName: string
 ): Promise<ProfileUpdateResult> {
   const user = await getUser()
   if (!user) {
@@ -110,12 +26,8 @@ export async function updateUserProfile(
   }
 
   const supabase = await createSupabaseServerClient()
-  
-  // Get current specialty to check if it changed
-  const currentSpecialty = user.user_metadata?.specialty
 
-  // Update user metadata
-  const updateData: Record<string, unknown> = { specialty }
+  const updateData: Record<string, unknown> = {}
   if (displayName !== undefined) {
     updateData.full_name = displayName
     updateData.name = displayName
@@ -135,11 +47,6 @@ export async function updateUserProfile(
       .from('profiles')
       .update({ full_name: displayName })
       .eq('id', user.id)
-  }
-
-  // If specialty changed, re-enroll in starter pack
-  if (specialty !== currentSpecialty) {
-    await enrollInStarterPack(specialty)
   }
 
   revalidatePath('/profile')
