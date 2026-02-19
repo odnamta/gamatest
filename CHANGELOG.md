@@ -2,6 +2,18 @@
 
 All notable changes to Cekatan will be documented in this file.
 
+## [v20] - RLS Policy Fixes
+
+### Fixed
+- **Organization deletion**: Added owner-only DELETE policy; removed premature member deletion that broke RLS check
+- **Notification delivery**: Switched 5 notification insert functions to service role client (cross-user inserts blocked by RLS)
+- **Invitation acceptance**: Switched `acceptInvitation()` to service role client for invitation lookup and status updates
+- **Assessment template updates**: Added UPDATE policy for creators and org admins/owners
+- **Matching groups data leak**: Replaced permissive policy (`chapter_id IS NULL` gave any user full access) with ownership-traced policy via book_chapters and card_templates
+
+### Added
+- DB migration: `scripts/migrate-v20-rls-fixes.sql` — 3 new/replaced RLS policies
+
 ## [v19.1] - Role-Based Competency Framework
 
 ### Added
