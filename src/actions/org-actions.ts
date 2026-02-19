@@ -461,13 +461,9 @@ export async function deleteOrganization(): Promise<ActionResultV2<void>> {
       return { ok: false, error: 'Only the owner can delete the organization' }
     }
 
-    // Delete all members first (cascading would handle this but be explicit)
-    await supabase
-      .from('organization_members')
-      .delete()
-      .eq('org_id', org.id)
-
-    // Delete the org
+    // Delete the org directly — ON DELETE CASCADE handles members.
+    // We must NOT delete members first: the DELETE RLS policy checks that
+    // the current user is an owner, which requires the membership row to exist.
     const { error } = await supabase
       .from('organizations')
       .delete()

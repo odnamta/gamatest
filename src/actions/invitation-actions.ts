@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { withUser, withOrgUser } from '@/actions/_helpers'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { inviteMemberSchema } from '@/lib/validations'
 import type { ActionResultV2 } from '@/types/actions'
 import type { Invitation, OrgRole } from '@/types/database'
@@ -116,8 +117,12 @@ export async function acceptInvitation(
   token: string
 ): Promise<ActionResultV2<void>> {
   return withUser(async ({ user, supabase }) => {
+    // Use service client for invitation operations — the token itself is the
+    // auth proof; the invited user has no RLS-based access to the invitations table.
+    const serviceClient = await createSupabaseServiceClient()
+
     // Find the invitation
-    const { data: invitation, error: fetchError } = await supabase
+    const { data: invitation, error: fetchError } = await serviceClient
       .from('invitations')
       .select('*')
       .eq('token', token)
@@ -144,14 +149,14 @@ export async function acceptInvitation(
 
     if (existing) {
       // Mark invitation as accepted even if already member
-      await supabase
+      await serviceClient
         .from('invitations')
         .update({ accepted_at: new Date().toISOString() })
         .eq('id', invitation.id)
       return { ok: false, error: 'You are already a member of this organization' }
     }
 
-    // Create membership
+    // Create membership (regular client — user is joining, RLS allows this)
     const { error: memberError } = await supabase
       .from('organization_members')
       .insert({
@@ -165,7 +170,7 @@ export async function acceptInvitation(
     }
 
     // Mark invitation as accepted
-    await supabase
+    await serviceClient
       .from('invitations')
       .update({ accepted_at: new Date().toISOString() })
       .eq('id', invitation.id)

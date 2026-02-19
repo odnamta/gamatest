@@ -5,6 +5,7 @@
  */
 
 import { withUser, withOrgUser } from '@/actions/_helpers'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 
@@ -160,7 +161,7 @@ export async function notifyOrgCandidates(
       return { ok: true }
     }
 
-    // Batch insert notifications
+    // Batch insert notifications via service role (system-level cross-user operation)
     const rows = members.map((m) => ({
       user_id: m.user_id,
       org_id: org.id,
@@ -170,7 +171,8 @@ export async function notifyOrgCandidates(
       link,
     }))
 
-    const { error } = await supabase.from('notifications').insert(rows)
+    const serviceClient = await createSupabaseServiceClient()
+    const { error } = await serviceClient.from('notifications').insert(rows)
     if (error) {
       return { ok: false, error: error.message }
     }
@@ -244,7 +246,8 @@ export async function sendAssessmentReminder(
       link: `/assessments`,
     }))
 
-    const { error: insertError } = await supabase.from('notifications').insert(rows)
+    const serviceClient = await createSupabaseServiceClient()
+    const { error: insertError } = await serviceClient.from('notifications').insert(rows)
     if (insertError) {
       return { ok: false, error: insertError.message }
     }
@@ -319,7 +322,8 @@ export async function sendDeadlineReminders(): Promise<ActionResultV2<{ notified
         link: `/assessments/${assessment.id}/take`,
       }))
 
-      const { error } = await supabase.from('notifications').insert(rows)
+      const serviceClient = await createSupabaseServiceClient()
+      const { error } = await serviceClient.from('notifications').insert(rows)
       if (!error) totalNotified += pending.length
     }
 
@@ -390,7 +394,8 @@ export async function assignAssessmentToAll(
       link: `/assessments/${assessment.id}/take`,
     }))
 
-    const { error } = await supabase.from('notifications').insert(rows)
+    const serviceClient = await createSupabaseServiceClient()
+    const { error } = await serviceClient.from('notifications').insert(rows)
     if (error) {
       return { ok: false, error: error.message }
     }
@@ -455,7 +460,8 @@ export async function bulkAssignAssessment(
       link: `/assessments/${assessment.id}/take`,
     }))
 
-    const { error } = await supabase.from('notifications').insert(rows)
+    const serviceClient = await createSupabaseServiceClient()
+    const { error } = await serviceClient.from('notifications').insert(rows)
     if (error) {
       return { ok: false, error: error.message }
     }
