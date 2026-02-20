@@ -2,6 +2,34 @@
 
 All notable changes to Cekatan will be documented in this file.
 
+## [v20.2] - Deep Code Review Hardening
+
+### Fixed
+- **Timing attack on access codes**: `startAssessmentSession()` now uses `crypto.timingSafeEqual` for constant-time access code comparison
+- **Missing input validation**: `updateAssessment()` now validates all fields via `updateAssessmentSchema` (Zod)
+- **`getOrgMembers()` authorization**: Added `hasMinimumRole(role, 'admin')` guard — was previously accessible to all org members
+- **`.or()` string interpolation**: Replaced unsafe `.or(\`org_id.eq.${id}\`)` with two parallel typed queries in `tag-actions.ts` and `book-source-actions.ts`
+- **Unhandled promise rejection**: Added `.catch()` to tag loading in `CardEditorPanel`
+- **Answer submission silent failure**: `handleSelectAnswer()` now retries once on error instead of fire-and-forget
+- **N+1 tag merge**: `mergeTags()` now batch-fetches target associations instead of per-row SELECT loop
+- **Unfiltered card_template_tags**: `getDashboardInsights()` now scopes query to user's cards only (was fetching entire table)
+- **Unbounded queries**: Added `.limit()` caps to `getOrgAssessments(500)`, `getMyAssessmentSessions(200)`, `getAssessmentSessions(1000)`, `getOrgMemberActivity(5000)`
+- **Tab switch spam**: Debounced `reportTabSwitch()` to once per 2 seconds (was every visibility change)
+
+### Changed
+- **`book-source-actions.ts` refactored**: Migrated all 5 functions from manual auth to `withOrgUser`, from `ActionResult` to `ActionResultV2`, added `org_id` to update/delete queries
+- **`updateAssessmentSchema` extended**: Added `cooldownMinutes`, `allowReview`, `startDate`, `endDate`, `accessCode` fields
+- **AI auto-tag concurrency**: Limited from unbounded `Promise.all` to batches of 5 concurrent API calls
+- **Leaner queries**: Replaced `select('*')` with specific columns in `global-study-actions` and `custom-study-actions`
+- **Batch operation UX**: Publish/Archive/Delete buttons on assessments page now show loading spinner
+
+### Accessibility
+- **Sortable table headers**: Wrapped in `<button>` elements with `aria-sort` attribute in `SessionReviewTable`
+- **OnboardingModal**: Added `role="dialog"`, `aria-modal="true"`, `aria-label`
+- **Icon-only buttons**: Added `aria-label` to all 9 icon-only buttons on assessments page
+- **Session review messages**: Added `role="status"` and `aria-live="polite"` for screen reader announcements
+- **Flashcard alt text**: Replaced generic "Card image" with contextual alt derived from card content
+
 ## [v20.1] - Code Review Hardening
 
 ### Fixed
