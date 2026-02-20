@@ -18,6 +18,13 @@ All notable changes to Cekatan will be documented in this file.
 - **CSP hardening**: Removed `'unsafe-eval'` from `script-src` Content Security Policy
 - **Sanitizer docs**: Clarified `sanitizeMarkdown()` is supplementary defense-in-depth; react-markdown is the primary XSS safety layer
 
+### Added
+- DB migration: `scripts/migrate-v21-rls-tightening.sql` — 4 RLS policy replacements:
+  - `org_members_update`: Added `WITH CHECK` to prevent `org_id` column tampering
+  - `org_members_delete`: Only owners can delete other owners (was admin+)
+  - `deck_skill_mappings_insert`: Cross-org coherence check (deck + skill must share same org)
+  - `deck_skill_mappings_delete`: Same cross-org coherence check
+
 ## [v20] - RLS Policy Fixes
 
 ### Fixed
