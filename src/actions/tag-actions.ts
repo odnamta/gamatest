@@ -96,14 +96,28 @@ export async function createTag(
 export async function getUserTags(): Promise<Tag[]> {
   const result = await withOrgUser(async ({ user, supabase, org }: OrgAuthContext) => {
     // V13: Filter tags by org_id. Also include legacy tags (org_id IS NULL) for migration.
-    const { data: tags } = await supabase
-      .from('tags')
-      .select('*')
-      .eq('user_id', user.id)
-      .or(`org_id.eq.${org.id},org_id.is.null`)
-      .order('name')
+    const [orgResult, legacyResult] = await Promise.all([
+      supabase
+        .from('tags')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('org_id', org.id)
+        .order('name'),
+      supabase
+        .from('tags')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('org_id', null)
+        .order('name'),
+    ])
 
-    return { ok: true as const, data: tags || [] }
+    const orgTags = orgResult.data ?? []
+    const legacyTags = legacyResult.data ?? []
+    // Deduplicate by id in case of overlap
+    const seen = new Set(orgTags.map(t => t.id))
+    const merged = [...orgTags, ...legacyTags.filter(t => !seen.has(t.id))]
+
+    return { ok: true as const, data: merged }
   })
 
   // Return empty array if auth or org resolution failed
@@ -561,9 +575,13 @@ export async function autoTagCards(
   const firstDeck = cardTemplates[0].deck_templates as unknown as { subject?: string }
   const effectiveSubject = subject || firstDeck.subject || 'General'
 
-  // V9.3: Process all cards in parallel using Promise.all
-  const results = await Promise.all(
-    cardTemplates.map(async (ct) => {
+  // V9.3: Process cards with bounded concurrency (5 at a time)
+  const CONCURRENCY_LIMIT = 5
+  const results: { cardId: string; success: boolean }[] = []
+  for (let i = 0; i < cardTemplates.length; i += CONCURRENCY_LIMIT) {
+    const batch = cardTemplates.slice(i, i + CONCURRENCY_LIMIT)
+    const batchResults = await Promise.all(
+      batch.map(async (ct) => {
       try {
         const cardForPrompt = { id: ct.id, stem: ct.stem }
 
@@ -689,8 +707,9 @@ Respond with JSON only, no markdown:
         console.error('Auto-tag error for card:', ct.id, error)
         return { cardId: ct.id, success: false }
       }
-    })
-  )
+    }))
+    results.push(...batchResults)
+  }
 
   // Aggregate results
   const totalTagged = results.filter((r) => r.success).length

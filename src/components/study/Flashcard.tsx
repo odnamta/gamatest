@@ -64,7 +64,7 @@ export function Flashcard({
             <div className="mb-4 relative w-full h-48">
               <Image
                 src={imageUrl}
-                alt="Card image"
+                alt={`Image for: ${front.slice(0, 80)}`}
                 fill
                 sizes="(max-width: 768px) 100vw, 672px"
                 className="rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity"

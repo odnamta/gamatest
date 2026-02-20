@@ -140,7 +140,7 @@ export async function getGlobalDueCards(
     // V8.2: Fetch due cards from progress
     const offset = batchNumber * BATCH_SIZE
     const { data: progressRecords, error: progressError } = await supabase
-      .from('user_card_progress').select(`*, card_templates!inner(*)`)
+      .from('user_card_progress').select(`id, user_id, card_template_id, interval, ease_factor, next_review, correct_count, total_attempts, card_templates!inner(id, deck_template_id, stem, options, correct_index, explanation)`)
       .eq('user_id', user.id).in('card_template_id', activeCardIds).lte('next_review', now).eq('suspended', false)
       .order('next_review', { ascending: true }).range(offset, offset + BATCH_SIZE - 1)
 

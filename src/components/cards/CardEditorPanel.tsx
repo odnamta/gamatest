@@ -65,7 +65,7 @@ export function CardEditorPanel({
       // Load tags
       getCardTags(card.id).then(tags => {
         setSelectedTagIds(tags.map(t => t.id))
-      })
+      }).catch(() => { /* tag load failure is non-critical */ })
     }
   }, [card])
 

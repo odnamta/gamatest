@@ -171,6 +171,11 @@ export const updateAssessmentSchema = z.object({
   shuffleOptions: z.boolean().optional(),
   showResults: z.boolean().optional(),
   maxAttempts: z.number().int().min(1).nullable().optional(),
+  cooldownMinutes: z.number().int().min(0).nullable().optional(),
+  allowReview: z.boolean().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  accessCode: z.string().max(50).nullable().optional(),
 });
 
 export const submitAnswerSchema = z.object({

@@ -276,17 +276,22 @@ export default function TakeAssessmentPage() {
     }
   }, [timeRemaining !== null, completing, handleCompleteRef])
 
-  // Tab-switch detection (only when proctoring is enabled)
+  // Tab-switch detection (only when proctoring is enabled, debounced to 1 report/2s)
   useEffect(() => {
     if (!proctoringEnabled || !session || completing) return
 
     const sessionId = session.id
+    let lastReportTime = 0
     function handleVisibilityChange() {
       if (document.hidden) {
         setTabSwitchCount((prev) => prev + 1)
         setShowTabWarning(true)
-        // Fire-and-forget: report to server
-        reportTabSwitch(sessionId)
+        // Debounce: report at most once every 2 seconds
+        const now = Date.now()
+        if (now - lastReportTime > 2000) {
+          lastReportTime = now
+          reportTabSwitch(sessionId)
+        }
       }
     }
 
@@ -416,7 +421,25 @@ export default function TakeAssessmentPage() {
     // Map display index → original index for server submission
     const originalIndex = q.optionMap[displayIndex] ?? displayIndex
     const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000)
-    await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+
+    // Submit with retry on failure
+    try {
+      const result = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+      if (!result.ok) {
+        // Retry once
+        const retry = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+        if (!retry.ok) {
+          console.error('[submitAnswer] Failed after retry:', retry.error)
+        }
+      }
+    } catch (err) {
+      // Network error — retry once
+      try {
+        await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
+      } catch {
+        console.error('[submitAnswer] Network error after retry:', err)
+      }
+    }
   }
 
   async function handleComplete() {

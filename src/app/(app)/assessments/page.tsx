@@ -370,15 +370,15 @@ export default function AssessmentsPage() {
             {selectedIds.size} selected
           </span>
           <div className="flex items-center gap-2 ml-auto">
-            <Button size="sm" variant="secondary" onClick={handleBatchPublish} disabled={isPending}>
+            <Button size="sm" variant="secondary" onClick={handleBatchPublish} disabled={isPending} loading={isPending}>
               <Send className="h-3.5 w-3.5 mr-1" />
               Publish
             </Button>
-            <Button size="sm" variant="secondary" onClick={handleBatchArchive} disabled={isPending}>
+            <Button size="sm" variant="secondary" onClick={handleBatchArchive} disabled={isPending} loading={isPending}>
               <Archive className="h-3.5 w-3.5 mr-1" />
               Archive
             </Button>
-            <Button size="sm" variant="secondary" onClick={handleBatchDelete} disabled={isPending}>
+            <Button size="sm" variant="secondary" onClick={handleBatchDelete} disabled={isPending} loading={isPending}>
               <Trash2 className="h-3.5 w-3.5 mr-1" />
               Delete
             </Button>
@@ -564,6 +564,7 @@ export default function AssessmentsPage() {
                         onClick={() => handleAssign(assessment.id)}
                         disabled={isPending}
                         title="Assign to candidates who haven't started"
+                        aria-label="Assign to candidates"
                       >
                         <UserPlus className="h-4 w-4" />
                       </Button>
@@ -582,6 +583,7 @@ export default function AssessmentsPage() {
                           onClick={() => handleReminder(assessment.id)}
                           disabled={isPending}
                           title="Send reminder to candidates who haven't completed"
+                          aria-label="Send reminder"
                         >
                           <Bell className="h-4 w-4" />
                         </Button>
@@ -595,6 +597,7 @@ export default function AssessmentsPage() {
                         variant="ghost"
                         onClick={() => handleCopyLink(assessment)}
                         title="Copy assessment link"
+                        aria-label="Copy assessment link"
                       >
                         <Link2 className="h-4 w-4" />
                       </Button>
@@ -608,6 +611,7 @@ export default function AssessmentsPage() {
                         onClick={() => handleArchive(assessment.id)}
                         disabled={isPending}
                         title="Archive assessment"
+                        aria-label="Archive assessment"
                       >
                         <Archive className="h-4 w-4" />
                       </Button>
@@ -621,6 +625,7 @@ export default function AssessmentsPage() {
                         onClick={() => handleUnpublish(assessment.id)}
                         disabled={isPending}
                         title="Revert to draft (edit settings)"
+                        aria-label="Revert to draft"
                       >
                         <RotateCcw className="h-4 w-4" />
                       </Button>
@@ -632,6 +637,7 @@ export default function AssessmentsPage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => router.push(`/assessments/${assessment.id}/edit`)}
+                        aria-label="Edit assessment"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -645,6 +651,7 @@ export default function AssessmentsPage() {
                         onClick={() => handleDuplicate(assessment.id)}
                         disabled={isPending}
                         title="Duplicate assessment"
+                        aria-label="Duplicate assessment"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -657,6 +664,7 @@ export default function AssessmentsPage() {
                         variant="ghost"
                         onClick={() => router.push(`/assessments/${assessment.id}/analytics`)}
                         title="Analytics"
+                        aria-label="View analytics"
                       >
                         <BarChart3 className="h-4 w-4" />
                       </Button>
@@ -669,6 +677,7 @@ export default function AssessmentsPage() {
                         variant="ghost"
                         onClick={() => router.push(`/assessments/${assessment.id}/results`)}
                         title="All results"
+                        aria-label="View all results"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

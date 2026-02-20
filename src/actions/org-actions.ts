@@ -8,6 +8,7 @@
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { withUser, withOrgUser } from '@/actions/_helpers'
+import { hasMinimumRole } from '@/lib/org-authorization'
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { ACTIVE_ORG_COOKIE } from '@/lib/org-context'
 import type { ActionResultV2 } from '@/types/actions'
@@ -105,7 +106,11 @@ export async function getMyOrganizations(): Promise<ActionResultV2<Array<Organiz
  * Requires at least 'admin' role to see member details.
  */
 export async function getOrgMembers(): Promise<ActionResultV2<OrganizationMemberWithProfile[]>> {
-  return withOrgUser(async ({ supabase, org }) => {
+  return withOrgUser(async ({ supabase, org, role }) => {
+    if (!hasMinimumRole(role, 'admin')) {
+      return { ok: false, error: 'Only admins can view member details' }
+    }
+
     const { data, error } = await supabase
       .from('organization_members')
       .select('*')
@@ -197,12 +202,13 @@ export async function getOrgMemberActivity(): Promise<ActionResultV2<Record<stri
       return { ok: false, error: 'Insufficient permissions' }
     }
 
-    // Fetch completed assessment sessions for org members
+    // Fetch completed assessment sessions for org members (capped at 5000)
     const { data: sessions } = await supabase
       .from('assessment_sessions')
       .select('user_id, status, completed_at')
       .eq('org_id', org.id)
       .eq('status', 'completed')
+      .limit(5000)
 
     const activity: Record<string, { completedSessions: number; lastActive: string | null }> = {}
     for (const s of sessions || []) {

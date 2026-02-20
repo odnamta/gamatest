@@ -5,12 +5,13 @@
  * CRUD for assessments, session management, scoring.
  */
 
+import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 import { withOrgUser } from '@/actions/_helpers'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { RATE_LIMITS } from '@/lib/rate-limit'
-import { createAssessmentSchema, submitAnswerSchema } from '@/lib/validations'
+import { createAssessmentSchema, updateAssessmentSchema, submitAnswerSchema } from '@/lib/validations'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
@@ -138,6 +139,7 @@ export async function getOrgAssessments(): Promise<ActionResultV2<AssessmentWith
       `)
       .eq('org_id', org.id)
       .order('created_at', { ascending: false })
+      .limit(500)
 
     // Candidates only see published assessments
     if (!hasMinimumRole(role, 'creator')) {
@@ -490,6 +492,12 @@ export async function updateAssessment(
     accessCode?: string | null
   }
 ): Promise<ActionResultV2<Assessment>> {
+  // Validate inputs
+  const validation = updateAssessmentSchema.safeParse({ assessmentId, ...input })
+  if (!validation.success) {
+    return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+  }
+
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!hasMinimumRole(role, 'creator')) {
       return { ok: false, error: 'Insufficient permissions' }
@@ -556,9 +564,14 @@ export async function startAssessmentSession(
       return { ok: false, error: 'Assessment not found or not published' }
     }
 
-    // Validate access code if set
+    // Validate access code if set (constant-time comparison to prevent timing attacks)
     if (assessment.access_code) {
-      if (!accessCode || accessCode !== assessment.access_code) {
+      if (!accessCode) {
+        return { ok: false, error: 'Invalid access code' }
+      }
+      const expected = Buffer.from(assessment.access_code, 'utf8')
+      const provided = Buffer.from(accessCode, 'utf8')
+      if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
         return { ok: false, error: 'Invalid access code' }
       }
     }
@@ -979,6 +992,7 @@ export async function getMyAssessmentSessions(): Promise<ActionResultV2<SessionW
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+      .limit(200)
 
     if (error) {
       return { ok: false, error: error.message }
@@ -1186,6 +1200,7 @@ export async function getAssessmentResultsDetailed(
       `)
       .eq('assessment_id', assessmentId)
       .order('completed_at', { ascending: false, nullsFirst: false })
+      .limit(1000)
 
     if (error) {
       return { ok: false, error: error.message }

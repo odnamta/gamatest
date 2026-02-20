@@ -37,7 +37,7 @@ export function BookSourceSelector({
     async function loadBookSources() {
       setIsLoading(true)
       const result = await getBookSources()
-      if (result.success && result.data) {
+      if (result.ok && result.data) {
         setBookSources(result.data)
       }
       setIsLoading(false)
@@ -67,14 +67,14 @@ export function BookSourceSelector({
       specialty: newSpecialty.trim() || null,
     })
 
-    if (result.success && result.data) {
+    if (result.ok && result.data) {
       setBookSources(prev => [result.data!, ...prev])
       onChange(result.data.id)
       setShowCreateDialog(false)
       setNewTitle('')
       setNewEdition('')
       setNewSpecialty('')
-    } else {
+    } else if (!result.ok) {
       setError(result.error || 'Failed to create book source')
     }
 

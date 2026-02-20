@@ -174,72 +174,65 @@ export async function mergeTags(
     return { ok: false, error: 'One or both tags not found' }
   }
 
-  // Get all card_template_tags associations for source tag
-  const { data: sourceAssociations } = await supabase
-    .from('card_template_tags')
-    .select('card_template_id')
-    .eq('tag_id', sourceTagId)
+  // Get all card_template_tags associations for source and target tags in parallel
+  const [{ data: sourceAssociations }, { data: targetAssociations }] = await Promise.all([
+    supabase.from('card_template_tags').select('card_template_id').eq('tag_id', sourceTagId),
+    supabase.from('card_template_tags').select('card_template_id').eq('tag_id', targetTagId),
+  ])
 
   let mergedCount = 0
+  const targetCardIds = new Set((targetAssociations ?? []).map((a) => a.card_template_id))
 
   if (sourceAssociations && sourceAssociations.length > 0) {
-    // For each association, check if target already has it
-    for (const assoc of sourceAssociations) {
-      const { data: existing } = await supabase
-        .from('card_template_tags')
-        .select('card_template_id')
-        .eq('card_template_id', assoc.card_template_id)
-        .eq('tag_id', targetTagId)
-        .single()
+    const toTransfer = sourceAssociations.filter((a) => !targetCardIds.has(a.card_template_id))
+    const toDedupe = sourceAssociations.filter((a) => targetCardIds.has(a.card_template_id))
 
-      if (!existing) {
-        // Transfer association to target tag
-        await supabase
-          .from('card_template_tags')
-          .update({ tag_id: targetTagId })
-          .eq('card_template_id', assoc.card_template_id)
-          .eq('tag_id', sourceTagId)
-        mergedCount++
-      } else {
-        // Delete duplicate association
-        await supabase
-          .from('card_template_tags')
-          .delete()
-          .eq('card_template_id', assoc.card_template_id)
-          .eq('tag_id', sourceTagId)
-      }
+    // Batch transfer: update non-duplicate associations to target tag
+    for (const assoc of toTransfer) {
+      await supabase
+        .from('card_template_tags')
+        .update({ tag_id: targetTagId })
+        .eq('card_template_id', assoc.card_template_id)
+        .eq('tag_id', sourceTagId)
+      mergedCount++
+    }
+
+    // Batch delete: remove duplicate associations
+    for (const assoc of toDedupe) {
+      await supabase
+        .from('card_template_tags')
+        .delete()
+        .eq('card_template_id', assoc.card_template_id)
+        .eq('tag_id', sourceTagId)
     }
   }
 
-  // Also handle legacy card_tags table
-  const { data: legacyAssociations } = await supabase
-    .from('card_tags')
-    .select('card_id')
-    .eq('tag_id', sourceTagId)
+  // Also handle legacy card_tags table (batched)
+  const [{ data: legacyAssociations }, { data: legacyTargetAssocs }] = await Promise.all([
+    supabase.from('card_tags').select('card_id').eq('tag_id', sourceTagId),
+    supabase.from('card_tags').select('card_id').eq('tag_id', targetTagId),
+  ])
+  const legacyTargetIds = new Set((legacyTargetAssocs ?? []).map((a) => a.card_id))
 
   if (legacyAssociations && legacyAssociations.length > 0) {
-    for (const assoc of legacyAssociations) {
-      const { data: existing } = await supabase
-        .from('card_tags')
-        .select('card_id')
-        .eq('card_id', assoc.card_id)
-        .eq('tag_id', targetTagId)
-        .single()
+    const toTransfer = legacyAssociations.filter((a) => !legacyTargetIds.has(a.card_id))
+    const toDedupe = legacyAssociations.filter((a) => legacyTargetIds.has(a.card_id))
 
-      if (!existing) {
-        await supabase
-          .from('card_tags')
-          .update({ tag_id: targetTagId })
-          .eq('card_id', assoc.card_id)
-          .eq('tag_id', sourceTagId)
-        mergedCount++
-      } else {
-        await supabase
-          .from('card_tags')
-          .delete()
-          .eq('card_id', assoc.card_id)
-          .eq('tag_id', sourceTagId)
-      }
+    for (const assoc of toTransfer) {
+      await supabase
+        .from('card_tags')
+        .update({ tag_id: targetTagId })
+        .eq('card_id', assoc.card_id)
+        .eq('tag_id', sourceTagId)
+      mergedCount++
+    }
+
+    for (const assoc of toDedupe) {
+      await supabase
+        .from('card_tags')
+        .delete()
+        .eq('card_id', assoc.card_id)
+        .eq('tag_id', sourceTagId)
     }
   }
 

@@ -7,25 +7,15 @@
  * V13: Org-scoped via withOrgUser helper.
  */
 
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { withOrgUser, type OrgAuthContext } from './_helpers'
+import { withOrgUser } from './_helpers'
 import {
   createBookSourceSchema,
   updateBookSourceSchema,
   type CreateBookSourceInput,
   type UpdateBookSourceInput,
 } from '@/lib/structured-content-schema'
+import type { ActionResultV2 } from '@/types/actions'
 import type { BookSource } from '@/types/database'
-
-// ============================================
-// Result Types (legacy — will migrate to ActionResultV2)
-// ============================================
-
-interface ActionResult<T = void> {
-  success: boolean
-  data?: T
-  error?: string
-}
 
 // ============================================
 // Create Book Source
@@ -33,127 +23,87 @@ interface ActionResult<T = void> {
 
 export async function createBookSource(
   input: CreateBookSourceInput
-): Promise<ActionResult<BookSource>> {
+): Promise<ActionResultV2<BookSource>> {
   // Validate input before auth to fail fast
   const validation = createBookSourceSchema.safeParse(input)
   if (!validation.success) {
-    return { success: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+    return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
   }
 
-  const supabase = await createSupabaseServerClient()
+  return withOrgUser(async ({ user, supabase, org }) => {
+    const { title, edition, specialty } = validation.data
 
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { success: false, error: 'Not authenticated' }
-  }
+    const { data, error } = await supabase
+      .from('book_sources')
+      .insert({
+        author_id: user.id,
+        org_id: org.id,
+        title,
+        edition: edition ?? null,
+        specialty: specialty ?? null,
+      })
+      .select()
+      .single()
 
-  // V13: Resolve user's active org for content scoping
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .single()
+    if (error) {
+      return { ok: false, error: 'Failed to create book source' }
+    }
 
-  if (!membership?.org_id) {
-    return { success: false, error: 'No active organization found' }
-  }
-
-  const { title, edition, specialty } = validation.data
-
-  // V13: Insert book source with org_id
-  const { data, error } = await supabase
-    .from('book_sources')
-    .insert({
-      author_id: user.id,
-      org_id: membership.org_id,
-      title,
-      edition: edition ?? null,
-      specialty: specialty ?? null,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('[createBookSource] Error:', error)
-    return { success: false, error: 'Failed to create book source' }
-  }
-
-  return { success: true, data: data as BookSource }
+    return { ok: true, data: data as BookSource }
+  })
 }
 
 // ============================================
 // Get Book Sources
 // ============================================
 
-export async function getBookSources(): Promise<ActionResult<BookSource[]>> {
-  const supabase = await createSupabaseServerClient()
+export async function getBookSources(): Promise<ActionResultV2<BookSource[]>> {
+  return withOrgUser(async ({ user, supabase, org }) => {
+    // Parallel queries instead of .or() string interpolation
+    const [orgResult, legacyResult] = await Promise.all([
+      supabase
+        .from('book_sources')
+        .select('*')
+        .eq('author_id', user.id)
+        .eq('org_id', org.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('book_sources')
+        .select('*')
+        .eq('author_id', user.id)
+        .is('org_id', null)
+        .order('created_at', { ascending: false }),
+    ])
 
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { success: false, error: 'Not authenticated' }
-  }
+    const orgBooks = orgResult.data ?? []
+    const legacyBooks = legacyResult.data ?? []
+    const seen = new Set(orgBooks.map((b) => b.id))
+    const merged = [...orgBooks, ...legacyBooks.filter((b) => !seen.has(b.id))]
 
-  // V13: Resolve user's active org for filtering
-  const { data: membership } = await supabase
-    .from('organization_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .single()
-
-  // V13: Fetch book sources scoped to org (include legacy null org_id)
-  let query = supabase
-    .from('book_sources')
-    .select('*')
-    .eq('author_id', user.id)
-    .order('created_at', { ascending: false })
-
-  if (membership?.org_id) {
-    query = query.or(`org_id.eq.${membership.org_id},org_id.is.null`)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('[getBookSources] Error:', error)
-    return { success: false, error: 'Failed to fetch book sources' }
-  }
-
-  return { success: true, data: data as BookSource[] }
+    return { ok: true, data: merged as BookSource[] }
+  })
 }
 
 // ============================================
 // Get Single Book Source
 // ============================================
 
-export async function getBookSource(id: string): Promise<ActionResult<BookSource>> {
-  const supabase = await createSupabaseServerClient()
+export async function getBookSource(id: string): Promise<ActionResultV2<BookSource>> {
+  return withOrgUser(async ({ user, supabase, org }) => {
+    const { data, error } = await supabase
+      .from('book_sources')
+      .select('*')
+      .eq('id', id)
+      .eq('author_id', user.id)
+      .eq('org_id', org.id)
+      .single()
 
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { success: false, error: 'Not authenticated' }
-  }
+    if (error) {
+      return { ok: false, error: 'Book source not found' }
+    }
 
-  // Fetch book source
-  const { data, error } = await supabase
-    .from('book_sources')
-    .select('*')
-    .eq('id', id)
-    .eq('author_id', user.id)
-    .single()
-
-  if (error) {
-    console.error('[getBookSource] Error:', error)
-    return { success: false, error: 'Book source not found' }
-  }
-
-  return { success: true, data: data as BookSource }
+    return { ok: true, data: data as BookSource }
+  })
 }
 
 // ============================================
@@ -162,74 +112,60 @@ export async function getBookSource(id: string): Promise<ActionResult<BookSource
 
 export async function updateBookSource(
   input: UpdateBookSourceInput
-): Promise<ActionResult<BookSource>> {
-  const supabase = await createSupabaseServerClient()
+): Promise<ActionResultV2<BookSource>> {
+  return withOrgUser(async ({ user, supabase, org }) => {
+    // Validate input
+    const validation = updateBookSourceSchema.safeParse(input)
+    if (!validation.success) {
+      return { ok: false, error: validation.error.issues[0]?.message || 'Invalid input' }
+    }
 
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { success: false, error: 'Not authenticated' }
-  }
+    const { id, ...updates } = validation.data
 
-  // Validate input
-  const validation = updateBookSourceSchema.safeParse(input)
-  if (!validation.success) {
-    return { success: false, error: validation.error.issues[0]?.message || 'Invalid input' }
-  }
+    // Build update object (only include defined fields)
+    const updateData: Record<string, unknown> = {}
+    if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.edition !== undefined) updateData.edition = updates.edition
+    if (updates.specialty !== undefined) updateData.specialty = updates.specialty
 
-  const { id, ...updates } = validation.data
+    if (Object.keys(updateData).length === 0) {
+      return { ok: false, error: 'No fields to update' }
+    }
 
-  // Build update object (only include defined fields)
-  const updateData: Record<string, unknown> = {}
-  if (updates.title !== undefined) updateData.title = updates.title
-  if (updates.edition !== undefined) updateData.edition = updates.edition
-  if (updates.specialty !== undefined) updateData.specialty = updates.specialty
+    const { data, error } = await supabase
+      .from('book_sources')
+      .update(updateData)
+      .eq('id', id)
+      .eq('author_id', user.id)
+      .eq('org_id', org.id)
+      .select()
+      .single()
 
-  if (Object.keys(updateData).length === 0) {
-    return { success: false, error: 'No fields to update' }
-  }
+    if (error) {
+      return { ok: false, error: 'Failed to update book source' }
+    }
 
-  // Update book source
-  const { data, error } = await supabase
-    .from('book_sources')
-    .update(updateData)
-    .eq('id', id)
-    .eq('author_id', user.id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('[updateBookSource] Error:', error)
-    return { success: false, error: 'Failed to update book source' }
-  }
-
-  return { success: true, data: data as BookSource }
+    return { ok: true, data: data as BookSource }
+  })
 }
 
 // ============================================
 // Delete Book Source
 // ============================================
 
-export async function deleteBookSource(id: string): Promise<ActionResult> {
-  const supabase = await createSupabaseServerClient()
+export async function deleteBookSource(id: string): Promise<ActionResultV2<void>> {
+  return withOrgUser(async ({ user, supabase, org }) => {
+    const { error } = await supabase
+      .from('book_sources')
+      .delete()
+      .eq('id', id)
+      .eq('author_id', user.id)
+      .eq('org_id', org.id)
 
-  // Get current user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return { success: false, error: 'Not authenticated' }
-  }
+    if (error) {
+      return { ok: false, error: 'Failed to delete book source' }
+    }
 
-  // Delete book source (cascades to chapters)
-  const { error } = await supabase
-    .from('book_sources')
-    .delete()
-    .eq('id', id)
-    .eq('author_id', user.id)
-
-  if (error) {
-    console.error('[deleteBookSource] Error:', error)
-    return { success: false, error: 'Failed to delete book source' }
-  }
-
-  return { success: true }
+    return { ok: true }
+  })
 }

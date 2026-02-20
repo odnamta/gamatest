@@ -422,10 +422,14 @@ export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
       .select('card_template_id, correct_count, total_attempts')
       .eq('user_id', user.id)
 
-    // Fetch card-tag associations
-    const { data: cardTags } = await supabase
-      .from('card_template_tags')
-      .select('card_template_id, tag_id')
+    // Fetch card-tag associations scoped to user's cards only
+    const userCardIds = (progressData ?? []).map((p) => p.card_template_id)
+    const { data: cardTags } = userCardIds.length > 0
+      ? await supabase
+          .from('card_template_tags')
+          .select('card_template_id, tag_id')
+          .in('card_template_id', userCardIds)
+      : { data: [] as { card_template_id: string; tag_id: string }[] }
 
     // Fetch user's tags (concept category only for weakest concepts)
     const { data: tags } = await supabase

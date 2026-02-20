@@ -141,8 +141,8 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
     <div>
       {/* Message banner */}
       {message && (
-        <div className={`mb-4 p-3 rounded-lg ${
-          message.type === 'success' 
+        <div role="status" aria-live="polite" className={`mb-4 p-3 rounded-lg ${
+          message.type === 'success'
             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
             : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
         }`}>
@@ -185,29 +185,25 @@ export function SessionReviewTable({ cards, sessionId, sessionMeta }: SessionRev
                   className="rounded"
                 />
               </th>
-              <th 
-                className="p-3 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => handleSort('questionNumber')}
-              >
-                Q# {sortField === 'questionNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+              <th className="p-3 text-left" aria-sort={sortField === 'questionNumber' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" className="w-full text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 -m-3 p-3" onClick={() => handleSort('questionNumber')}>
+                  Q# {sortField === 'questionNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
               </th>
-              <th 
-                className="p-3 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => handleSort('stem')}
-              >
-                Stem {sortField === 'stem' && (sortDirection === 'asc' ? '↑' : '↓')}
+              <th className="p-3 text-left" aria-sort={sortField === 'stem' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" className="w-full text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 -m-3 p-3" onClick={() => handleSort('stem')}>
+                  Stem {sortField === 'stem' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
               </th>
-              <th 
-                className="p-3 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => handleSort('tags')}
-              >
-                Tags {sortField === 'tags' && (sortDirection === 'asc' ? '↑' : '↓')}
+              <th className="p-3 text-left" aria-sort={sortField === 'tags' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" className="w-full text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 -m-3 p-3" onClick={() => handleSort('tags')}>
+                  Tags {sortField === 'tags' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
               </th>
-              <th 
-                className="p-3 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => handleSort('status')}
-              >
-                Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+              <th className="p-3 text-left" aria-sort={sortField === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" className="w-full text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 -m-3 p-3" onClick={() => handleSort('status')}>
+                  Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
               </th>
               <th className="p-3 text-left">Actions</th>
             </tr>

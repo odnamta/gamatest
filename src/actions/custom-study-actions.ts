@@ -190,7 +190,7 @@ export async function getCustomSessionCardsV2(
       // Get all matching card_templates
       const { data: cardTemplates, error: templatesError } = await supabase
         .from('card_templates')
-        .select('*')
+        .select('id, deck_template_id, stem, options, correct_index, explanation, status')
         .in('id', cardTemplateIdArray)
 
       if (templatesError) {
