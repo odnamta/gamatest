@@ -15,6 +15,7 @@ import { ArrowLeft, LinkIcon, Unlink, Target, Users } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
   getOrgSkillDomains,
+  getSkillDeckMappings,
   linkDeckToSkill,
   unlinkDeckFromSkill,
   getOrgSkillHeatmap,
@@ -93,15 +94,12 @@ export default function SkillDetailPage() {
     }
 
     // Fetch linked decks for this skill domain
-    try {
-      const res = await fetch(`/api/v1/skills/${skillId}/decks`)
-      if (res.ok) {
-        const data = await res.json()
-        setLinkedDecks(data.linked || [])
-        setAvailableDecks(data.available || [])
-      }
-    } catch {
-      // API might not exist yet — silently fail
+    const decksResult = await getSkillDeckMappings(skillId)
+    if (decksResult.ok && decksResult.data) {
+      setLinkedDecks(decksResult.data.linked)
+      setAvailableDecks(decksResult.data.available)
+    } else if (!decksResult.ok) {
+      showToast(decksResult.error, 'error')
     }
 
     setLoading(false)

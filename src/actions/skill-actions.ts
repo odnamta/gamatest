@@ -235,6 +235,54 @@ export async function getEmployeeSkillScores(
 }
 
 /**
+ * V19: Get linked and available decks for a skill domain.
+ */
+export async function getSkillDeckMappings(
+  skillDomainId: string
+): Promise<ActionResultV2<{
+  linked: { deck_template_id: string; title: string }[]
+  available: { id: string; title: string }[]
+}>> {
+  return withOrgUser(async ({ supabase, org }) => {
+    // Get linked decks
+    const { data: mappings, error: mappingsError } = await supabase
+      .from('deck_skill_mappings')
+      .select('deck_template_id')
+      .eq('skill_domain_id', skillDomainId)
+
+    if (mappingsError) {
+      return { ok: false, error: mappingsError.message }
+    }
+
+    const linkedIds = (mappings ?? []).map((m) => m.deck_template_id)
+
+    let linked: { deck_template_id: string; title: string }[] = []
+    if (linkedIds.length > 0) {
+      const { data: decks } = await supabase
+        .from('deck_templates')
+        .select('id, title')
+        .in('id', linkedIds)
+
+      linked = (decks ?? []).map((d) => ({
+        deck_template_id: d.id,
+        title: d.title,
+      }))
+    }
+
+    // Get available (unlinked) decks for this org
+    const { data: orgDecks } = await supabase
+      .from('deck_templates')
+      .select('id, title')
+      .eq('org_id', org.id)
+      .order('title')
+
+    const available = (orgDecks ?? []).filter((d) => !linkedIds.includes(d.id))
+
+    return { ok: true, data: { linked, available } }
+  })
+}
+
+/**
  * V19: Get org-wide skill heatmap (employees × skills matrix).
  * Admin+ only.
  */

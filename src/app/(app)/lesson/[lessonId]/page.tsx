@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LessonStudy, MistakeRecord } from '@/components/study/LessonStudy'
 import { LessonSummary } from '@/components/study/LessonSummary'
-import { completeLessonAction, getLessonItems, LessonItemWithCard } from '@/actions/course-actions'
+import { completeLessonAction, getLessonDetail, getLessonItems, LessonItemWithCard } from '@/actions/course-actions'
 import type { Lesson, LessonProgress } from '@/types/database'
 import { usePageTitle } from '@/hooks/use-page-title'
 
@@ -66,23 +66,20 @@ export default function LessonStudyPage({ params }: LessonStudyPageProps) {
           return
         }
 
-        // Fetch lesson details via API
-        const response = await fetch(`/api/lesson/${currentLessonId}`)
-        if (!response.ok) {
-          const data = await response.json()
-          setError(data.error || 'Failed to load lesson details')
+        // Fetch lesson details via server action
+        const detailResult = await getLessonDetail(currentLessonId)
+        if (!detailResult.ok) {
+          setError(detailResult.error || 'Failed to load lesson details')
           setIsLoading(false)
           return
         }
 
-        const data = await response.json()
-        
         setLessonData({
-          lesson: data.lesson,
-          courseId: data.courseId,
+          lesson: detailResult.data!.lesson,
+          courseId: detailResult.data!.courseId,
           items: itemsResult.data || [],
-          progress: data.progress,
-          isLocked: data.isLocked,
+          progress: detailResult.data!.progress,
+          isLocked: detailResult.data!.isLocked,
         })
       } catch (err) {
         setError('An error occurred while loading the lesson')
