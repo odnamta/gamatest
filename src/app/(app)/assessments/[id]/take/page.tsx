@@ -82,6 +82,7 @@ export default function TakeAssessmentPage() {
   const [showReview, setShowReview] = useState(false)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
+  const [showTimeWarning, setShowTimeWarning] = useState(false)
   const [fullscreenExited, setFullscreenExited] = useState(false)
   const [attemptCount, setAttemptCount] = useState(0)
   const [accessCodeInput, setAccessCodeInput] = useState('')
@@ -266,6 +267,9 @@ export default function TakeAssessmentPage() {
         if (prev === null || prev <= 1) {
           handleCompleteRef()
           return 0
+        }
+        if (prev === 31) {
+          setShowTimeWarning(true)
         }
         return prev - 1
       })
@@ -817,6 +821,24 @@ export default function TakeAssessmentPage() {
                 </Button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Time Warning (30 seconds remaining) */}
+      {showTimeWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="time-warning-title">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
+            <Clock className="h-10 w-10 mx-auto mb-3 text-red-500" aria-hidden="true" />
+            <h3 id="time-warning-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+              Time Almost Up!
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Less than 30 seconds remaining. Your exam will be auto-submitted when time runs out.
+            </p>
+            <Button size="sm" onClick={() => setShowTimeWarning(false)}>
+              Continue
+            </Button>
           </div>
         </div>
       )}

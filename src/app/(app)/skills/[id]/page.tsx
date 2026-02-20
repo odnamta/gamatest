@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { ArrowLeft, LinkIcon, Unlink, Target, Users } from 'lucide-react'
@@ -21,7 +22,8 @@ import {
 import { canManageSkillDomains, canLinkDeckToSkill } from '@/lib/skill-authorization'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
-import { EmployeeSkillRadar } from '@/components/skills/EmployeeSkillRadar'
+
+const EmployeeSkillRadar = dynamic(() => import('@/components/skills/EmployeeSkillRadar').then(m => m.EmployeeSkillRadar), { ssr: false })
 import type { SkillDomain } from '@/types/database'
 
 interface LinkedDeck {

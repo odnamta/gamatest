@@ -1,5 +1,6 @@
 'use server'
 
+import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
@@ -51,14 +52,15 @@ export async function createSupabaseServiceClient() {
 /**
  * Gets the currently authenticated user from the session.
  * Returns null if no user is authenticated.
+ * Wrapped with React cache() to deduplicate within a single request.
  */
-export async function getUser(): Promise<User | null> {
+export const getUser = cache(async (): Promise<User | null> => {
   const supabase = await createSupabaseServerClient()
   const { data: { user }, error } = await supabase.auth.getUser()
-  
+
   if (error || !user) {
     return null
   }
-  
+
   return user
-}
+})

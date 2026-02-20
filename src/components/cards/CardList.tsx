@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useReducer, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Search, X } from 'lucide-react'
 import { CardListItem } from './CardListItem'
@@ -43,65 +43,173 @@ interface CardListProps {
   deckSubject?: string
 }
 
+// --- useReducer state management (V20.2 refactor) ---
+
+interface CardListState {
+  selectedIds: Set<string>
+  showDeckSelector: boolean
+  filterTagIds: string[]
+  searchQuery: string
+  showNeedsReviewOnly: boolean
+  showBulkTagModal: boolean
+  isSelectingAll: boolean
+  showUntaggedOnly: boolean
+  showAutoTagModal: boolean
+  filterSourceIds: string[]
+  statusFilter: StatusFilter
+  showPublishAllDialog: boolean
+  isPublishing: boolean
+  isAllSelected: boolean
+  showEditorPanel: boolean
+  deleteConfirm: { cardId: string; preview: string; type: string } | null
+  bulkDeleteConfirm: boolean
+  editingCardIndex: number
+}
+
+type CardListAction =
+  | { type: 'TOGGLE_SELECTION'; id: string }
+  | { type: 'SELECT_ALL'; ids: string[] }
+  | { type: 'SELECT_ALL_IN_DECK_START' }
+  | { type: 'SELECT_ALL_IN_DECK_DONE'; ids: string[] }
+  | { type: 'SELECT_ALL_IN_DECK_FAIL' }
+  | { type: 'CLEAR_SELECTION' }
+  | { type: 'SET_FILTER_TAG_IDS'; ids: string[] }
+  | { type: 'SET_SEARCH_QUERY'; query: string }
+  | { type: 'SET_SHOW_NEEDS_REVIEW_ONLY'; show: boolean }
+  | { type: 'SET_SHOW_UNTAGGED_ONLY'; show: boolean }
+  | { type: 'SET_FILTER_SOURCE_IDS'; ids: string[] }
+  | { type: 'SET_STATUS_FILTER'; filter: StatusFilter }
+  | { type: 'SHOW_DECK_SELECTOR'; show: boolean }
+  | { type: 'SHOW_BULK_TAG_MODAL'; show: boolean }
+  | { type: 'SHOW_AUTO_TAG_MODAL'; show: boolean }
+  | { type: 'SHOW_PUBLISH_ALL_DIALOG'; show: boolean }
+  | { type: 'SET_IS_PUBLISHING'; publishing: boolean }
+  | { type: 'OPEN_EDITOR'; index: number }
+  | { type: 'CLOSE_EDITOR' }
+  | { type: 'NAVIGATE_EDITOR'; index: number }
+  | { type: 'SET_DELETE_CONFIRM'; confirm: { cardId: string; preview: string; type: string } | null }
+  | { type: 'SET_BULK_DELETE_CONFIRM'; show: boolean }
+  | { type: 'CLEAR_FILTERS' }
+
+const initialCardListState: CardListState = {
+  selectedIds: new Set(),
+  showDeckSelector: false,
+  filterTagIds: [],
+  searchQuery: '',
+  showNeedsReviewOnly: false,
+  showBulkTagModal: false,
+  isSelectingAll: false,
+  showUntaggedOnly: false,
+  showAutoTagModal: false,
+  filterSourceIds: [],
+  statusFilter: 'all',
+  showPublishAllDialog: false,
+  isPublishing: false,
+  isAllSelected: false,
+  showEditorPanel: false,
+  deleteConfirm: null,
+  bulkDeleteConfirm: false,
+  editingCardIndex: 0,
+}
+
+function cardListReducer(state: CardListState, action: CardListAction): CardListState {
+  switch (action.type) {
+    case 'TOGGLE_SELECTION': {
+      const next = new Set(state.selectedIds)
+      if (next.has(action.id)) next.delete(action.id)
+      else next.add(action.id)
+      return { ...state, selectedIds: next }
+    }
+    case 'SELECT_ALL':
+      return { ...state, selectedIds: new Set(action.ids) }
+    case 'SELECT_ALL_IN_DECK_START':
+      return { ...state, isSelectingAll: true }
+    case 'SELECT_ALL_IN_DECK_DONE':
+      return { ...state, isSelectingAll: false, selectedIds: new Set(action.ids) }
+    case 'SELECT_ALL_IN_DECK_FAIL':
+      return { ...state, isSelectingAll: false }
+    case 'CLEAR_SELECTION':
+      return { ...state, selectedIds: new Set(), isAllSelected: false }
+    case 'SET_FILTER_TAG_IDS':
+      return { ...state, filterTagIds: action.ids }
+    case 'SET_SEARCH_QUERY':
+      return { ...state, searchQuery: action.query }
+    case 'SET_SHOW_NEEDS_REVIEW_ONLY':
+      return { ...state, showNeedsReviewOnly: action.show }
+    case 'SET_SHOW_UNTAGGED_ONLY':
+      return { ...state, showUntaggedOnly: action.show }
+    case 'SET_FILTER_SOURCE_IDS':
+      return { ...state, filterSourceIds: action.ids }
+    case 'SET_STATUS_FILTER':
+      // Reset selection when status filter changes
+      return { ...state, statusFilter: action.filter, selectedIds: new Set(), isAllSelected: false }
+    case 'SHOW_DECK_SELECTOR':
+      return { ...state, showDeckSelector: action.show }
+    case 'SHOW_BULK_TAG_MODAL':
+      return { ...state, showBulkTagModal: action.show }
+    case 'SHOW_AUTO_TAG_MODAL':
+      return { ...state, showAutoTagModal: action.show }
+    case 'SHOW_PUBLISH_ALL_DIALOG':
+      return { ...state, showPublishAllDialog: action.show }
+    case 'SET_IS_PUBLISHING':
+      return { ...state, isPublishing: action.publishing }
+    case 'OPEN_EDITOR':
+      return { ...state, showEditorPanel: true, editingCardIndex: action.index }
+    case 'CLOSE_EDITOR':
+      return { ...state, showEditorPanel: false }
+    case 'NAVIGATE_EDITOR':
+      return { ...state, editingCardIndex: action.index }
+    case 'SET_DELETE_CONFIRM':
+      return { ...state, deleteConfirm: action.confirm }
+    case 'SET_BULK_DELETE_CONFIRM':
+      return { ...state, bulkDeleteConfirm: action.show }
+    case 'CLEAR_FILTERS':
+      return { ...state, filterTagIds: [], searchQuery: '' }
+    default:
+      return state
+  }
+}
+
 /**
  * CardList - Client component wrapper for card list with bulk actions
  * V9.3: Integrated useAutoTag hook for chunked auto-tagging with progress modal
+ * V20.2: Refactored 18 useState calls to single useReducer
  * Requirements: FR-1, FR-3, FR-4, C.1-C.9, V9.3 1.1-1.6, 5.1-5.5
  */
 export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAuthor = true, deckSubject }: CardListProps) {
   const router = useRouter()
   const { showToast } = useToast()
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showDeckSelector, setShowDeckSelector] = useState(false)
-  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
-  // V22: Search query for filtering cards by stem text
-  const [searchQuery, setSearchQuery] = useState('')
-  // V8.6: NeedsReview filter toggle
-  const [showNeedsReviewOnly, setShowNeedsReviewOnly] = useState(false)
-  // V9.1: Bulk tag modal state
-  const [showBulkTagModal, setShowBulkTagModal] = useState(false)
-  // V9.1: Select All in Deck loading state
-  const [isSelectingAll, setIsSelectingAll] = useState(false)
-  // V9.2: Untagged filter toggle
-  const [showUntaggedOnly, setShowUntaggedOnly] = useState(false)
-  // V9.3: Auto-tag progress modal state
-  const [showAutoTagModal, setShowAutoTagModal] = useState(false)
-  // V11.1: Source filter state
-  const [filterSourceIds, setFilterSourceIds] = useState<string[]>([])
-  // V11.4: Status filter state (replaces V11.3 showDrafts toggle)
   const searchParams = useSearchParams()
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  // V11.4: Publish all confirmation dialog
-  const [showPublishAllDialog, setShowPublishAllDialog] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
-  // V11.4: isAllSelected flag for smart select-all
-  const [isAllSelected, setIsAllSelected] = useState(false)
-  // V11.4: CardEditorPanel state
-  const [showEditorPanel, setShowEditorPanel] = useState(false)
-  // V24: Confirm dialog state
-  const [deleteConfirm, setDeleteConfirm] = useState<{ cardId: string; preview: string; type: string } | null>(null)
-  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
-  const [editingCardIndex, setEditingCardIndex] = useState(0)
-  
+
+  const [state, dispatch] = useReducer(cardListReducer, initialCardListState)
+  const {
+    selectedIds, showDeckSelector, filterTagIds, searchQuery,
+    showNeedsReviewOnly, showBulkTagModal, isSelectingAll,
+    showUntaggedOnly, showAutoTagModal, filterSourceIds,
+    statusFilter, showPublishAllDialog, isPublishing,
+    isAllSelected, showEditorPanel, deleteConfirm,
+    bulkDeleteConfirm, editingCardIndex,
+  } = state
+
   // V11.4: Calculate counts for status filter chips
   const draftCount = useMemo(() => {
     return cards.filter(card => card.status === 'draft').length
   }, [cards])
-  
+
   const publishedCount = useMemo(() => {
     return cards.filter(card => !card.status || card.status === 'published').length
   }, [cards])
-  
+
   // V11.4: Initialize status filter based on draft count and URL params
   useEffect(() => {
     const showDraftsParam = searchParams.get('showDrafts')
     if (showDraftsParam === 'true') {
-      setStatusFilter('draft')
+      dispatch({ type: 'SET_STATUS_FILTER', filter: 'draft' })
     } else {
-      setStatusFilter(getDefaultStatusFilter(draftCount))
+      dispatch({ type: 'SET_STATUS_FILTER', filter: getDefaultStatusFilter(draftCount) })
     }
   }, [searchParams, draftCount])
-  
+
   // V9.3: useAutoTag hook for chunked processing with progress
   const autoTag = useAutoTag({
     onComplete: (totalTagged, totalSkipped) => {
@@ -110,7 +218,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
           `Auto-tagged ${totalTagged} card${totalTagged !== 1 ? 's' : ''}${totalSkipped > 0 ? ` (${totalSkipped} skipped)` : ''}`,
           'success'
         )
-        clearSelection()
+        dispatch({ type: 'CLEAR_SELECTION' })
         router.refresh()
       }
     },
@@ -152,7 +260,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   // V11.4: Filter by status using StatusFilterChips
   const filteredCards = useMemo(() => {
     let result = cards
-    
+
     // V11.4: Apply status filter first
     switch (statusFilter) {
       case 'draft':
@@ -166,20 +274,20 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         result = result.filter(card => !card.status || card.status === 'published' || card.status === 'draft')
         break
     }
-    
+
     // V9.2: Apply untagged filter first (mutually exclusive with tag filter)
     if (showUntaggedOnly) {
       result = result.filter(card => !card.tags || card.tags.length === 0)
       return result
     }
-    
+
     // V11.1: Apply source filter (AND logic)
     if (filterSourceIds.length > 0) {
       result = result.filter((card) => {
         return card.book_source && filterSourceIds.includes(card.book_source.id)
       })
     }
-    
+
     // Apply tag filter
     if (filterTagIds.length > 0) {
       result = result.filter((card) => {
@@ -187,7 +295,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         return filterTagIds.every((tagId) => cardTagIds.includes(tagId))
       })
     }
-    
+
     // V8.6: Apply NeedsReview filter
     if (showNeedsReviewOnly) {
       result = result.filter(hasNeedsReviewTag)
@@ -208,58 +316,47 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
 
     return result
   }, [cards, filterTagIds, filterSourceIds, showNeedsReviewOnly, showUntaggedOnly, statusFilter, searchQuery])
-  
-  // V11.4: Reset selection when status filter changes
-  useEffect(() => {
-    setSelectedIds(new Set())
-    setIsAllSelected(false)
-  }, [statusFilter])
-  
+
+  // Note: Selection reset on status filter change is handled inside the reducer (SET_STATUS_FILTER)
+
   // V11.4: Open editor panel from URL param
   useEffect(() => {
     const editCardParam = searchParams.get('editCard')
     if (editCardParam && filteredCards.length > 0) {
       const index = filteredCards.findIndex(c => c.id === editCardParam)
       if (index >= 0) {
-        setEditingCardIndex(index)
-        setShowEditorPanel(true)
+        dispatch({ type: 'OPEN_EDITOR', index })
       }
     }
   }, [searchParams, filteredCards])
 
   // Selection handlers
   const toggleSelection = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    dispatch({ type: 'TOGGLE_SELECTION', id })
   }
 
   const selectAll = () => {
-    setSelectedIds(new Set(filteredCards.map((c) => c.id)))
+    dispatch({ type: 'SELECT_ALL', ids: filteredCards.map((c) => c.id) })
   }
 
   // V9.1: Select All in Deck - fetches all card IDs from database
   const selectAllInDeck = async () => {
-    setIsSelectingAll(true)
+    dispatch({ type: 'SELECT_ALL_IN_DECK_START' })
     try {
       const allIds = await getAllCardIdsInDeck(deckId)
-      setSelectedIds(new Set(allIds))
+      dispatch({ type: 'SELECT_ALL_IN_DECK_DONE', ids: allIds })
       if (allIds.length > 0) {
         showToast(`Selected all ${allIds.length} cards in deck`, 'success')
       }
     } catch (error) {
+      dispatch({ type: 'SELECT_ALL_IN_DECK_FAIL' })
       console.error('Failed to select all cards:', error)
       showToast('Failed to select all cards', 'error')
-    } finally {
-      setIsSelectingAll(false)
     }
   }
 
   const clearSelection = () => {
-    setSelectedIds(new Set())
+    dispatch({ type: 'CLEAR_SELECTION' })
   }
 
   // V9.1: Handle bulk tag success
@@ -270,26 +367,26 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   // V9.3: Handle auto-tag with chunked processing and progress modal
   const handleAutoTag = () => {
     if (selectedIds.size === 0) return
-    
-    setShowAutoTagModal(true)
+
+    dispatch({ type: 'SHOW_AUTO_TAG_MODAL', show: true })
     autoTag.startTagging([...selectedIds], deckSubject)
   }
 
   // V9.3: Handle closing the auto-tag modal
   const handleAutoTagModalClose = () => {
-    setShowAutoTagModal(false)
+    dispatch({ type: 'SHOW_AUTO_TAG_MODAL', show: false })
     autoTag.reset()
   }
 
   // Single card handlers
   const handleDelete = async (cardId: string, preview: string, type: string) => {
-    setDeleteConfirm({ cardId, preview, type })
+    dispatch({ type: 'SET_DELETE_CONFIRM', confirm: { cardId, preview, type } })
   }
 
   const confirmDeleteCard = async () => {
     if (!deleteConfirm) return
     const { cardId } = deleteConfirm
-    setDeleteConfirm(null)
+    dispatch({ type: 'SET_DELETE_CONFIRM', confirm: null })
 
     const result = await deleteCard(cardId)
     if (result.ok) {
@@ -312,11 +409,11 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
 
   // Bulk handlers
   const handleBulkDelete = async () => {
-    setBulkDeleteConfirm(true)
+    dispatch({ type: 'SET_BULK_DELETE_CONFIRM', show: true })
   }
 
   const confirmBulkDelete = async () => {
-    setBulkDeleteConfirm(false)
+    dispatch({ type: 'SET_BULK_DELETE_CONFIRM', show: false })
     const result = await bulkDeleteCards([...selectedIds])
     if (result.ok) {
       showToast(`${result.count} card${result.count !== 1 ? 's' : ''} deleted`, 'success')
@@ -328,7 +425,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   }
 
   const handleBulkMove = async (targetDeckId: string, targetDeckTitle: string) => {
-    setShowDeckSelector(false)
+    dispatch({ type: 'SHOW_DECK_SELECTOR', show: false })
     const result = await bulkMoveCards([...selectedIds], targetDeckId)
     if (result.ok) {
       showToast(`${result.count} card${result.count !== 1 ? 's' : ''} moved to ${targetDeckTitle}`, 'success')
@@ -370,13 +467,13 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
   // V11.4: Handle bulk publish
   const handleBulkPublish = async () => {
     if (selectedIds.size === 0 && !isAllSelected) return
-    
-    setIsPublishing(true)
+
+    dispatch({ type: 'SET_IS_PUBLISHING', publishing: true })
     try {
       const result = isAllSelected
         ? await bulkPublishCards({ filterDescriptor: { deckId, status: statusFilter, tagIds: filterTagIds.length > 0 ? filterTagIds : undefined } })
         : await bulkPublishCards({ cardIds: [...selectedIds] })
-      
+
       if (result.ok) {
         showToast(`Published ${result.count} card${result.count !== 1 ? 's' : ''} successfully`, 'success')
         clearSelection()
@@ -387,20 +484,20 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     } catch {
       showToast('Failed to publish cards', 'error')
     } finally {
-      setIsPublishing(false)
+      dispatch({ type: 'SET_IS_PUBLISHING', publishing: false })
     }
   }
-  
+
   // V11.4: Handle publish all drafts
   const handlePublishAllDrafts = async () => {
-    setIsPublishing(true)
+    dispatch({ type: 'SET_IS_PUBLISHING', publishing: true })
     try {
       const result = await bulkPublishCards({ filterDescriptor: { deckId, status: 'draft' } })
-      
+
       if (result.ok) {
         showToast(`Published ${result.count} card${result.count !== 1 ? 's' : ''} successfully`, 'success')
-        setShowPublishAllDialog(false)
-        setStatusFilter('published')
+        dispatch({ type: 'SHOW_PUBLISH_ALL_DIALOG', show: false })
+        dispatch({ type: 'SET_STATUS_FILTER', filter: 'published' })
         router.refresh()
       } else {
         showToast(result.error || 'Failed to publish cards', 'error')
@@ -408,38 +505,37 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     } catch {
       showToast('Failed to publish cards', 'error')
     } finally {
-      setIsPublishing(false)
+      dispatch({ type: 'SET_IS_PUBLISHING', publishing: false })
     }
   }
-  
+
   // V11.4: Handle opening editor panel
   const handleOpenEditor = (cardId: string) => {
     const index = filteredCards.findIndex(c => c.id === cardId)
     if (index >= 0) {
-      setEditingCardIndex(index)
-      setShowEditorPanel(true)
+      dispatch({ type: 'OPEN_EDITOR', index })
       // Update URL with card ID
       const url = new URL(window.location.href)
       url.searchParams.set('editCard', cardId)
       window.history.pushState({}, '', url.toString())
     }
   }
-  
+
   // V11.4: Handle closing editor panel
   const handleCloseEditor = () => {
-    setShowEditorPanel(false)
+    dispatch({ type: 'CLOSE_EDITOR' })
     // Remove editCard from URL
     const url = new URL(window.location.href)
     url.searchParams.delete('editCard')
     window.history.pushState({}, '', url.toString())
   }
-  
+
   // V11.4: Handle editor panel navigation
   const handleEditorNavigate = (direction: 'prev' | 'next') => {
-    const newIndex = direction === 'prev' 
+    const newIndex = direction === 'prev'
       ? Math.max(0, editingCardIndex - 1)
       : Math.min(filteredCards.length - 1, editingCardIndex + 1)
-    setEditingCardIndex(newIndex)
+    dispatch({ type: 'NAVIGATE_EDITOR', index: newIndex })
     // Update URL with new card ID
     const newCardId = filteredCards[newIndex]?.id
     if (newCardId) {
@@ -448,10 +544,10 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       window.history.pushState({}, '', url.toString())
     }
   }
-  
+
   // V11.4: Get card by ID for editor panel
   const getCardById = (id: string) => filteredCards.find(c => c.id === id)
-  
+
   // V11.4: Handle editor save success
   const handleEditorSaveSuccess = () => {
     router.refresh()
@@ -465,13 +561,13 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', query: e.target.value })}
           placeholder="Search cards by stem, options, explanation..."
           className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {searchQuery && (
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', query: '' })}
             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
           >
             <X className="h-3.5 w-3.5 text-slate-400" />
@@ -485,8 +581,8 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
           draftCount={draftCount}
           publishedCount={publishedCount}
           activeFilter={statusFilter}
-          onFilterChange={setStatusFilter}
-          onPublishAllDrafts={() => setShowPublishAllDialog(true)}
+          onFilterChange={(filter) => dispatch({ type: 'SET_STATUS_FILTER', filter })}
+          onPublishAllDrafts={() => dispatch({ type: 'SHOW_PUBLISH_ALL_DIALOG', show: true })}
           isAuthor={isAuthor}
         />
       )}
@@ -495,7 +591,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       {needsReviewCount > 0 && (
         <div className="mb-4">
           <button
-            onClick={() => setShowNeedsReviewOnly(!showNeedsReviewOnly)}
+            onClick={() => dispatch({ type: 'SET_SHOW_NEEDS_REVIEW_ONLY', show: !showNeedsReviewOnly })}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               showNeedsReviewOnly
                 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700'
@@ -516,7 +612,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
           </label>
           <TagSelector
             selectedTagIds={filterTagIds}
-            onChange={setFilterTagIds}
+            onChange={(ids) => dispatch({ type: 'SET_FILTER_TAG_IDS', ids })}
           />
         </div>
       )}
@@ -525,14 +621,14 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       <FilterBar
         tags={allTags}
         selectedTagIds={filterTagIds}
-        onTagsChange={setFilterTagIds}
-        onClear={() => setFilterTagIds([])}
+        onTagsChange={(ids) => dispatch({ type: 'SET_FILTER_TAG_IDS', ids })}
+        onClear={() => dispatch({ type: 'SET_FILTER_TAG_IDS', ids: [] })}
         showUntaggedOnly={showUntaggedOnly}
-        onShowUntaggedOnlyChange={setShowUntaggedOnly}
+        onShowUntaggedOnlyChange={(show) => dispatch({ type: 'SET_SHOW_UNTAGGED_ONLY', show })}
         untaggedCount={untaggedCount}
         availableSources={availableSources}
         selectedSourceIds={filterSourceIds}
-        onSourcesChange={setFilterSourceIds}
+        onSourcesChange={(ids) => dispatch({ type: 'SET_FILTER_SOURCE_IDS', ids })}
       />
 
       {/* Bulk actions bar - Author only for delete/move/tag */}
@@ -540,9 +636,9 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         <BulkActionsBar
           selectedCount={selectedIds.size}
           onDelete={handleBulkDelete}
-          onMove={() => setShowDeckSelector(true)}
+          onMove={() => dispatch({ type: 'SHOW_DECK_SELECTOR', show: true })}
           onExport={handleExport}
-          onAddTag={() => setShowBulkTagModal(true)}
+          onAddTag={() => dispatch({ type: 'SHOW_BULK_TAG_MODAL', show: true })}
           onAutoTag={handleAutoTag}
           isAutoTagging={autoTag.isTagging}
           onClearSelection={clearSelection}
@@ -596,7 +692,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
             {searchQuery.trim() ? `No cards match "${searchQuery}"` : 'No cards match the selected tags'}
           </p>
           <button
-            onClick={() => { setFilterTagIds([]); setSearchQuery('') }}
+            onClick={() => dispatch({ type: 'CLEAR_FILTERS' })}
             className="text-blue-600 dark:text-blue-400 text-sm mt-2 hover:underline"
           >
             Clear filters
@@ -627,14 +723,14 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         <DeckSelector
           currentDeckId={deckId}
           onSelect={handleBulkMove}
-          onCancel={() => setShowDeckSelector(false)}
+          onCancel={() => dispatch({ type: 'SHOW_DECK_SELECTOR', show: false })}
         />
       )}
 
       {/* V9.1: Bulk tag modal */}
       <BulkTagModal
         isOpen={showBulkTagModal}
-        onClose={() => setShowBulkTagModal(false)}
+        onClose={() => dispatch({ type: 'SHOW_BULK_TAG_MODAL', show: false })}
         selectedCardIds={[...selectedIds]}
         onSuccess={handleBulkTagSuccess}
       />
@@ -655,7 +751,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       {/* V11.4: Publish all confirmation dialog */}
       <PublishAllConfirmDialog
         isOpen={showPublishAllDialog}
-        onClose={() => setShowPublishAllDialog(false)}
+        onClose={() => dispatch({ type: 'SHOW_PUBLISH_ALL_DIALOG', show: false })}
         onConfirm={handlePublishAllDrafts}
         draftCount={draftCount}
         isPublishing={isPublishing}
@@ -677,7 +773,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       {/* V24: Delete confirmation dialogs */}
       <ConfirmDialog
         open={!!deleteConfirm}
-        onOpenChange={() => setDeleteConfirm(null)}
+        onOpenChange={() => dispatch({ type: 'SET_DELETE_CONFIRM', confirm: null })}
         title={`Delete ${deleteConfirm?.type || 'card'}`}
         description={deleteConfirm ? `"${deleteConfirm.preview.length > 80 ? deleteConfirm.preview.substring(0, 80) + '...' : deleteConfirm.preview}"` : ''}
         confirmLabel="Delete"
@@ -685,7 +781,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       />
       <ConfirmDialog
         open={bulkDeleteConfirm}
-        onOpenChange={setBulkDeleteConfirm}
+        onOpenChange={(open) => dispatch({ type: 'SET_BULK_DELETE_CONFIRM', show: open })}
         title="Delete cards"
         description={`Delete ${selectedIds.size} card${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`}
         confirmLabel="Delete"

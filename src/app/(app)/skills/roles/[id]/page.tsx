@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useTransition, use } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { ArrowLeft, Plus, X, UserMinus, Target, ChevronDown } from 'lucide-react'
@@ -24,7 +25,8 @@ import { getOrgSkillDomains, getEmployeeSkillScores } from '@/actions/skill-acti
 import { canManageRoleProfiles } from '@/lib/skill-authorization'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
-import { RoleGapRadar } from '@/components/skills/RoleGapRadar'
+
+const RoleGapRadar = dynamic(() => import('@/components/skills/RoleGapRadar').then(m => m.RoleGapRadar), { ssr: false })
 import type { SkillDomain, SkillPriority } from '@/types/database'
 
 const PRIORITY_LABELS: Record<SkillPriority, string> = {

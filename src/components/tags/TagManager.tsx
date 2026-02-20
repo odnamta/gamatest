@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useReducer, useEffect, useMemo, useRef, useCallback } from 'react'
 import { BookOpen, FolderTree, Lightbulb, Merge, Loader2, Pencil, Sparkles, Settings, Plus, Trash2 } from 'lucide-react'
 import { TagBadge } from './TagBadge'
 import dynamic from 'next/dynamic'
@@ -10,12 +10,12 @@ import { DeleteTagConfirmDialog } from './DeleteTagConfirmDialog'
 const TagMergeModal = dynamic(() => import('./TagMergeModal').then(m => ({ default: m.TagMergeModal })), { ssr: false })
 const SmartCleanupTab = dynamic(() => import('./SmartCleanupTab').then(m => ({ default: m.SmartCleanupTab })), { ssr: false })
 import { getCategoryColorClasses } from '@/lib/tag-colors'
-import { 
-  getTagsByCategory, 
-  updateTagCategory, 
+import {
+  getTagsByCategory,
+  updateTagCategory,
   mergeMultipleTags,
   renameTag,
-  type RenameTagResult 
+  type RenameTagResult
 } from '@/actions/admin-tag-actions'
 import { deleteTag } from '@/actions/tag-actions'
 import { AutoFormatButton } from './AutoFormatButton'
@@ -78,7 +78,7 @@ function EditableTagItem({
 
   const handleSave = useCallback(async () => {
     const trimmedValue = editValue.trim()
-    
+
     // Validate: reject empty names
     if (!trimmedValue) {
       setError('Tag name cannot be empty')
@@ -152,8 +152,8 @@ function EditableTagItem({
             onBlur={handleSave}
             disabled={isSaving}
             className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              error 
-                ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
+              error
+                ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
                 : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
             }`}
           />
@@ -215,6 +215,99 @@ interface TagsByCategory {
 // V9.6: Tab type for navigation
 type TabType = 'manage' | 'cleanup'
 
+// --- useReducer state management (V20.2 refactor) ---
+
+interface TagManagerState {
+  activeTab: TabType
+  tags: TagsByCategory
+  isLoading: boolean
+  selectedTags: string[]
+  showMergeModal: boolean
+  updatingTagId: string | null
+  pendingMerge: { sourceTagId: string; targetTagId: string; targetTagName: string } | null
+  showCreateDialog: boolean
+  createDialogCategory: TagCategory
+  editingTag: Tag | null
+  showDeleteConfirm: boolean
+  deletingTag: Tag | null
+  isDeleting: boolean
+}
+
+type TagManagerAction =
+  | { type: 'SET_ACTIVE_TAB'; tab: TabType }
+  | { type: 'SET_TAGS'; tags: TagsByCategory }
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'TOGGLE_TAG_SELECTION'; tagId: string }
+  | { type: 'SET_SELECTED_TAGS'; tagIds: string[] }
+  | { type: 'CLEAR_SELECTION' }
+  | { type: 'SHOW_MERGE_MODAL'; show: boolean }
+  | { type: 'SET_UPDATING_TAG_ID'; tagId: string | null }
+  | { type: 'SET_PENDING_MERGE'; merge: { sourceTagId: string; targetTagId: string; targetTagName: string } | null }
+  | { type: 'OPEN_CREATE_DIALOG'; category: TagCategory; editTag?: Tag | null }
+  | { type: 'CLOSE_CREATE_DIALOG' }
+  | { type: 'OPEN_DELETE_CONFIRM'; tag: Tag }
+  | { type: 'CLOSE_DELETE_CONFIRM' }
+  | { type: 'SET_DELETING'; deleting: boolean }
+  | { type: 'MERGE_REQUEST'; sourceTagId: string; targetTagId: string; selectedTagIds: string[] }
+
+const initialTagManagerState: TagManagerState = {
+  activeTab: 'manage',
+  tags: { source: [], topic: [], concept: [] },
+  isLoading: true,
+  selectedTags: [],
+  showMergeModal: false,
+  updatingTagId: null,
+  pendingMerge: null,
+  showCreateDialog: false,
+  createDialogCategory: 'concept',
+  editingTag: null,
+  showDeleteConfirm: false,
+  deletingTag: null,
+  isDeleting: false,
+}
+
+function tagManagerReducer(state: TagManagerState, action: TagManagerAction): TagManagerState {
+  switch (action.type) {
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.tab }
+    case 'SET_TAGS':
+      return { ...state, tags: action.tags }
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.loading }
+    case 'TOGGLE_TAG_SELECTION': {
+      const prev = state.selectedTags
+      const next = prev.includes(action.tagId)
+        ? prev.filter(id => id !== action.tagId)
+        : [...prev, action.tagId]
+      return { ...state, selectedTags: next }
+    }
+    case 'SET_SELECTED_TAGS':
+      return { ...state, selectedTags: action.tagIds }
+    case 'CLEAR_SELECTION':
+      return { ...state, selectedTags: [] }
+    case 'SHOW_MERGE_MODAL':
+      return { ...state, showMergeModal: action.show }
+    case 'SET_UPDATING_TAG_ID':
+      return { ...state, updatingTagId: action.tagId }
+    case 'SET_PENDING_MERGE':
+      return { ...state, pendingMerge: action.merge }
+    case 'OPEN_CREATE_DIALOG':
+      return { ...state, showCreateDialog: true, createDialogCategory: action.category, editingTag: action.editTag ?? null }
+    case 'CLOSE_CREATE_DIALOG':
+      return { ...state, showCreateDialog: false, editingTag: null }
+    case 'OPEN_DELETE_CONFIRM':
+      return { ...state, showDeleteConfirm: true, deletingTag: action.tag }
+    case 'CLOSE_DELETE_CONFIRM':
+      return { ...state, showDeleteConfirm: false, deletingTag: null }
+    case 'SET_DELETING':
+      return { ...state, isDeleting: action.deleting }
+    case 'MERGE_REQUEST':
+      return { ...state, selectedTags: action.selectedTagIds, showMergeModal: true }
+    default:
+      return state
+  }
+}
+
 /**
  * TagManager - Admin UI for managing tag categories and merging tags
  * V9: Three-column layout with category management and merge functionality
@@ -222,30 +315,18 @@ type TabType = 'manage' | 'cleanup'
  * V9.5: Added inline editing and auto-format
  * V9.6: Added Smart Cleanup tab for AI-powered tag consolidation
  * V11.3: Added Add Tag button, delete controls, and TagCreateDialog integration
+ * V20.2: Refactored 13 useState calls to single useReducer
  * Requirements: V9-3.1, V9-3.2, V9-3.3, V9.2-3.1, V9.2-3.2, V9.2-3.3, V9.5-1.1, V9.5-3.1, V9.6-3.1, V11.3-1.1, V11.3-3.1
  */
 export function TagManager() {
   const { showToast } = useToast()
-  const [activeTab, setActiveTab] = useState<TabType>('manage')
-  const [tags, setTags] = useState<TagsByCategory>({ source: [], topic: [], concept: [] })
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [showMergeModal, setShowMergeModal] = useState(false)
-  const [updatingTagId, setUpdatingTagId] = useState<string | null>(null)
-  // V9.5: Merge from rename conflict
-  const [pendingMerge, setPendingMerge] = useState<{
-    sourceTagId: string
-    targetTagId: string
-    targetTagName: string
-  } | null>(null)
-  // V11.3: Create/Edit dialog state
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [createDialogCategory, setCreateDialogCategory] = useState<TagCategory>('concept')
-  const [editingTag, setEditingTag] = useState<Tag | null>(null)
-  // V11.3: Delete confirmation state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deletingTag, setDeletingTag] = useState<Tag | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [state, dispatch] = useReducer(tagManagerReducer, initialTagManagerState)
+  const {
+    activeTab, tags, isLoading, selectedTags, showMergeModal,
+    updatingTagId, pendingMerge, showCreateDialog, createDialogCategory,
+    editingTag, showDeleteConfirm, deletingTag, isDeleting,
+  } = state
 
   // Load tags on mount
   useEffect(() => {
@@ -266,16 +347,16 @@ export function TagManager() {
   const canMerge = selectedTags.length >= 2
 
   async function loadTags() {
-    setIsLoading(true)
+    dispatch({ type: 'SET_LOADING', loading: true })
     const result = await getTagsByCategory()
-    setTags(result)
-    setIsLoading(false)
+    dispatch({ type: 'SET_TAGS', tags: result })
+    dispatch({ type: 'SET_LOADING', loading: false })
   }
 
   async function handleCategoryChange(tagId: string, newCategory: TagCategory) {
-    setUpdatingTagId(tagId)
+    dispatch({ type: 'SET_UPDATING_TAG_ID', tagId })
     const result = await updateTagCategory(tagId, newCategory)
-    setUpdatingTagId(null)
+    dispatch({ type: 'SET_UPDATING_TAG_ID', tagId: null })
 
     if (result.ok) {
       showToast('Tag category updated', 'success')
@@ -287,18 +368,13 @@ export function TagManager() {
 
   // V9.2: Toggle tag selection (no limit on number of selections)
   function toggleTagSelection(tagId: string) {
-    setSelectedTags(prev => {
-      if (prev.includes(tagId)) {
-        return prev.filter(id => id !== tagId)
-      }
-      return [...prev, tagId]
-    })
+    dispatch({ type: 'TOGGLE_TAG_SELECTION', tagId })
   }
 
   // V9.2: Handle merge with modal
   async function handleMerge(targetTagId: string) {
     const sourceTagIds = selectedTags.filter(id => id !== targetTagId)
-    
+
     if (sourceTagIds.length === 0) {
       showToast('No source tags to merge', 'error')
       return
@@ -311,7 +387,7 @@ export function TagManager() {
         `Merged ${result.deletedTags} tag${result.deletedTags !== 1 ? 's' : ''}, ${result.affectedCards} card${result.affectedCards !== 1 ? 's' : ''} affected`,
         'success'
       )
-      setSelectedTags([])
+      dispatch({ type: 'CLEAR_SELECTION' })
       loadTags()
     } else {
       throw new Error(result.error)
@@ -329,7 +405,7 @@ export function TagManager() {
         `Merged tag, ${result.affectedCards} card${result.affectedCards !== 1 ? 's' : ''} affected`,
         'success'
       )
-      setPendingMerge(null)
+      dispatch({ type: 'SET_PENDING_MERGE', merge: null })
       loadTags()
     } else {
       showToast(result.error, 'error')
@@ -338,28 +414,23 @@ export function TagManager() {
 
   // V9.5: Handle rename conflict - show merge modal
   function handleMergeRequest(sourceTagId: string, targetTagId: string, targetTagName: string) {
-    setPendingMerge({ sourceTagId, targetTagId, targetTagName })
     // Find the source tag to show in modal
     const sourceTag = allTags.find(t => t.id === sourceTagId)
     const targetTag = allTags.find(t => t.id === targetTagId)
     if (sourceTag && targetTag) {
-      setSelectedTags([sourceTagId, targetTagId])
-      setShowMergeModal(true)
+      dispatch({ type: 'SET_PENDING_MERGE', merge: { sourceTagId, targetTagId, targetTagName } })
+      dispatch({ type: 'MERGE_REQUEST', sourceTagId, targetTagId, selectedTagIds: [sourceTagId, targetTagId] })
     }
   }
 
   // V11.3: Open create dialog for a specific category
   function handleAddTag(category: TagCategory) {
-    setCreateDialogCategory(category)
-    setEditingTag(null)
-    setShowCreateDialog(true)
+    dispatch({ type: 'OPEN_CREATE_DIALOG', category })
   }
 
   // V11.3: Open edit dialog for a tag
   function handleEditTag(tag: Tag) {
-    setEditingTag(tag)
-    setCreateDialogCategory(tag.category)
-    setShowCreateDialog(true)
+    dispatch({ type: 'OPEN_CREATE_DIALOG', category: tag.category, editTag: tag })
   }
 
   // V11.3: Handle tag creation/edit success
@@ -369,22 +440,20 @@ export function TagManager() {
 
   // V11.3: Open delete confirmation
   function handleDeleteClick(tag: Tag) {
-    setDeletingTag(tag)
-    setShowDeleteConfirm(true)
+    dispatch({ type: 'OPEN_DELETE_CONFIRM', tag })
   }
 
   // V11.3: Confirm tag deletion
   async function handleConfirmDelete() {
     if (!deletingTag) return
 
-    setIsDeleting(true)
+    dispatch({ type: 'SET_DELETING', deleting: true })
     const result = await deleteTag(deletingTag.id)
-    setIsDeleting(false)
+    dispatch({ type: 'SET_DELETING', deleting: false })
 
     if (result.ok) {
       showToast(`Tag "${deletingTag.name}" deleted`, 'success')
-      setShowDeleteConfirm(false)
-      setDeletingTag(null)
+      dispatch({ type: 'CLOSE_DELETE_CONFIRM' })
       loadTags()
     } else {
       showToast(result.error, 'error')
@@ -430,7 +499,7 @@ export function TagManager() {
       {/* V9.6: Tab Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-700">
         <button
-          onClick={() => setActiveTab('manage')}
+          onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: 'manage' })}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'manage'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400'
@@ -441,7 +510,7 @@ export function TagManager() {
           Manage Tags
         </button>
         <button
-          onClick={() => setActiveTab('cleanup')}
+          onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', tab: 'cleanup' })}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'cleanup'
               ? 'border-violet-600 text-violet-600 dark:text-violet-400'
@@ -474,7 +543,7 @@ export function TagManager() {
             </span>
             {/* V9.2: Merge button enabled when >= 2 tags selected */}
             <button
-              onClick={() => setShowMergeModal(true)}
+              onClick={() => dispatch({ type: 'SHOW_MERGE_MODAL', show: true })}
               disabled={!canMerge}
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -482,7 +551,7 @@ export function TagManager() {
               Merge Selected
             </button>
             <button
-              onClick={() => setSelectedTags([])}
+              onClick={() => dispatch({ type: 'CLEAR_SELECTION' })}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             >
               Clear selection
@@ -573,7 +642,7 @@ export function TagManager() {
       {/* V9.2: Merge Modal */}
       <TagMergeModal
         isOpen={showMergeModal}
-        onClose={() => setShowMergeModal(false)}
+        onClose={() => dispatch({ type: 'SHOW_MERGE_MODAL', show: false })}
         sourceTags={selectedTagObjects}
         onMerge={handleMerge}
       />
@@ -581,10 +650,7 @@ export function TagManager() {
       {/* V11.3: Create/Edit Dialog */}
       <TagCreateDialog
         isOpen={showCreateDialog}
-        onClose={() => {
-          setShowCreateDialog(false)
-          setEditingTag(null)
-        }}
+        onClose={() => dispatch({ type: 'CLOSE_CREATE_DIALOG' })}
         onSuccess={handleTagSuccess}
         editTag={editingTag}
         defaultCategory={createDialogCategory}
@@ -593,10 +659,7 @@ export function TagManager() {
       {/* V11.3: Delete Confirmation Dialog */}
       <DeleteTagConfirmDialog
         isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false)
-          setDeletingTag(null)
-        }}
+        onClose={() => dispatch({ type: 'CLOSE_DELETE_CONFIRM' })}
         onConfirm={handleConfirmDelete}
         tag={deletingTag}
         isDeleting={isDeleting}

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Target, ChevronDown, ChevronUp } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { EmployeeSkillRadar } from './EmployeeSkillRadar'
-import { RoleGapRadar } from './RoleGapRadar'
+
+const EmployeeSkillRadar = dynamic(() => import('./EmployeeSkillRadar').then(m => m.EmployeeSkillRadar), { ssr: false })
+const RoleGapRadar = dynamic(() => import('./RoleGapRadar').then(m => m.RoleGapRadar), { ssr: false })
 import { getEmployeeSkillScores } from '@/actions/skill-actions'
 import { getEmployeeRoleGapAnalysis } from '@/actions/role-actions'
 import { useOrg } from '@/components/providers/OrgProvider'
