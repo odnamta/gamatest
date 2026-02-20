@@ -2,6 +2,22 @@
 
 All notable changes to Cekatan will be documented in this file.
 
+## [v20.4] - E2E Tests & API Route Cleanup
+
+### Added
+- **Playwright E2E test suite**: 18 tests covering auth flows, dashboard navigation, library pages, and protected route redirects
+- **`getSkillDeckMappings()` server action**: Replaces `GET /api/v1/skills/[id]/decks` — uses `withOrgUser` pattern for consistency
+- **`getLessonDetail()` server action**: Replaces `GET /api/lesson/[lessonId]` — uses `withUser` pattern with `ActionResultV2`
+- npm scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:headed`
+
+### Fixed
+- **Silent error on skill deck fetch**: Skills detail page now shows error toast when deck mapping fetch fails (was silently swallowed in `catch {}`)
+
+### Removed
+- `GET /api/v1/skills/[id]/decks` route — migrated to server action
+- `GET /api/lesson/[lessonId]` route — migrated to server action
+- Only `GET /api/health` API route remains
+
 ## [v20.3] - State Management & Performance
 
 ### Refactored
