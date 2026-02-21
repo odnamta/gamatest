@@ -4,7 +4,7 @@ This file provides guidance to AI coding assistants working with this repository
 
 ## Project Overview
 
-**GamaTest** is a multi-tenant assessment and study platform. ONE platform, TWO modes (Study Mode + Assessment Mode). Domain-agnostic — the domain lives in content and org configuration, not in code.
+**Cekatan** is a multi-tenant assessment and study platform. ONE platform, TWO modes (Study Mode + Assessment Mode). Domain-agnostic — the domain lives in content and org configuration, not in code.
 
 ## Common Commands
 
