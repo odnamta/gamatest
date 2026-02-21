@@ -80,7 +80,7 @@ export function EditableDeckSubject({ deckId, initialSubject }: EditableDeckSubj
     try {
       const result = await updateDeckSubject(deckId, trimmed)
       
-      if (result.success) {
+      if (result.ok) {
         setState('viewing')
         showToast('Subject updated', 'success')
       } else {

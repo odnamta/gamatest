@@ -47,10 +47,10 @@ export default async function CustomStudyPage({ searchParams }: CustomStudyPageP
 
   // Fetch user stats for streak display
   const statsResult = await getUserStats()
-  const currentStreak = statsResult.stats?.current_streak || 0
+  const currentStreak = statsResult.ok ? (statsResult.data?.stats?.current_streak || 0) : 0
 
   // Handle errors
-  if (!result.success) {
+  if (!result.ok) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link
@@ -74,8 +74,11 @@ export default async function CustomStudyPage({ searchParams }: CustomStudyPageP
     )
   }
 
+  const cards = result.data?.cards ?? []
+  const totalMatching = result.data?.totalMatching ?? 0
+
   // Handle empty state
-  if (result.cards.length === 0) {
+  if (cards.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link
@@ -129,14 +132,14 @@ export default async function CustomStudyPage({ searchParams }: CustomStudyPageP
           Custom Study
         </h1>
         <p className="text-slate-600 dark:text-slate-400">
-          {modeLabel} • {result.cards.length} of {result.totalMatching} cards
+          {modeLabel} • {cards.length} of {totalMatching} cards
         </p>
       </div>
 
       {/* Study session */}
       <GlobalStudySession
-        initialCards={result.cards}
-        totalDueRemaining={result.totalMatching}
+        initialCards={cards}
+        totalDueRemaining={totalMatching}
         currentStreak={currentStreak}
       />
     </div>

@@ -23,7 +23,7 @@ export function SyncProgressButton({ deckId }: SyncProgressButtonProps) {
   const handleSync = () => {
     startTransition(async () => {
       const result = await syncAuthorProgress(deckId)
-      if (result.success) {
+      if (result.ok) {
         const data = result.data as { synced: number } | undefined
         const synced = data?.synced ?? 0
         showToast(`Progress synced! ${synced} cards ready for review.`, 'success')

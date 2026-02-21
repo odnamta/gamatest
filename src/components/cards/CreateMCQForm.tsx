@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
 import { TagSelector } from '@/components/tags/TagSelector'
 import { getOptionLabel, adjustCorrectIndexAfterRemoval } from '@/lib/mcq-options'
-import type { ActionResult } from '@/types/actions'
+import type { ActionResultV2 } from '@/types/actions'
 
 interface CreateMCQFormProps {
   deckId: string
@@ -17,7 +17,7 @@ interface CreateMCQFormProps {
   onSuccess?: () => void
 }
 
-const initialState: ActionResult = { success: true }
+const initialState: ActionResultV2 = { ok: true }
 
 const MIN_OPTIONS = 2
 const MAX_OPTIONS = 5  // A-E for standard multiple choice
@@ -63,7 +63,7 @@ export function CreateMCQForm({
 
   // Reset form on successful submission
   useEffect(() => {
-    if (state.success && formRef.current) {
+    if (state.ok && formRef.current) {
       formRef.current.reset()
       setOptions(Array(DEFAULT_OPTIONS).fill(''))
       setCorrectIndex(0)
@@ -114,7 +114,6 @@ export function CreateMCQForm({
         value={stem}
         onChange={(e) => setStem(e.target.value)}
         placeholder="Enter the question or scenario..."
-        error={!state.success ? state.fieldErrors?.stem?.[0] : undefined}
       />
 
       {/* Markdown helper text */}
@@ -143,11 +142,6 @@ export function CreateMCQForm({
           Answer Options
         </label>
         
-        {!state.success && state.fieldErrors?.options && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {state.fieldErrors.options[0]}
-          </p>
-        )}
 
         {options.map((option, index) => (
           <div key={index} className="flex items-center gap-2">
@@ -211,13 +205,6 @@ export function CreateMCQForm({
         </p>
       </div>
 
-      {/* Correct index error */}
-      {!state.success && state.fieldErrors?.correctIndex && (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {state.fieldErrors.correctIndex[0]}
-        </p>
-      )}
-
       {/* Explanation (optional) */}
       <Textarea
         label="Explanation (optional)"
@@ -225,7 +212,6 @@ export function CreateMCQForm({
         value={explanation}
         onChange={(e) => setExplanation(e.target.value)}
         placeholder="Explain why the correct answer is correct..."
-        error={!state.success ? state.fieldErrors?.explanation?.[0] : undefined}
       />
 
       {/* Optional image URL */}
@@ -234,11 +220,10 @@ export function CreateMCQForm({
         name="imageUrl"
         type="url"
         placeholder="https://example.com/image.jpg"
-        error={!state.success ? state.fieldErrors?.imageUrl?.[0] : undefined}
       />
 
-      {/* General error message */}
-      {!state.success && state.error && !state.fieldErrors && (
+      {/* Error message */}
+      {!state.ok && (
         <p className="text-sm text-red-400" role="alert">
           {state.error}
         </p>

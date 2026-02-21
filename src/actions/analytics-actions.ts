@@ -13,31 +13,12 @@ import type {
   DeckProgress,
   DailyActivity,
 } from '@/types/database'
+import type { ActionResultV2 } from '@/types/actions'
 
-export interface AnalyticsResult {
-  success: boolean
-  topicAccuracies: TopicAccuracy[]
-  deckProgress: DeckProgress[]
-  weakestTopic: TopicAccuracy | null
-  error?: string
-}
-
-export interface ActivityResult {
-  success: boolean
-  activity: DailyActivity[]
-  error?: string
-}
-
-export async function getUserAnalytics(): Promise<AnalyticsResult> {
+export async function getUserAnalytics(): Promise<ActionResultV2<{ topicAccuracies: TopicAccuracy[]; deckProgress: DeckProgress[]; weakestTopic: TopicAccuracy | null }>> {
   const user = await getUser()
   if (!user) {
-    return {
-      success: false,
-      topicAccuracies: [],
-      deckProgress: [],
-      weakestTopic: null,
-      error: 'Authentication required',
-    }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -50,25 +31,14 @@ export async function getUserAnalytics(): Promise<AnalyticsResult> {
       .eq('is_active', true)
 
     if (userDecksError) {
-      return {
-        success: false,
-        topicAccuracies: [],
-        deckProgress: [],
-        weakestTopic: null,
-        error: userDecksError.message,
-      }
+      return { ok: false, error: userDecksError.message }
     }
 
 
     const deckTemplateIds = userDecks?.map(d => d.deck_template_id) || []
 
     if (deckTemplateIds.length === 0) {
-      return {
-        success: true,
-        topicAccuracies: [],
-        deckProgress: [],
-        weakestTopic: null,
-      }
+      return { ok: true, data: { topicAccuracies: [], deckProgress: [], weakestTopic: null } }
     }
 
     const selectQuery = `correct_count, total_attempts, card_template_id, card_templates!inner(id, deck_template_id, card_template_tags(tags!inner(id, name, color, category)))`
@@ -78,13 +48,7 @@ export async function getUserAnalytics(): Promise<AnalyticsResult> {
       .eq('user_id', user.id)
 
     if (progressError) {
-      return {
-        success: false,
-        topicAccuracies: [],
-        deckProgress: [],
-        weakestTopic: null,
-        error: progressError.message,
-      }
+      return { ok: false, error: progressError.message }
     }
 
     const topicMap = new Map<string, {
@@ -189,33 +153,21 @@ export async function getUserAnalytics(): Promise<AnalyticsResult> {
     const weakestTopic = findWeakestTopic(topicAccuracies)
     const deckProgress: DeckProgress[] = Array.from(deckProgressMap.values())
 
-    return {
-      success: true,
-      topicAccuracies,
-      deckProgress,
-      weakestTopic,
-    }
+    return { ok: true, data: { topicAccuracies, deckProgress, weakestTopic } }
   } catch (error) {
     console.error('getUserAnalytics error:', error)
-    return {
-      success: false,
-      topicAccuracies: [],
-      deckProgress: [],
-      weakestTopic: null,
-      error: 'Failed to fetch analytics data',
-    }
+    return { ok: false, error: 'Failed to fetch analytics data' }
   }
 }
 
 
-export async function getActivityData(days: number = 7): Promise<ActivityResult> {
+export async function getActivityData(days: number = 7): Promise<ActionResultV2<{ activity: DailyActivity[] }>> {
+  // V20.6: Bounds validation — cap days to prevent expensive queries
+  const safeDays = Math.max(1, Math.min(365, Math.floor(days)))
+
   const user = await getUser()
   if (!user) {
-    return {
-      success: false,
-      activity: [],
-      error: 'Authentication required',
-    }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -223,7 +175,7 @@ export async function getActivityData(days: number = 7): Promise<ActivityResult>
   try {
     const today = new Date()
     const startDate = new Date(today)
-    startDate.setDate(startDate.getDate() - (days - 1))
+    startDate.setDate(startDate.getDate() - (safeDays - 1))
     const startDateStr = startDate.toISOString().split('T')[0]
 
     const { data: logs, error: logsError } = await supabase
@@ -234,11 +186,7 @@ export async function getActivityData(days: number = 7): Promise<ActivityResult>
       .order('study_date', { ascending: true })
 
     if (logsError) {
-      return {
-        success: false,
-        activity: [],
-        error: logsError.message,
-      }
+      return { ok: false, error: logsError.message }
     }
 
     const logMap = new Map<string, number>()
@@ -247,7 +195,7 @@ export async function getActivityData(days: number = 7): Promise<ActivityResult>
     }
 
     const activity: DailyActivity[] = []
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = safeDays - 1; i >= 0; i--) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
@@ -259,41 +207,24 @@ export async function getActivityData(days: number = 7): Promise<ActivityResult>
       })
     }
 
-    return {
-      success: true,
-      activity,
-    }
+    return { ok: true, data: { activity } }
   } catch (error) {
     console.error('getActivityData error:', error)
-    return {
-      success: false,
-      activity: [],
-      error: 'Failed to fetch activity data',
-    }
+    return { ok: false, error: 'Failed to fetch activity data' }
   }
 }
 
 
-export interface SubjectResult {
-  success: boolean
-  subject: string
-  error?: string
-}
-
 /**
  * Gets the user's current subject from their first active deck.
  * Returns "General" as default if no decks found.
- * 
+ *
  * Requirements: 2.2, 2.3
  */
-export async function getUserSubject(): Promise<SubjectResult> {
+export async function getUserSubject(): Promise<ActionResultV2<{ subject: string }>> {
   const user = await getUser()
   if (!user) {
-    return {
-      success: false,
-      subject: 'General',
-      error: 'Authentication required',
-    }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -307,11 +238,7 @@ export async function getUserSubject(): Promise<SubjectResult> {
       .limit(1)
 
     if (userDecksError) {
-      return {
-        success: false,
-        subject: 'General',
-        error: userDecksError.message,
-      }
+      return { ok: false, error: userDecksError.message }
     }
 
     const decks = userDecks?.map(ud => {
@@ -321,17 +248,10 @@ export async function getUserSubject(): Promise<SubjectResult> {
 
     const subject = deriveSubjectFromDecks(decks)
 
-    return {
-      success: true,
-      subject,
-    }
+    return { ok: true, data: { subject } }
   } catch (error) {
     console.error('getUserSubject error:', error)
-    return {
-      success: false,
-      subject: 'General',
-      error: 'Failed to fetch subject',
-    }
+    return { ok: false, error: 'Failed to fetch subject' }
   }
 }
 
@@ -340,19 +260,13 @@ export async function getUserSubject(): Promise<SubjectResult> {
 // V22: Study Data Export
 // ============================================
 
-export interface StudyExportResult {
-  success: boolean
-  csv: string
-  error?: string
-}
-
 /**
  * Export study data as CSV: card stem, correct count, total attempts, accuracy, last reviewed.
  */
-export async function exportStudyData(): Promise<StudyExportResult> {
+export async function exportStudyData(): Promise<ActionResultV2<{ csv: string }>> {
   const user = await getUser()
   if (!user) {
-    return { success: false, csv: '', error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -365,7 +279,7 @@ export async function exportStudyData(): Promise<StudyExportResult> {
       .order('last_reviewed', { ascending: false })
 
     if (error) {
-      return { success: false, csv: '', error: error.message }
+      return { ok: false, error: error.message }
     }
 
     const rows: string[] = ['Deck,Question Stem,Correct,Attempts,Accuracy %,Last Reviewed']
@@ -377,10 +291,10 @@ export async function exportStudyData(): Promise<StudyExportResult> {
       rows.push(`"${deckTitle}","${stem}",${p.correct_count},${p.total_attempts},${acc},${p.last_reviewed || ''}`)
     }
 
-    return { success: true, csv: rows.join('\n') }
+    return { ok: true, data: { csv: rows.join('\n') } }
   } catch (err) {
     console.error('exportStudyData error:', err)
-    return { success: false, csv: '', error: 'Failed to export study data' }
+    return { ok: false, error: 'Failed to export study data' }
   }
 }
 
@@ -405,7 +319,7 @@ export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
   return withUser(async ({ user, supabase }: AuthContext) => {
     // Get global stats for due count
     const statsResult = await getGlobalStats()
-    const dueCount = statsResult.success ? statsResult.totalDueCount : 0
+    const dueCount = statsResult.ok ? statsResult.data?.totalDueCount ?? 0 : 0
 
     // Get today's reviewed count from study_logs
     const todayDateStr = new Date().toISOString().split('T')[0]

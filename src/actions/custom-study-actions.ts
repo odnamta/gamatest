@@ -3,6 +3,7 @@
 import { withOrgUser } from '@/actions/_helpers'
 import type { Card, CardTemplate, UserCardProgress } from '@/types/database'
 import type { SessionMode } from '@/lib/custom-session-params'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * Input for getCustomSessionCards
@@ -14,16 +15,6 @@ export interface CustomSessionInput {
   limit: number
   // V10.6: Flagged only filter
   flaggedOnly?: boolean
-}
-
-/**
- * Result type for getCustomSessionCards
- */
-export interface CustomSessionResult {
-  success: boolean
-  cards: Card[]
-  totalMatching: number
-  error?: string
 }
 
 /**
@@ -84,7 +75,7 @@ function templateToCard(
  */
 export async function getCustomSessionCardsV2(
   input: CustomSessionInput
-): Promise<CustomSessionResult> {
+): Promise<ActionResultV2<{ cards: Card[]; totalMatching: number }>> {
   const result = await withOrgUser(async ({ user, supabase, org }) => {
     const { tagIds = [], deckIds = [], mode, limit, flaggedOnly = false } = input
     const now = new Date().toISOString()
@@ -92,9 +83,7 @@ export async function getCustomSessionCardsV2(
     // Must have at least one filter
     if (tagIds.length === 0 && deckIds.length === 0) {
       return {
-        success: false,
-        cards: [] as Card[],
-        totalMatching: 0,
+        ok: false as const,
         error: 'Please select at least one tag or deck',
       }
     }
@@ -108,12 +97,7 @@ export async function getCustomSessionCardsV2(
         .eq('is_active', true)
 
       if (userDecksError) {
-        return {
-          success: false,
-          cards: [] as Card[],
-          totalMatching: 0,
-          error: userDecksError.message,
-        }
+        return { ok: false as const, error: userDecksError.message }
       }
 
       // V13: Filter subscribed decks to only those in the user's org
@@ -141,12 +125,7 @@ export async function getCustomSessionCardsV2(
           .in('tag_id', tagIds)
 
         if (tagError) {
-          return {
-            success: false,
-            cards: [] as Card[],
-            totalMatching: 0,
-            error: tagError.message,
-          }
+          return { ok: false as const, error: tagError.message }
         }
 
         for (const ct of taggedCards || []) {
@@ -162,12 +141,7 @@ export async function getCustomSessionCardsV2(
           .in('deck_template_id', validDeckIds)
 
         if (deckError) {
-          return {
-            success: false,
-            cards: [] as Card[],
-            totalMatching: 0,
-            error: deckError.message,
-          }
+          return { ok: false as const, error: deckError.message }
         }
 
         for (const c of deckCards || []) {
@@ -177,11 +151,7 @@ export async function getCustomSessionCardsV2(
 
       // If no cards match, return empty
       if (cardTemplateIds.size === 0) {
-        return {
-          success: true,
-          cards: [] as Card[],
-          totalMatching: 0,
-        }
+        return { ok: true as const, data: { cards: [] as Card[], totalMatching: 0 } }
       }
 
       // Fetch card_templates with their progress
@@ -194,12 +164,7 @@ export async function getCustomSessionCardsV2(
         .in('id', cardTemplateIdArray)
 
       if (templatesError) {
-        return {
-          success: false,
-          cards: [] as Card[],
-          totalMatching: 0,
-          error: templatesError.message,
-        }
+        return { ok: false as const, error: templatesError.message }
       }
 
       // Get user's progress for these cards
@@ -210,12 +175,7 @@ export async function getCustomSessionCardsV2(
         .in('card_template_id', cardTemplateIdArray)
 
       if (progressError) {
-        return {
-          success: false,
-          cards: [] as Card[],
-          totalMatching: 0,
-          error: progressError.message,
-        }
+        return { ok: false as const, error: progressError.message }
       }
 
       // Create a map of progress by card_template_id
@@ -258,26 +218,17 @@ export async function getCustomSessionCardsV2(
       }
 
       return {
-        success: true,
-        cards: resultCards,
-        totalMatching,
+        ok: true as const,
+        data: { cards: resultCards, totalMatching },
       }
     } catch (error) {
       console.error('Custom session V2 error:', error)
-      return {
-        success: false,
-        cards: [] as Card[],
-        totalMatching: 0,
-        error: 'Failed to fetch cards',
-      }
+      return { ok: false as const, error: 'Failed to fetch cards' }
     }
   })
 
-  // Map withOrgUser auth/org errors to existing return format
-  if ('ok' in result && result.ok === false) {
-    return { success: false, cards: [], totalMatching: 0, error: result.error }
-  }
-  return result as CustomSessionResult
+  // withOrgUser already returns { ok: false, error } for auth/org errors
+  return result as ActionResultV2<{ cards: Card[]; totalMatching: number }>
 }
 
 /**
@@ -286,6 +237,6 @@ export async function getCustomSessionCardsV2(
  */
 export async function getCustomSessionCards(
   input: CustomSessionInput
-): Promise<CustomSessionResult> {
+): Promise<ActionResultV2<{ cards: Card[]; totalMatching: number }>> {
   return getCustomSessionCardsV2(input)
 }

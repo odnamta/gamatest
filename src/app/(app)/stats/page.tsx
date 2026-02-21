@@ -17,20 +17,20 @@ export default async function StatsPage() {
     getActivityData(7),
   ])
 
-  if (!analyticsResult.success || !activityResult.success) {
+  if (!analyticsResult.ok || !activityResult.ok) {
     return (
       <div className="p-4 md:p-6">
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <p className="text-red-600">
-            {analyticsResult.error || activityResult.error || 'Failed to load analytics'}
+            {(!analyticsResult.ok ? analyticsResult.error : undefined) || (!activityResult.ok ? activityResult.error : undefined) || 'Failed to load analytics'}
           </p>
         </div>
       </div>
     )
   }
 
-  const { topicAccuracies, deckProgress, weakestTopic } = analyticsResult
-  const { activity } = activityResult
+  const { topicAccuracies, deckProgress, weakestTopic } = analyticsResult.data!
+  const { activity } = activityResult.data!
 
   const hasData = topicAccuracies.length > 0 || activity.some(d => d.cardsReviewed > 0)
 

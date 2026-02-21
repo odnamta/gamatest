@@ -26,8 +26,8 @@ export default async function LibraryPage() {
         </Link>
       </div>
 
-      {result.success ? (
-        <LibraryGrid decks={result.decks} />
+      {result.ok ? (
+        <LibraryGrid decks={result.data?.decks ?? []} />
       ) : (
         <div className="text-center py-12">
           <p className="text-red-600 dark:text-red-400">

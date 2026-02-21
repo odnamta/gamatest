@@ -3,13 +3,12 @@
 import { useState, useEffect, useTransition } from 'react'
 import { Wrench, CheckCircle, AlertCircle, Merge } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { 
-  checkHealthStatus, 
+import {
+  checkHealthStatus,
   healAuthorProgress,
   findDuplicateDeckGroups,
   mergeDuplicateDecks,
   type DuplicateDecksResult,
-  type MergeResult,
 } from '@/actions/heal-actions'
 
 /**
@@ -30,15 +29,15 @@ export function RepairButton() {
   // V8.2: Duplicate deck state
   const [duplicateStatus, setDuplicateStatus] = useState<'checking' | 'none' | 'found' | 'merged' | 'error'>('checking')
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateDecksResult | null>(null)
-  const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
+  const [mergeResult, setMergeResult] = useState<{ mergedCount: number; movedCards: number; deletedDuplicates: number } | null>(null)
 
   // Check health status on mount
   useEffect(() => {
     // Check for missing progress records
     checkHealthStatus().then(result => {
-      if (result.needsRepair) {
+      if (result.ok && result.data?.needsRepair) {
         setStatus('needs-repair')
-        setMissingCount(result.missingCount)
+        setMissingCount(result.data.missingCount)
       } else {
         setStatus('healthy')
       }
@@ -48,9 +47,9 @@ export function RepairButton() {
 
     // V8.2: Check for duplicate decks
     findDuplicateDeckGroups().then(result => {
-      if (result.hasDuplicates) {
+      if (result.ok && result.data?.hasDuplicates) {
         setDuplicateStatus('found')
-        setDuplicateInfo(result)
+        setDuplicateInfo(result.data)
       } else {
         setDuplicateStatus('none')
       }
@@ -62,9 +61,9 @@ export function RepairButton() {
   const handleRepair = () => {
     startTransition(async () => {
       const result = await healAuthorProgress()
-      if (result.success) {
+      if (result.ok) {
         setStatus('repaired')
-        setHealedCount(result.healedCount)
+        setHealedCount(result.data?.healedCount ?? 0)
       } else {
         setStatus('error')
         setErrorMessage(result.error || 'Unknown error')
@@ -76,9 +75,9 @@ export function RepairButton() {
   const handleMerge = () => {
     startTransition(async () => {
       const result = await mergeDuplicateDecks()
-      if (result.success) {
+      if (result.ok) {
         setDuplicateStatus('merged')
-        setMergeResult(result)
+        setMergeResult(result.data ?? { mergedCount: 0, movedCards: 0, deletedDuplicates: 0 })
       } else {
         setDuplicateStatus('error')
         setErrorMessage(result.error || 'Merge failed')

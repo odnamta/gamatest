@@ -28,10 +28,11 @@ export function CleanDuplicatesButton({ deckId }: CleanDuplicatesButtonProps) {
       const result = await removeDuplicateCards(deckId)
       
       if (result.ok) {
-        if (result.deletedCount === 0) {
+        const deletedCount = result.data?.deletedCount ?? 0
+        if (deletedCount === 0) {
           showToast('No duplicate cards found', 'info')
         } else {
-          showToast(`Removed ${result.deletedCount} duplicate card${result.deletedCount === 1 ? '' : 's'}`, 'success')
+          showToast(`Removed ${deletedCount} duplicate card${deletedCount === 1 ? '' : 's'}`, 'success')
           router.refresh()
         }
       } else {

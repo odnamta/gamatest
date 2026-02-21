@@ -56,7 +56,7 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
 
     setIsLoading(false)
 
-    if (!result.success) {
+    if (!result.ok) {
       setError(result.error || 'Failed to submit answer')
       return
     }
@@ -66,9 +66,9 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
       ...prev,
       isAnswered: true,
       selectedIndex,
-      correctIndex: result.correctIndex ?? null,
-      correctCount: result.isCorrect ? prev.correctCount + 1 : prev.correctCount,
-      incorrectCount: !result.isCorrect ? prev.incorrectCount + 1 : prev.incorrectCount,
+      correctIndex: result.data?.correctIndex ?? null,
+      correctCount: result.data?.isCorrect ? prev.correctCount + 1 : prev.correctCount,
+      incorrectCount: !result.data?.isCorrect ? prev.incorrectCount + 1 : prev.incorrectCount,
     }))
   }
 

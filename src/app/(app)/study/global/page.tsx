@@ -40,17 +40,19 @@ export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageP
   const tagIds = parseTagIdsFromUrl(params)
 
   // Fetch global due cards with batch pagination and optional tag filter
-  const { cards, totalDue, hasMoreBatches, isNewCardsFallback, error } = await getGlobalDueCards(
+  const dueCardsResult = await getGlobalDueCards(
     validBatchNumber,
     tagIds.length > 0 ? tagIds : undefined
   )
-  
+
   // Fetch user stats for streak
-  const { stats } = await getUserStats()
+  const statsResult = await getUserStats()
+  const stats = statsResult.ok ? statsResult.data?.stats : null
   const currentStreak = stats?.current_streak ?? 0
 
   // Handle error state
-  if (error) {
+  if (!dueCardsResult.ok) {
+    const error = dueCardsResult.error
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="text-center py-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -67,6 +69,8 @@ export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageP
     )
   }
 
+  const { cards, totalDue, hasMoreBatches, isNewCardsFallback } = dueCardsResult.data!
+
   // Handle empty state - redirect to dashboard with message
   if (cards.length === 0) {
     redirect('/dashboard?message=no-cards')
@@ -80,7 +84,7 @@ export default async function GlobalStudyPage({ searchParams }: GlobalStudyPageP
 
   // Handler for continue studying - navigate to next batch
   // V11.7: Preserve tag filter in next batch URL
-  const nextBatchUrl = hasMoreBatches 
+  const nextBatchUrl = hasMoreBatches
     ? `/study/global?batch=${validBatchNumber + 1}${tagIds.length > 0 ? `&tags=${tagIds.join(',')}` : ''}`
     : undefined
 

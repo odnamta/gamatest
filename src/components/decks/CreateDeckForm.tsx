@@ -5,7 +5,7 @@ import { useActionState } from 'react'
 import { createDeckAction } from '@/actions/deck-actions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import type { ActionResult } from '@/types/actions'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * V9.1: Common subject areas for subject dropdown
@@ -23,7 +23,7 @@ const COMMON_SUBJECTS = [
   'Dermatology',
 ]
 
-const initialState: ActionResult = { success: true }
+const initialState: ActionResultV2 = { ok: true }
 
 /**
  * V9.1: Enhanced CreateDeckForm with subject field
@@ -40,7 +40,7 @@ export function CreateDeckForm() {
           <Input
             name="title"
             placeholder="Enter new deck title..."
-            error={!state.success ? state.fieldErrors?.title?.[0] : undefined}
+            error={!state.ok ? state.error : undefined}
           />
         </div>
         <Button type="submit" disabled={isPending}>

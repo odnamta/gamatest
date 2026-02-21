@@ -35,18 +35,24 @@ export async function inviteMember(
       return { ok: false, error: 'Cannot invite someone as owner. Promote after joining.' }
     }
 
-    // Check if already a member
-    const { data: existingMember } = await supabase
-      .from('organization_members')
+    // V20.6: Check if already a member — fetch user ID first to avoid nested query
+    const { data: targetProfile } = await supabase
+      .from('profiles')
       .select('id')
-      .eq('org_id', org.id)
-      .eq('user_id', (
-        await supabase.from('auth.users').select('id').eq('email', email).single()
-      ).data?.id ?? '')
+      .eq('email', email)
       .maybeSingle()
 
-    if (existingMember) {
-      return { ok: false, error: 'This user is already a member' }
+    if (targetProfile) {
+      const { data: existingMember } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('org_id', org.id)
+        .eq('user_id', targetProfile.id)
+        .maybeSingle()
+
+      if (existingMember) {
+        return { ok: false, error: 'This user is already a member' }
+      }
     }
 
     // Check for existing pending invitation

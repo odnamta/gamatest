@@ -5,7 +5,8 @@ import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { createCardSchema } from '@/lib/validations'
 import { getCardDefaults } from '@/lib/card-defaults'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
-import type { ActionResult } from '@/types/actions'
+import { formatZodErrors } from '@/lib/zod-utils'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * V8.0: Server Action for creating a new card (flashcard).
@@ -13,9 +14,9 @@ import type { ActionResult } from '@/types/actions'
  * Requirements: 3.1, 3.2, 9.3, V8 2.2
  */
 export async function createCardAction(
-  _prevState: ActionResult,
+  _prevState: ActionResultV2,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResultV2> {
   const rawData = {
     deckId: formData.get('deckId'),
     front: formData.get('front'),
@@ -38,27 +39,19 @@ export async function createCardAction(
   const validationResult = createCardSchema.safeParse(rawData)
   
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) {
-        fieldErrors[field] = []
-      }
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   // Get authenticated user
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   // Rate limit check
   const rateLimitResult = checkRateLimit(`user:${user.id}:createCard`, RATE_LIMITS.standard)
   if (!rateLimitResult.allowed) {
-    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { deckId, front, back } = validationResult.data
@@ -72,11 +65,11 @@ export async function createCardAction(
     .single()
 
   if (deckError || !deckTemplate) {
-    return { success: false, error: 'Deck not found in V2 schema. Please run migration.' }
+    return { ok: false, error: 'Deck not found in V2 schema. Please run migration.' }
   }
 
   if (deckTemplate.author_id !== user.id) {
-    return { success: false, error: 'Access denied' }
+    return { ok: false, error: 'Access denied' }
   }
 
   // V8.0: Create card_template (flashcards stored as MCQ with front/back as stem/explanation)
@@ -95,7 +88,7 @@ export async function createCardAction(
     .single()
 
   if (insertError || !cardTemplate) {
-    return { success: false, error: insertError?.message || 'Failed to create card' }
+    return { ok: false, error: insertError?.message || 'Failed to create card' }
   }
 
   // V8.0: Create user_card_progress with default SM-2 values
@@ -124,16 +117,8 @@ export async function createCardAction(
   // Revalidate deck details page to show new card
   revalidatePath(`/decks/${deckId}`)
 
-  return { success: true, data: cardTemplate }
+  return { ok: true, data: cardTemplate }
 }
-
-
-/**
- * Result type for card update/delete operations
- */
-export type CardActionResult = 
-  | { ok: true }
-  | { ok: false; error: string }
 
 /**
  * Input type for updating a flashcard
@@ -165,7 +150,7 @@ export type UpdateCardInput = UpdateFlashcardInput | UpdateMCQInput
  * Updates card_templates table only (no legacy fallback).
  * Requirements: FR-2, FR-4, V8 2.3, V8 4.1
  */
-export async function updateCard(input: UpdateCardInput): Promise<CardActionResult> {
+export async function updateCard(input: UpdateCardInput): Promise<ActionResultV2> {
   // Get authenticated user
   const user = await getUser()
   if (!user) {
@@ -244,7 +229,7 @@ export async function updateCard(input: UpdateCardInput): Promise<CardActionResu
  * Deletes from card_templates only (no legacy fallback).
  * Requirements: FR-3, FR-4, V8 2.4, V8 4.1
  */
-export async function deleteCard(cardId: string): Promise<CardActionResult> {
+export async function deleteCard(cardId: string): Promise<ActionResultV2> {
   // Get authenticated user
   const user = await getUser()
   if (!user) {
@@ -299,7 +284,7 @@ export async function deleteCard(cardId: string): Promise<CardActionResult> {
  * Creates new card_template and user_card_progress.
  * Requirements: B.2, B.3, B.4, V8 2.2
  */
-export async function duplicateCard(cardId: string): Promise<CardActionResult> {
+export async function duplicateCard(cardId: string): Promise<ActionResultV2> {
   // Get authenticated user
   const user = await getUser()
   if (!user) {
@@ -370,7 +355,7 @@ export async function duplicateCard(cardId: string): Promise<CardActionResult> {
  * Deletes from card_templates only.
  * Requirements: C.4, C.5, V8 2.4
  */
-export async function bulkDeleteCards(cardIds: string[]): Promise<CardActionResult & { count?: number }> {
+export async function bulkDeleteCards(cardIds: string[]): Promise<ActionResultV2<{ count: number }>> {
   if (!cardIds.length) {
     return { ok: false, error: 'No cards selected' }
   }
@@ -430,7 +415,7 @@ export async function bulkDeleteCards(cardIds: string[]): Promise<CardActionResu
     revalidatePath(`/decks/${deckId}`)
   }
 
-  return { ok: true, count: cardIds.length }
+  return { ok: true, data: { count: cardIds.length } }
 }
 
 /**
@@ -441,7 +426,7 @@ export async function bulkDeleteCards(cardIds: string[]): Promise<CardActionResu
 export async function bulkMoveCards(
   cardIds: string[],
   targetDeckId: string
-): Promise<CardActionResult & { count?: number }> {
+): Promise<ActionResultV2<{ count: number }>> {
   if (!cardIds.length) {
     return { ok: false, error: 'No cards selected' }
   }
@@ -510,7 +495,7 @@ export async function bulkMoveCards(
   }
   revalidatePath(`/decks/${targetDeckId}`)
 
-  return { ok: true, count: cardIds.length }
+  return { ok: true, data: { count: cardIds.length } }
 }
 
 
@@ -581,11 +566,7 @@ export async function getAllCardIdsInDeck(deckId: string): Promise<string[]> {
   return cardTemplates.map(ct => ct.id)
 }
 
-export interface DeduplicationResult {
-  ok: boolean
-  deletedCount?: number
-  error?: string
-}
+export type DeduplicationResult = ActionResultV2<{ deletedCount: number }>
 
 /**
  * V8.3: Server Action for removing duplicate MCQ cards from a deck.
@@ -628,14 +609,14 @@ export async function removeDuplicateCards(deckId: string): Promise<Deduplicatio
   }
 
   if (!cards || cards.length === 0) {
-    return { ok: true, deletedCount: 0 }
+    return { ok: true, data: { deletedCount: 0 } }
   }
 
   // Identify duplicates using pure function
   const toDelete = identifyDuplicates(cards)
 
   if (toDelete.length === 0) {
-    return { ok: true, deletedCount: 0 }
+    return { ok: true, data: { deletedCount: 0 } }
   }
 
   // Delete duplicate card_templates (CASCADE handles user_card_progress and card_template_tags)
@@ -656,7 +637,7 @@ export async function removeDuplicateCards(deckId: string): Promise<Deduplicatio
   // Revalidate deck page
   revalidatePath(`/decks/${deckId}`)
 
-  return { ok: true, deletedCount: toDelete.length }
+  return { ok: true, data: { deletedCount: toDelete.length } }
 }
 
 // ============================================
@@ -674,11 +655,7 @@ export interface BulkPublishInput {
   }
 }
 
-export interface BulkPublishResult {
-  ok: boolean
-  count?: number
-  error?: string
-}
+export type BulkPublishResult = ActionResultV2<{ count: number }>
 
 /**
  * V11.4: Server Action for bulk publishing cards.
@@ -733,7 +710,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
       .map(ct => ct.id)
 
     if (cardIdsToPublish.length === 0) {
-      return { ok: true, count: 0 }
+      return { ok: true, data: { count: 0 } }
     }
 
     deckId = cardTemplates[0]?.deck_template_id || null
@@ -792,7 +769,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
     }
 
     if (cardIdsToPublish.length === 0) {
-      return { ok: true, count: 0 }
+      return { ok: true, data: { count: 0 } }
     }
 
   } else {
@@ -814,5 +791,5 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
     revalidatePath(`/decks/${deckId}`)
   }
 
-  return { ok: true, count: cardIdsToPublish.length }
+  return { ok: true, data: { count: cardIdsToPublish.length } }
 }

@@ -48,7 +48,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
     setShowMenu(false)
     startTransition(async () => {
       const result = await unsubscribeFromDeck(deck.id)
-      if (result.success) {
+      if (result.ok) {
         onUnsubscribeSuccess?.()
       } else {
         setIsVisible(true) // Restore on error

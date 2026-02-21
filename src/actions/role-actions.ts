@@ -1,10 +1,19 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { withOrgUser } from './_helpers'
 import { canManageRoleProfiles, canAssignRoles } from '@/lib/skill-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 import type { RoleProfile, RoleSkillRequirement, EmployeeRoleAssignment, SkillPriority } from '@/types/database'
+
+// V20.6: Validation schemas for role actions
+const updateRoleProfileSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long').optional(),
+  description: z.string().max(500, 'Description too long').optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid color format').optional(),
+  sort_order: z.number().int().min(0).max(1000).optional(),
+})
 
 /**
  * V19.1: Create a new role profile for the org.
@@ -49,16 +58,28 @@ export async function updateRoleProfile(
   id: string,
   updates: { name?: string; description?: string; color?: string; sort_order?: number }
 ): Promise<ActionResultV2<RoleProfile>> {
+  // V20.6: Validate ID format
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return { ok: false, error: 'Invalid role profile ID' }
+  }
+
+  // V20.6: Validate updates with Zod schema
+  const validation = updateRoleProfileSchema.safeParse(updates)
+  if (!validation.success) {
+    return { ok: false, error: validation.error.issues[0].message }
+  }
+
   return withOrgUser(async ({ supabase, org, role }) => {
     if (!canManageRoleProfiles(role)) {
       return { ok: false, error: 'Admin access required' }
     }
 
+    const validated = validation.data
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
-    if (updates.name !== undefined) updateData.name = updates.name.trim()
-    if (updates.description !== undefined) updateData.description = updates.description.trim() || null
-    if (updates.color !== undefined) updateData.color = updates.color
-    if (updates.sort_order !== undefined) updateData.sort_order = updates.sort_order
+    if (validated.name !== undefined) updateData.name = validated.name.trim()
+    if (validated.description !== undefined) updateData.description = validated.description.trim() || null
+    if (validated.color !== undefined) updateData.color = validated.color
+    if (validated.sort_order !== undefined) updateData.sort_order = validated.sort_order
 
     const { data, error } = await supabase
       .from('role_profiles')

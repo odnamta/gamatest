@@ -7,6 +7,7 @@ import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './
 import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getCategoryColor } from '@/lib/tag-colors'
 import { TAG_CATEGORIES, isValidTagCategory } from '@/lib/constants'
+import { hasMinimumRole } from '@/lib/org-authorization'
 import type { Tag, TagCategory } from '@/types/database'
 import type { ActionResultV2 } from '@/types/actions'
 
@@ -51,7 +52,12 @@ export async function createTag(
     return { ok: false, error: validation.error.issues[0].message }
   }
 
-  return withOrgUser(async ({ user, supabase, org }: OrgAuthContext) => {
+  return withOrgUser(async ({ user, supabase, org, role }: OrgAuthContext) => {
+    // V20.6: Candidates cannot create tags — require at least 'member' (creator) role
+    if (!hasMinimumRole(role, 'creator')) {
+      return { ok: false, error: 'Insufficient permissions to create tags' }
+    }
+
     // Check for duplicate name within org (case-insensitive)
     const { data: existing } = await supabase
       .from('tags')

@@ -50,7 +50,7 @@ export function VisibilityToggle({
     startTransition(async () => {
       const result = await updateDeckVisibilityAction(deckId, newVisibility)
       
-      if (result.success) {
+      if (result.ok) {
         onVisibilityChange?.(newVisibility)
         showToast(`Deck is now ${newVisibility}`, 'success')
       } else {

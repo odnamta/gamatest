@@ -3,14 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import type { BrowseDeckItem, MyDeckItem } from '@/types/database'
-
-/**
- * Result type for library actions
- */
-export interface ActionResult {
-  success: boolean
-  error?: string
-}
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * Fetches deck templates visible to the current user for the library browse page.
@@ -18,14 +11,10 @@ export interface ActionResult {
  * 
  * Requirements: 1.1, 1.3, 1.4
  */
-export async function getBrowseDecksForUser(): Promise<{
-  success: boolean
-  decks: BrowseDeckItem[]
-  error?: string
-}> {
+export async function getBrowseDecksForUser(): Promise<ActionResultV2<{ decks: BrowseDeckItem[] }>> {
   const user = await getUser()
   if (!user) {
-    return { success: false, decks: [], error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -47,11 +36,11 @@ export async function getBrowseDecksForUser(): Promise<{
     .order('created_at', { ascending: false })
 
   if (decksError) {
-    return { success: false, decks: [], error: decksError.message }
+    return { ok: false, error: decksError.message }
   }
 
   if (!deckTemplates || deckTemplates.length === 0) {
-    return { success: true, decks: [] }
+    return { ok: true, data: { decks: [] } }
   }
 
 
@@ -63,7 +52,7 @@ export async function getBrowseDecksForUser(): Promise<{
     .eq('is_active', true)
 
   if (userDecksError) {
-    return { success: false, decks: [], error: userDecksError.message }
+    return { ok: false, error: userDecksError.message }
   }
 
   const subscribedDeckIds = new Set((userDecks || []).map(ud => ud.deck_template_id))
@@ -81,7 +70,7 @@ export async function getBrowseDecksForUser(): Promise<{
     created_at: dt.created_at,
   }))
 
-  return { success: true, decks }
+  return { ok: true, data: { decks } }
 }
 
 /**
@@ -91,10 +80,10 @@ export async function getBrowseDecksForUser(): Promise<{
  * 
  * Requirements: 2.1, 2.2, 2.3, 2.5
  */
-export async function subscribeToDeck(deckTemplateId: string): Promise<ActionResult> {
+export async function subscribeToDeck(deckTemplateId: string): Promise<ActionResultV2> {
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -107,12 +96,12 @@ export async function subscribeToDeck(deckTemplateId: string): Promise<ActionRes
     .single()
 
   if (deckError || !deck) {
-    return { success: false, error: 'Deck not found' }
+    return { ok: false, error: 'Deck not found' }
   }
 
   // Check visibility: must be public OR user is author
   if (deck.visibility !== 'public' && deck.author_id !== user.id) {
-    return { success: false, error: 'Deck not found or not accessible' }
+    return { ok: false, error: 'Deck not found or not accessible' }
   }
 
   // Upsert subscription (create or reactivate)
@@ -127,13 +116,13 @@ export async function subscribeToDeck(deckTemplateId: string): Promise<ActionRes
     })
 
   if (upsertError) {
-    return { success: false, error: upsertError.message }
+    return { ok: false, error: upsertError.message }
   }
 
   revalidatePath('/library')
   revalidatePath('/library/my')
 
-  return { success: true }
+  return { ok: true }
 }
 
 
@@ -143,14 +132,10 @@ export async function subscribeToDeck(deckTemplateId: string): Promise<ActionRes
  * 
  * Requirements: 3.1, 3.2, 3.3
  */
-export async function getUserSubscribedDecks(): Promise<{
-  success: boolean
-  decks: MyDeckItem[]
-  error?: string
-}> {
+export async function getUserSubscribedDecks(): Promise<ActionResultV2<{ decks: MyDeckItem[] }>> {
   const user = await getUser()
   if (!user) {
-    return { success: false, decks: [], error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -173,11 +158,11 @@ export async function getUserSubscribedDecks(): Promise<{
     .eq('is_active', true)
 
   if (userDecksError) {
-    return { success: false, decks: [], error: userDecksError.message }
+    return { ok: false, error: userDecksError.message }
   }
 
   if (!userDecks || userDecks.length === 0) {
-    return { success: true, decks: [] }
+    return { ok: true, data: { decks: [] } }
   }
 
   const deckTemplateIds = userDecks.map(ud => ud.deck_template_id)
@@ -189,7 +174,7 @@ export async function getUserSubscribedDecks(): Promise<{
     .in('deck_template_id', deckTemplateIds)
 
   if (cardCountError) {
-    return { success: false, decks: [], error: cardCountError.message }
+    return { ok: false, error: cardCountError.message }
   }
 
   // Count cards per deck
@@ -211,7 +196,7 @@ export async function getUserSubscribedDecks(): Promise<{
     .eq('suspended', false)
 
   if (dueError) {
-    return { success: false, decks: [], error: dueError.message }
+    return { ok: false, error: dueError.message }
   }
 
   // Count due cards per deck
@@ -229,7 +214,7 @@ export async function getUserSubscribedDecks(): Promise<{
     .eq('user_id', user.id)
 
   if (progressError) {
-    return { success: false, decks: [], error: progressError.message }
+    return { ok: false, error: progressError.message }
   }
 
   const progressCardIds = new Set((allProgress || []).map(p => p.card_template_id))
@@ -241,7 +226,7 @@ export async function getUserSubscribedDecks(): Promise<{
     .in('deck_template_id', deckTemplateIds)
 
   if (allCardsError) {
-    return { success: false, decks: [], error: allCardsError.message }
+    return { ok: false, error: allCardsError.message }
   }
 
   // Count new cards per deck (cards without progress)
@@ -274,7 +259,7 @@ export async function getUserSubscribedDecks(): Promise<{
     }
   })
 
-  return { success: true, decks }
+  return { ok: true, data: { decks } }
 }
 
 
@@ -284,10 +269,10 @@ export async function getUserSubscribedDecks(): Promise<{
  * 
  * Requirements: 4.1, 4.2
  */
-export async function unsubscribeFromDeck(deckTemplateId: string): Promise<ActionResult> {
+export async function unsubscribeFromDeck(deckTemplateId: string): Promise<ActionResultV2> {
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -300,10 +285,10 @@ export async function unsubscribeFromDeck(deckTemplateId: string): Promise<Actio
     .eq('deck_template_id', deckTemplateId)
 
   if (error) {
-    return { success: false, error: error.message }
+    return { ok: false, error: error.message }
   }
 
   revalidatePath('/library/my')
 
-  return { success: true }
+  return { ok: true }
 }

@@ -6,7 +6,8 @@ import { createMCQSchema } from '@/lib/validations'
 import { getCardDefaults } from '@/lib/card-defaults'
 import { calculateNextReview } from '@/lib/sm2'
 import { calculateStreak, updateLongestStreak, incrementTotalReviews } from '@/lib/streak'
-import type { ActionResult } from '@/types/actions'
+import { formatZodErrors } from '@/lib/zod-utils'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * V8.0: Server Action for creating a new MCQ card.
@@ -14,9 +15,9 @@ import type { ActionResult } from '@/types/actions'
  * Requirements: 1.1, 3.3, 3.4, V8 2.2
  */
 export async function createMCQAction(
-  _prevState: ActionResult,
+  _prevState: ActionResultV2,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResultV2> {
   // Parse options from form data (they come as option_0, option_1, etc.)
   const options: string[] = []
   let i = 0
@@ -52,21 +53,13 @@ export async function createMCQAction(
   const validationResult = createMCQSchema.safeParse(rawData)
 
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) {
-        fieldErrors[field] = []
-      }
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   // Get authenticated user
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const { deckId, stem, options: validOptions, correctIndex, explanation } = validationResult.data
@@ -80,11 +73,11 @@ export async function createMCQAction(
     .single()
 
   if (deckError || !deckTemplate) {
-    return { success: false, error: 'Deck not found in V2 schema. Please run migration.' }
+    return { ok: false, error: 'Deck not found in V2 schema. Please run migration.' }
   }
 
   if (deckTemplate.author_id !== user.id) {
-    return { success: false, error: 'Access denied' }
+    return { ok: false, error: 'Access denied' }
   }
 
   // V8.0: Create card_template
@@ -103,7 +96,7 @@ export async function createMCQAction(
     .single()
 
   if (insertError || !cardTemplate) {
-    return { success: false, error: insertError?.message || 'Failed to create MCQ' }
+    return { ok: false, error: insertError?.message || 'Failed to create MCQ' }
   }
 
   // V8.0: Create user_card_progress with default SM-2 values
@@ -132,20 +125,18 @@ export async function createMCQAction(
   // Revalidate deck details page to show new card
   revalidatePath(`/decks/${deckId}`)
 
-  return { success: true, data: cardTemplate }
+  return { ok: true, data: cardTemplate }
 }
 
 
 /**
  * Result type for answerMCQAction
  */
-export interface AnswerMCQResult {
-  success: boolean
-  isCorrect?: boolean
-  correctIndex?: number
+export type AnswerMCQResult = ActionResultV2<{
+  isCorrect: boolean
+  correctIndex: number
   explanation?: string | null
-  error?: string
-}
+}>
 
 /**
  * V8.0: Server Action for answering an MCQ during study.
@@ -159,7 +150,7 @@ export async function answerMCQAction(
   // Get authenticated user
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -175,12 +166,12 @@ export async function answerMCQAction(
     .single()
 
   if (cardError || !cardTemplate) {
-    return { success: false, error: 'MCQ card not found in V2 schema' }
+    return { ok: false, error: 'MCQ card not found in V2 schema' }
   }
 
   // Verify correct_index exists
   if (cardTemplate.correct_index === null) {
-    return { success: false, error: 'Invalid MCQ card: missing correct_index' }
+    return { ok: false, error: 'Invalid MCQ card: missing correct_index' }
   }
 
   // Determine correctness (Requirement 2.4, 2.5)
@@ -228,7 +219,7 @@ export async function answerMCQAction(
   })
 
   if (updateError) {
-    return { success: false, error: updateError.message }
+    return { ok: false, error: updateError.message }
   }
 
   // === Update user_stats and study_logs (Requirement 2.6) ===
@@ -243,7 +234,7 @@ export async function answerMCQAction(
     .single()
 
   if (statsError && statsError.code !== 'PGRST116') {
-    return { success: false, error: statsError.message }
+    return { ok: false, error: statsError.message }
   }
 
   // Calculate streak updates
@@ -318,9 +309,11 @@ export async function answerMCQAction(
   revalidatePath(`/study/${cardTemplate.deck_template_id}`)
 
   return {
-    success: true,
-    isCorrect,
-    correctIndex: cardTemplate.correct_index,
-    explanation: cardTemplate.explanation,
+    ok: true,
+    data: {
+      isCorrect,
+      correctIndex: cardTemplate.correct_index,
+      explanation: cardTemplate.explanation,
+    },
   }
 }

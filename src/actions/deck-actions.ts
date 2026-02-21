@@ -5,7 +5,8 @@ import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './_helpers'
 import { createDeckSchema } from '@/lib/validations'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
-import type { ActionResult, ActionResultV2 } from '@/types/actions'
+import { formatZodErrors } from '@/lib/zod-utils'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * V8.0/V9.1: Server Action for creating a new deck.
@@ -14,31 +15,25 @@ import type { ActionResult, ActionResultV2 } from '@/types/actions'
  * Requirements: 2.1, 9.3, V8 2.2, V9.1 3.1
  */
 export async function createDeckAction(
-  prevState: ActionResult,
+  prevState: ActionResultV2,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResultV2> {
   const rawData = { title: formData.get('title') }
 
   const validationResult = createDeckSchema.safeParse(rawData)
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) fieldErrors[field] = []
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   // Rate limit check
   const rateLimitResult = checkRateLimit(`user:${user.id}:createDeck`, RATE_LIMITS.standard)
   if (!rateLimitResult.allowed) {
-    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { title } = validationResult.data
@@ -57,7 +52,7 @@ export async function createDeckAction(
     .single()
 
   if (!membership?.org_id) {
-    return { success: false, error: 'No active organization found. Please join an organization first.' }
+    return { ok: false, error: 'No active organization found. Please join an organization first.' }
   }
 
   // V8.0/V9.1/V13: Create deck_template with subject and org_id
@@ -68,7 +63,7 @@ export async function createDeckAction(
     .single()
 
   if (createError) {
-    return { success: false, error: createError.message }
+    return { ok: false, error: createError.message }
   }
 
   // V8.0: Auto-subscribe author via user_decks
@@ -79,7 +74,7 @@ export async function createDeckAction(
   })
 
   revalidatePath('/dashboard')
-  return { success: true, data: deckTemplate }
+  return { ok: true, data: deckTemplate }
 }
 
 /**
@@ -303,36 +298,28 @@ export async function getUserDeckTemplates(): Promise<{ id: string; title: strin
  * V6.4: Write Path
  */
 export async function createDeckTemplateAction(
-  prevState: ActionResult,
+  prevState: ActionResultV2,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResultV2> {
   const rawData = {
     title: formData.get('title'),
   }
 
   const validationResult = createDeckSchema.safeParse(rawData)
-  
+
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) {
-        fieldErrors[field] = []
-      }
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   // Rate limit check
   const rateLimitResult = checkRateLimit(`user:${user.id}:createDeckTemplate`, RATE_LIMITS.standard)
   if (!rateLimitResult.allowed) {
-    return { success: false, error: 'Rate limit exceeded. Please try again later.' }
+    return { ok: false, error: 'Rate limit exceeded. Please try again later.' }
   }
 
   const { title } = validationResult.data
@@ -348,7 +335,7 @@ export async function createDeckTemplateAction(
     .single()
 
   if (!membership?.org_id) {
-    return { success: false, error: 'No active organization found' }
+    return { ok: false, error: 'No active organization found' }
   }
 
   // V13: Create deck_template with org_id
@@ -364,7 +351,7 @@ export async function createDeckTemplateAction(
     .single()
 
   if (createError) {
-    return { success: false, error: createError.message }
+    return { ok: false, error: createError.message }
   }
 
   // Auto-subscribe author via user_decks
@@ -383,7 +370,7 @@ export async function createDeckTemplateAction(
 
   revalidatePath('/dashboard')
 
-  return { success: true, data: deckTemplate }
+  return { ok: true, data: deckTemplate }
 }
 
 
@@ -399,29 +386,29 @@ export async function createDeckTemplateAction(
  * 
  * @param deckId - The deck_template ID to update
  * @param newTitle - The new title (1-100 characters)
- * @returns ActionResult with success/error
+ * @returns ActionResultV2 with ok/error
  */
 export async function updateDeckTitle(
   deckId: string,
   newTitle: string
-): Promise<ActionResult> {
+): Promise<ActionResultV2<{ title: string }>> {
   // Validate deck ID format
   if (!deckId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deckId)) {
-    return { success: false, error: 'Invalid deck ID' }
+    return { ok: false, error: 'Invalid deck ID' }
   }
 
   // Validate title length (1-100 characters)
   const trimmedTitle = newTitle.trim()
   if (!trimmedTitle || trimmedTitle.length < 1) {
-    return { success: false, error: 'Title cannot be empty' }
+    return { ok: false, error: 'Title cannot be empty' }
   }
   if (trimmedTitle.length > 100) {
-    return { success: false, error: 'Title must be at most 100 characters' }
+    return { ok: false, error: 'Title must be at most 100 characters' }
   }
 
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -434,12 +421,12 @@ export async function updateDeckTitle(
     .single()
 
   if (fetchError || !deckTemplate) {
-    return { success: false, error: 'Deck not found' }
+    return { ok: false, error: 'Deck not found' }
   }
 
   // V8.6: Check user is author
   if (deckTemplate.author_id !== user.id) {
-    return { success: false, error: 'Only the author can rename this deck' }
+    return { ok: false, error: 'Only the author can rename this deck' }
   }
 
   // V8.6: Update the title
@@ -449,14 +436,14 @@ export async function updateDeckTitle(
     .eq('id', deckId)
 
   if (updateError) {
-    return { success: false, error: updateError.message }
+    return { ok: false, error: updateError.message }
   }
 
   // Revalidate paths
   revalidatePath(`/decks/${deckId}`)
   revalidatePath('/dashboard')
 
-  return { success: true, data: { title: trimmedTitle } }
+  return { ok: true, data: { title: trimmedTitle } }
 }
 
 
@@ -472,26 +459,26 @@ export async function updateDeckTitle(
  * 
  * @param deckId - The deck_template ID to update
  * @param newSubject - The new subject area
- * @returns ActionResult with success/error
+ * @returns ActionResultV2 with ok/error
  */
 export async function updateDeckSubject(
   deckId: string,
   newSubject: string
-): Promise<ActionResult> {
+): Promise<ActionResultV2<{ subject: string }>> {
   // Validate deck ID format
   if (!deckId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deckId)) {
-    return { success: false, error: 'Invalid deck ID' }
+    return { ok: false, error: 'Invalid deck ID' }
   }
 
   // Validate subject (allow empty to reset to default)
   const trimmedSubject = newSubject.trim() || 'General'
   if (trimmedSubject.length > 100) {
-    return { success: false, error: 'Subject must be at most 100 characters' }
+    return { ok: false, error: 'Subject must be at most 100 characters' }
   }
 
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -504,12 +491,12 @@ export async function updateDeckSubject(
     .single()
 
   if (fetchError || !deckTemplate) {
-    return { success: false, error: 'Deck not found' }
+    return { ok: false, error: 'Deck not found' }
   }
 
   // Check user is author
   if (deckTemplate.author_id !== user.id) {
-    return { success: false, error: 'Only the author can change the subject' }
+    return { ok: false, error: 'Only the author can change the subject' }
   }
 
   // Update the subject
@@ -519,14 +506,14 @@ export async function updateDeckSubject(
     .eq('id', deckId)
 
   if (updateError) {
-    return { success: false, error: updateError.message }
+    return { ok: false, error: updateError.message }
   }
 
   // Revalidate paths
   revalidatePath(`/decks/${deckId}`)
   revalidatePath(`/decks/${deckId}/add-bulk`)
 
-  return { success: true, data: { subject: trimmedSubject } }
+  return { ok: true, data: { subject: trimmedSubject } }
 }
 
 /**
@@ -561,12 +548,12 @@ export async function getDeckSubject(deckId: string): Promise<string> {
  * This fixes the "0 Cards Due" issue for authors who create decks but haven't studied yet.
  * 
  * @param deckId - The deck_template ID to sync
- * @returns ActionResult with success/error
+ * @returns ActionResultV2 with ok/error
  */
-export async function syncAuthorProgress(deckId: string): Promise<ActionResult> {
+export async function syncAuthorProgress(deckId: string): Promise<ActionResultV2<{ synced: number }>> {
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -579,11 +566,11 @@ export async function syncAuthorProgress(deckId: string): Promise<ActionResult> 
     .single()
 
   if (deckError || !deck) {
-    return { success: false, error: 'Deck not found' }
+    return { ok: false, error: 'Deck not found' }
   }
 
   if (deck.author_id !== user.id) {
-    return { success: false, error: 'Only the author can sync progress' }
+    return { ok: false, error: 'Only the author can sync progress' }
   }
 
   // Get all card IDs in this deck
@@ -593,11 +580,11 @@ export async function syncAuthorProgress(deckId: string): Promise<ActionResult> 
     .eq('deck_template_id', deckId)
 
   if (cardsError) {
-    return { success: false, error: cardsError.message }
+    return { ok: false, error: cardsError.message }
   }
 
   if (!cards || cards.length === 0) {
-    return { success: true, data: { synced: 0 } }
+    return { ok: true, data: { synced: 0 } }
   }
 
   // Bulk insert progress rows (ON CONFLICT DO NOTHING)
@@ -622,14 +609,14 @@ export async function syncAuthorProgress(deckId: string): Promise<ActionResult> 
     })
 
   if (upsertError) {
-    return { success: false, error: upsertError.message }
+    return { ok: false, error: upsertError.message }
   }
 
   revalidatePath(`/decks/${deckId}`)
   revalidatePath('/study')
   revalidatePath('/dashboard')
 
-  return { success: true, data: { synced: cards.length } }
+  return { ok: true, data: { synced: cards.length } }
 }
 
 
@@ -647,25 +634,25 @@ import type { DeckVisibility } from '@/types/database'
  * 
  * @param deckId - The deck_template ID to update
  * @param visibility - The new visibility setting ('private' | 'public')
- * @returns ActionResult with success/error
+ * @returns ActionResultV2 with ok/error
  */
 export async function updateDeckVisibilityAction(
   deckId: string,
   visibility: DeckVisibility
-): Promise<ActionResult> {
+): Promise<ActionResultV2<{ visibility: DeckVisibility }>> {
   // Validate deck ID format
   if (!deckId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deckId)) {
-    return { success: false, error: 'Invalid deck ID' }
+    return { ok: false, error: 'Invalid deck ID' }
   }
 
   // Validate visibility value
   if (visibility !== 'private' && visibility !== 'public') {
-    return { success: false, error: 'Invalid visibility value. Must be "private" or "public"' }
+    return { ok: false, error: 'Invalid visibility value. Must be "private" or "public"' }
   }
 
   const user = await getUser()
   if (!user) {
-    return { success: false, error: 'Authentication required' }
+    return { ok: false, error: 'Authentication required' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -678,12 +665,12 @@ export async function updateDeckVisibilityAction(
     .single()
 
   if (fetchError || !deckTemplate) {
-    return { success: false, error: 'Deck not found' }
+    return { ok: false, error: 'Deck not found' }
   }
 
   // Check user is author - only authors can change visibility
   if (deckTemplate.author_id !== user.id) {
-    return { success: false, error: 'Only the author can change deck visibility' }
+    return { ok: false, error: 'Only the author can change deck visibility' }
   }
 
   // Update the visibility
@@ -693,7 +680,7 @@ export async function updateDeckVisibilityAction(
     .eq('id', deckId)
 
   if (updateError) {
-    return { success: false, error: updateError.message }
+    return { ok: false, error: updateError.message }
   }
 
   // Revalidate paths
@@ -701,5 +688,5 @@ export async function updateDeckVisibilityAction(
   revalidatePath('/library')
   revalidatePath('/dashboard')
 
-  return { success: true, data: { visibility } }
+  return { ok: true, data: { visibility } }
 }

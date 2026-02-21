@@ -74,18 +74,18 @@ export function LessonStudy({ lesson, items, onComplete }: LessonStudyProps) {
 
     setIsLoading(false)
 
-    if (!result.success) {
+    if (!result.ok) {
       setError(result.error || 'Failed to submit answer')
       return
     }
 
-    const isCorrect = result.isCorrect ?? false
+    const isCorrect = result.data?.isCorrect ?? false
 
     setState(prev => ({
       ...prev,
       isAnswered: true,
       selectedIndex,
-      correctIndex: result.correctIndex ?? null,
+      correctIndex: result.data?.correctIndex ?? null,
       correctCount: isCorrect ? prev.correctCount + 1 : prev.correctCount,
       mistakes: isCorrect
         ? prev.mistakes

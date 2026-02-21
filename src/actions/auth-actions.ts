@@ -3,14 +3,15 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { loginSchema, registerSchema } from '@/lib/validations'
-import type { ActionResult } from '@/types/actions'
+import { formatZodErrors } from '@/lib/zod-utils'
+import type { ActionResultV2 } from '@/types/actions'
 
 /**
  * Server Action for user login.
  * Validates input with Zod and authenticates via Supabase Auth.
  * Requirements: 1.1, 1.2, 9.3
  */
-export async function loginAction(formData: FormData): Promise<ActionResult> {
+export async function loginAction(formData: FormData): Promise<ActionResultV2> {
   const rawData = {
     email: formData.get('email'),
     password: formData.get('password'),
@@ -20,15 +21,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
   const validationResult = loginSchema.safeParse(rawData)
   
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) {
-        fieldErrors[field] = []
-      }
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   const { email, password } = validationResult.data
@@ -41,7 +34,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { ok: false, error: error.message }
   }
 
   // Redirect to dashboard on success (Requirement 1.2)
@@ -54,7 +47,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
  * Validates input with Zod and creates account via Supabase Auth.
  * Requirements: 1.1, 9.3
  */
-export async function registerAction(formData: FormData): Promise<ActionResult> {
+export async function registerAction(formData: FormData): Promise<ActionResultV2> {
   const rawData = {
     email: formData.get('email'),
     password: formData.get('password'),
@@ -65,15 +58,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
   const validationResult = registerSchema.safeParse(rawData)
   
   if (!validationResult.success) {
-    const fieldErrors: Record<string, string[]> = {}
-    for (const issue of validationResult.error.issues) {
-      const field = issue.path[0] as string
-      if (!fieldErrors[field]) {
-        fieldErrors[field] = []
-      }
-      fieldErrors[field].push(issue.message)
-    }
-    return { success: false, error: 'Validation failed', fieldErrors }
+    return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
   const { email, password } = validationResult.data
@@ -86,7 +71,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { ok: false, error: error.message }
   }
 
   // Redirect to dashboard on success (Requirement 1.1)

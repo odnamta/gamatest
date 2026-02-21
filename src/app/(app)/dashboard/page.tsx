@@ -34,13 +34,16 @@ export default async function DashboardPage() {
   const now = new Date().toISOString()
 
   // Fetch study logs for heatmap - full year (Requirement 2.2)
-  const { logs: studyLogs } = await getStudyLogs(365)
+  const studyLogsResult = await getStudyLogs(365)
+  const studyLogs = studyLogsResult.ok ? (studyLogsResult.data?.logs ?? []) : []
 
   // Fetch user stats for streak display (Requirement 1.7)
-  const { stats: userStats } = await getUserStats()
+  const userStatsResult = await getUserStats()
+  const userStats = userStatsResult.ok ? (userStatsResult.data?.stats ?? null) : null
 
   // Fetch global stats for DashboardHero (Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8)
-  const globalStats = await getGlobalStats()
+  const globalStatsResult = await getGlobalStats()
+  const globalStats = globalStatsResult.ok ? globalStatsResult.data! : { totalDueCount: 0, completedToday: 0, currentStreak: 0, hasNewCards: false }
 
   // V11.7: Fetch dashboard insights for weakest concepts
   const insightsResult = await getDashboardInsights()

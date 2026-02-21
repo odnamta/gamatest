@@ -12,9 +12,9 @@ export function ExportStudyDataButton() {
     setLoading(true)
     try {
       const result = await exportStudyData()
-      if (!result.success || !result.csv) return
+      if (!result.ok || !result.data?.csv) return
 
-      const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8;' })
+      const blob = new Blob([result.data.csv], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

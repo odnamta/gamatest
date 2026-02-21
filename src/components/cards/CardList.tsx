@@ -416,7 +416,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     dispatch({ type: 'SET_BULK_DELETE_CONFIRM', show: false })
     const result = await bulkDeleteCards([...selectedIds])
     if (result.ok) {
-      showToast(`${result.count} card${result.count !== 1 ? 's' : ''} deleted`, 'success')
+      showToast(`${result.data?.count} card${result.data?.count !== 1 ? 's' : ''} deleted`, 'success')
       clearSelection()
       router.refresh()
     } else {
@@ -428,7 +428,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
     dispatch({ type: 'SHOW_DECK_SELECTOR', show: false })
     const result = await bulkMoveCards([...selectedIds], targetDeckId)
     if (result.ok) {
-      showToast(`${result.count} card${result.count !== 1 ? 's' : ''} moved to ${targetDeckTitle}`, 'success')
+      showToast(`${result.data?.count} card${result.data?.count !== 1 ? 's' : ''} moved to ${targetDeckTitle}`, 'success')
       clearSelection()
       router.refresh()
     } else {
@@ -475,7 +475,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
         : await bulkPublishCards({ cardIds: [...selectedIds] })
 
       if (result.ok) {
-        showToast(`Published ${result.count} card${result.count !== 1 ? 's' : ''} successfully`, 'success')
+        showToast(`Published ${result.data?.count} card${result.data?.count !== 1 ? 's' : ''} successfully`, 'success')
         clearSelection()
         router.refresh()
       } else {
@@ -495,7 +495,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
       const result = await bulkPublishCards({ filterDescriptor: { deckId, status: 'draft' } })
 
       if (result.ok) {
-        showToast(`Published ${result.count} card${result.count !== 1 ? 's' : ''} successfully`, 'success')
+        showToast(`Published ${result.data?.count} card${result.data?.count !== 1 ? 's' : ''} successfully`, 'success')
         dispatch({ type: 'SHOW_PUBLISH_ALL_DIALOG', show: false })
         dispatch({ type: 'SET_STATUS_FILTER', filter: 'published' })
         router.refresh()

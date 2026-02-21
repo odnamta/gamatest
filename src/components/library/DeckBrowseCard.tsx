@@ -19,7 +19,7 @@ export function DeckBrowseCard({ deck, onSubscribeSuccess }: DeckBrowseCardProps
   const handleSubscribe = () => {
     startTransition(async () => {
       const result = await subscribeToDeck(deck.id)
-      if (result.success) {
+      if (result.ok) {
         showToast(`Added "${deck.title}" to your library!`, 'success')
         if (onSubscribeSuccess) {
           onSubscribeSuccess()

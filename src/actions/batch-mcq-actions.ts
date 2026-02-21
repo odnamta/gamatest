@@ -642,46 +642,83 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
     // V11.5.1: Import tag resolver for canonical topic tag matching
     const { resolveTopicTag } = await import('@/lib/tag-resolver')
     
-    // Step 2: Resolve tag names to IDs
+    // Step 2: Batch resolve tag names to IDs (V20.5: replaces N+1 loop)
     // V11.5.1: Use resolveTopicTag for canonical Golden List matching
     const tagNameToId = new Map<string, string>()
-    for (const tagName of allTagNames) {
-      const { data: existingTag } = await supabase
-        .from('tags')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .ilike('name', tagName)
-        .single()
-      
-      if (existingTag) {
-        tagNameToId.set(tagName.toLowerCase(), existingTag.id)
+    const tagNamesArray = Array.from(allTagNames)
+
+    // Step 2a: Fetch all existing tags for this user in a single query
+    const { data: existingUserTags } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .limit(5000)
+
+    const existingByLower = new Map<string, { id: string; name: string }>()
+    for (const tag of existingUserTags ?? []) {
+      existingByLower.set(tag.name.toLowerCase(), tag)
+    }
+
+    // Match existing tags case-insensitively (also check canonical forms)
+    for (const tagName of tagNamesArray) {
+      const existing = existingByLower.get(tagName.toLowerCase())
+      if (existing) {
+        tagNameToId.set(tagName.toLowerCase(), existing.id)
         continue
       }
-      
-      // V11.5.1: Use resolveTopicTag for canonical Golden List matching
-      const canonicalTopic = resolveTopicTag(tagName)
-      const isGoldenTopic = canonicalTopic !== null
-      const category = isGoldenTopic ? 'topic' : 'concept'
-      const color = isGoldenTopic ? 'purple' : 'green'
-      // V11.5.1: Use canonical form if available, otherwise original name
-      const finalTagName = canonicalTopic || tagName
-      
-      const { data: newTag, error: createTagError } = await supabase
+      const canonical = resolveTopicTag(tagName)
+      if (canonical) {
+        const existingCanonical = existingByLower.get(canonical.toLowerCase())
+        if (existingCanonical) {
+          tagNameToId.set(tagName.toLowerCase(), existingCanonical.id)
+        }
+      }
+    }
+
+    // Step 2b: Batch create missing tags
+    const missingTagNames = tagNamesArray.filter(
+      name => !tagNameToId.has(name.toLowerCase())
+    )
+
+    if (missingTagNames.length > 0) {
+      const newTagRows = missingTagNames.map(tagName => {
+        const canonicalTopic = resolveTopicTag(tagName)
+        const isGoldenTopic = canonicalTopic !== null
+        return {
+          user_id: user.id,
+          name: canonicalTopic || tagName,
+          color: isGoldenTopic ? 'purple' : 'green',
+          category: isGoldenTopic ? 'topic' : 'concept',
+        }
+      })
+
+      const { data: createdTags, error: createError } = await supabase
         .from('tags')
-        .insert({ user_id: user.id, name: finalTagName, color, category })
+        .insert(newTagRows)
         .select('id, name')
-        .single()
-      
-      if (createTagError?.code === '23505') {
-        const { data: raceTag } = await supabase
+
+      if (createError?.code === '23505') {
+        // Race condition: some tags created concurrently — re-fetch to resolve
+        const { data: refreshedTags } = await supabase
           .from('tags')
           .select('id, name')
           .eq('user_id', user.id)
-          .ilike('name', tagName)
-          .single()
-        if (raceTag) tagNameToId.set(tagName.toLowerCase(), raceTag.id)
-      } else if (newTag) {
-        tagNameToId.set(newTag.name.toLowerCase(), newTag.id)
+          .limit(5000)
+
+        const refreshedByLower = new Map<string, string>()
+        for (const tag of refreshedTags ?? []) {
+          refreshedByLower.set(tag.name.toLowerCase(), tag.id)
+        }
+
+        for (const tagName of missingTagNames) {
+          const finalName = resolveTopicTag(tagName) || tagName
+          const tagId = refreshedByLower.get(finalName.toLowerCase())
+          if (tagId) tagNameToId.set(tagName.toLowerCase(), tagId)
+        }
+      } else if (createdTags) {
+        for (let i = 0; i < createdTags.length; i++) {
+          tagNameToId.set(missingTagNames[i].toLowerCase(), createdTags[i].id)
+        }
       }
     }
     

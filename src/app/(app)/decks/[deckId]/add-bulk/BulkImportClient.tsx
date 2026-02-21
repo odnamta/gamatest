@@ -1235,9 +1235,9 @@ function BulkMCQForm({
       sessionTagIds.forEach((tagId, i) => formData.append(`tagId_${i}`, tagId))
 
       const { createMCQAction } = await import('@/actions/mcq-actions')
-      const result = await createMCQAction({ success: true }, formData)
+      const result = await createMCQAction({ ok: true }, formData)
 
-      if (result.success) {
+      if (result.ok) {
         setMessage({ type: 'success', text: 'MCQ created successfully!' })
         setStem('')
         setOptions(['', '', '', '', ''])

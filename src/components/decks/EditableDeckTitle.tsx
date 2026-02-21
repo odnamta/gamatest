@@ -74,7 +74,7 @@ export function EditableDeckTitle({ deckId, initialTitle }: EditableDeckTitlePro
     try {
       const result = await updateDeckTitle(deckId, trimmed)
       
-      if (result.success) {
+      if (result.ok) {
         setState('viewing')
         showToast('Title updated', 'success')
       } else {

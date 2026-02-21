@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
 import { TagSelector } from '@/components/tags/TagSelector'
-import type { ActionResult } from '@/types/actions'
+import type { ActionResultV2 } from '@/types/actions'
 
 interface CreateCardFormProps {
   deckId: string
 }
 
-const initialState: ActionResult = { success: true }
+const initialState: ActionResultV2 = { ok: true }
 
 /**
  * Client Component for creating new flashcards.
@@ -26,7 +26,7 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
 
   // Reset form on successful submission
   useEffect(() => {
-    if (state.success && formRef.current) {
+    if (state.ok && formRef.current) {
       formRef.current.reset()
       setSelectedTagIds([])
     }
@@ -42,7 +42,6 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
         label="Front (Question)"
         name="front"
         placeholder="Enter the question or prompt..."
-        error={!state.success ? state.fieldErrors?.front?.[0] : undefined}
       />
 
       {/* Back content */}
@@ -50,7 +49,6 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
         label="Back (Answer)"
         name="back"
         placeholder="Enter the answer..."
-        error={!state.success ? state.fieldErrors?.back?.[0] : undefined}
       />
 
       {/* Markdown helper text (Requirement 5.3) */}
@@ -79,11 +77,10 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
         name="imageUrl"
         type="url"
         placeholder="https://example.com/image.jpg"
-        error={!state.success ? state.fieldErrors?.imageUrl?.[0] : undefined}
       />
 
       {/* Error message */}
-      {!state.success && state.error && !state.fieldErrors && (
+      {!state.ok && (
         <p className="text-sm text-red-400" role="alert">
           {state.error}
         </p>

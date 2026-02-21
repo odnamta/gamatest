@@ -41,6 +41,11 @@ export interface DuplicateCardResult {
  * @returns SessionCardsResult with cards and session metadata
  */
 export async function getSessionCards(sessionId: string): Promise<SessionCardsResult> {
+  // V20.6: Validate sessionId format
+  if (!sessionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    return { ok: false, error: { message: 'Invalid session ID', code: 'VALIDATION_ERROR' } }
+  }
+
   const user = await getUser()
   if (!user) {
     return { ok: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } }

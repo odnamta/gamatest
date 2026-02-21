@@ -2,27 +2,10 @@
 
 import { withOrgUser } from '@/actions/_helpers'
 import type { Card, CardTemplate, UserCardProgress } from '@/types/database'
+import type { ActionResultV2 } from '@/types/actions'
 
 const BATCH_SIZE = 50
 const NEW_CARDS_FALLBACK_LIMIT = 10
-
-export interface GlobalDueCardsResult {
-  success: boolean
-  cards: Card[]
-  totalDue: number
-  hasMoreBatches: boolean
-  isNewCardsFallback: boolean
-  error?: string
-}
-
-export interface GlobalStatsResult {
-  success: boolean
-  totalDueCount: number
-  completedToday: number
-  currentStreak: number
-  hasNewCards: boolean
-  error?: string
-}
 
 function templateToCard(template: CardTemplate, progress?: UserCardProgress): Card {
   return {
@@ -59,19 +42,20 @@ function templateToCard(template: CardTemplate, progress?: UserCardProgress): Ca
 export async function getGlobalDueCards(
   batchNumber: number = 0,
   tagIds?: string[]
-): Promise<GlobalDueCardsResult> {
+): Promise<ActionResultV2<{ cards: Card[]; totalDue: number; hasMoreBatches: boolean; isNewCardsFallback: boolean }>> {
   const result = await withOrgUser(async ({ user, supabase, org }) => {
     const now = new Date().toISOString()
 
     const { data: userDecks, error: userDecksError } = await supabase
       .from('user_decks').select('deck_template_id').eq('user_id', user.id).eq('is_active', true)
+      .limit(500)
 
     if (userDecksError) {
-      return { success: false, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false, error: userDecksError.message }
+      return { ok: false, error: userDecksError.message }
     }
 
     if (!userDecks || userDecks.length === 0) {
-      return { success: true, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+      return { ok: true, data: { cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false } }
     }
 
     // V13: Filter subscribed decks to only those in the user's org
@@ -81,20 +65,22 @@ export async function getGlobalDueCards(
       .select('id')
       .in('id', subscribedIds)
       .eq('org_id', org.id)
+      .limit(500)
 
     const deckTemplateIds = (orgDecks || []).map(d => d.id)
 
     if (deckTemplateIds.length === 0) {
-      return { success: true, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+      return { ok: true, data: { cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false } }
     }
 
     // V11.3: Only fetch published cards for study (draft/archived cards are excluded)
     const { data: activeCardTemplates } = await supabase
       .from('card_templates').select('id').in('deck_template_id', deckTemplateIds).eq('status', 'published')
+      .limit(10000)
 
     let activeCardIds = (activeCardTemplates || []).map(c => c.id)
     if (activeCardIds.length === 0) {
-      return { success: true, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+      return { ok: true, data: { cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false } }
     }
 
     // V11.7: Filter by tags if tagIds provided
@@ -110,13 +96,14 @@ export async function getGlobalDueCards(
       activeCardIds = activeCardIds.filter(id => taggedCardIds.has(id))
 
       if (activeCardIds.length === 0) {
-        return { success: true, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+        return { ok: true, data: { cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false } }
       }
     }
 
     // V8.2: Get existing progress records to identify new cards
     const { data: existingProgress } = await supabase
       .from('user_card_progress').select('card_template_id').eq('user_id', user.id)
+      .limit(50000)
     const existingCardIds = new Set((existingProgress || []).map(p => p.card_template_id))
 
     // V8.2: Count new cards (no progress row)
@@ -134,7 +121,7 @@ export async function getGlobalDueCards(
     const totalDue = dueProgressCount + cappedNewCards
 
     if (totalDue === 0) {
-      return { success: true, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false }
+      return { ok: true, data: { cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false } }
     }
 
     // V8.2: Fetch due cards from progress
@@ -145,7 +132,7 @@ export async function getGlobalDueCards(
       .order('next_review', { ascending: true }).range(offset, offset + BATCH_SIZE - 1)
 
     if (progressError) {
-      return { success: false, cards: [] as Card[], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false, error: progressError.message }
+      return { ok: false, error: progressError.message }
     }
 
     const dueCards = (progressRecords || []).map(record => {
@@ -169,14 +156,11 @@ export async function getGlobalDueCards(
     }
 
     const isNewCardsFallback = dueProgressCount === 0 && newCardsCount > 0
-    return { success: true, cards, totalDue, hasMoreBatches: totalDue > (offset + BATCH_SIZE), isNewCardsFallback }
+    return { ok: true, data: { cards, totalDue, hasMoreBatches: totalDue > (offset + BATCH_SIZE), isNewCardsFallback } }
   })
 
-  // Map withOrgUser auth/org errors to existing return format
-  if ('ok' in result && result.ok === false) {
-    return { success: false, cards: [], totalDue: 0, hasMoreBatches: false, isNewCardsFallback: false, error: result.error }
-  }
-  return result as GlobalDueCardsResult
+  // withOrgUser already returns ActionResultV2 format on auth/org errors
+  return result as ActionResultV2<{ cards: Card[]; totalDue: number; hasMoreBatches: boolean; isNewCardsFallback: boolean }>
 }
 
 /**
@@ -209,13 +193,14 @@ function interleaveCards(dueCards: Card[], newCards: Card[], ratio: number): Car
   return result
 }
 
-export async function getGlobalStats(): Promise<GlobalStatsResult> {
+export async function getGlobalStats(): Promise<ActionResultV2<{ totalDueCount: number; completedToday: number; currentStreak: number; hasNewCards: boolean }>> {
   const result = await withOrgUser(async ({ user, supabase, org }) => {
     const now = new Date().toISOString()
     const todayDateStr = new Date().toISOString().split('T')[0]
 
     const { data: userDecks } = await supabase
       .from('user_decks').select('deck_template_id').eq('user_id', user.id).eq('is_active', true)
+      .limit(500)
 
     const { data: studyLog } = await supabase
       .from('study_logs').select('cards_reviewed').eq('user_id', user.id).eq('study_date', todayDateStr).single()
@@ -224,7 +209,7 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
       .from('user_stats').select('current_streak').eq('user_id', user.id).single()
 
     if (!userDecks || userDecks.length === 0) {
-      return { success: true, totalDueCount: 0, completedToday: studyLog?.cards_reviewed || 0, currentStreak: userStats?.current_streak || 0, hasNewCards: false }
+      return { ok: true, data: { totalDueCount: 0, completedToday: studyLog?.cards_reviewed || 0, currentStreak: userStats?.current_streak || 0, hasNewCards: false } }
     }
 
     // V13: Filter subscribed decks to only those in the user's org
@@ -238,12 +223,13 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
     const deckTemplateIds = (orgDecks || []).map(d => d.id)
 
     if (deckTemplateIds.length === 0) {
-      return { success: true, totalDueCount: 0, completedToday: studyLog?.cards_reviewed || 0, currentStreak: userStats?.current_streak || 0, hasNewCards: false }
+      return { ok: true, data: { totalDueCount: 0, completedToday: studyLog?.cards_reviewed || 0, currentStreak: userStats?.current_streak || 0, hasNewCards: false } }
     }
 
     // V11.3: Only count published cards for stats
     const { data: activeCardTemplates } = await supabase
       .from('card_templates').select('id').in('deck_template_id', deckTemplateIds).eq('status', 'published')
+      .limit(10000)
 
     const activeCardIds = (activeCardTemplates || []).map(c => c.id)
     let totalDueCount = 0
@@ -260,28 +246,24 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
       .from('card_templates').select('*', { count: 'exact', head: true }).in('deck_template_id', deckTemplateIds).eq('status', 'published')
 
     return {
-      success: true,
-      totalDueCount,
-      completedToday: studyLog?.cards_reviewed || 0,
-      currentStreak: userStats?.current_streak || 0,
-      hasNewCards: (totalCardsCount || 0) > 0,
+      ok: true,
+      data: {
+        totalDueCount,
+        completedToday: studyLog?.cards_reviewed || 0,
+        currentStreak: userStats?.current_streak || 0,
+        hasNewCards: (totalCardsCount || 0) > 0,
+      },
     }
   })
 
-  // Map withOrgUser auth/org errors to existing return format
-  if ('ok' in result && result.ok === false) {
-    return { success: false, totalDueCount: 0, completedToday: 0, currentStreak: 0, hasNewCards: false, error: result.error }
-  }
-  return result as GlobalStatsResult
+  // withOrgUser already returns ActionResultV2 format on auth/org errors
+  return result as ActionResultV2<{ totalDueCount: number; completedToday: number; currentStreak: number; hasNewCards: boolean }>
 }
-
-export const getGlobalDueCardsV2 = getGlobalDueCards
-export const getGlobalStatsV2 = getGlobalStats
 
 export async function upsertCardProgress(
   cardTemplateId: string,
   srsUpdate: { interval: number; easeFactor: number; nextReview: Date }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResultV2> {
   const result = await withOrgUser(async ({ user, supabase, org }) => {
     // V13: Verify card_template belongs to a deck in the user's org
     const { data: cardTemplate } = await supabase
@@ -291,7 +273,7 @@ export async function upsertCardProgress(
       .single()
 
     if (!cardTemplate) {
-      return { success: false, error: 'Card not found' }
+      return { ok: false, error: 'Card not found' }
     }
 
     const { data: deck } = await supabase
@@ -302,7 +284,7 @@ export async function upsertCardProgress(
       .single()
 
     if (!deck) {
-      return { success: false, error: 'Card does not belong to your organization' }
+      return { ok: false, error: 'Card does not belong to your organization' }
     }
 
     const { error } = await supabase.from('user_card_progress').upsert({
@@ -316,13 +298,10 @@ export async function upsertCardProgress(
       suspended: false,
     }, { onConflict: 'user_id,card_template_id' })
 
-    return error ? { success: false, error: error.message } : { success: true }
+    return error ? { ok: false, error: error.message } : { ok: true }
   })
 
-  // Map withOrgUser auth/org errors to existing return format
-  if ('ok' in result && result.ok === false) {
-    return { success: false, error: result.error }
-  }
-  return result as { success: boolean; error?: string }
+  // withOrgUser already returns ActionResultV2 format on auth/org errors
+  return result as ActionResultV2
 }
 

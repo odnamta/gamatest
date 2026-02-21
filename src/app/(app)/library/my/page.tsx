@@ -8,8 +8,9 @@ export default async function MyLibraryPage() {
   const result = await getUserSubscribedDecks()
 
   // Calculate total due across all decks
-  const totalDue = result.success
-    ? result.decks.reduce((sum, deck) => sum + deck.due_count + deck.new_count, 0)
+  const decks = result.ok ? (result.data?.decks ?? []) : []
+  const totalDue = result.ok
+    ? decks.reduce((sum, deck) => sum + deck.due_count + deck.new_count, 0)
     : 0
 
   return (
@@ -20,8 +21,8 @@ export default async function MyLibraryPage() {
             My Library
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {result.success && result.decks.length > 0
-              ? `${result.decks.length} ${result.decks.length === 1 ? 'deck' : 'decks'} • ${totalDue} cards due`
+            {result.ok && decks.length > 0
+              ? `${decks.length} ${decks.length === 1 ? 'deck' : 'decks'} • ${totalDue} cards due`
               : 'Your subscribed study decks'}
           </p>
         </div>
@@ -33,8 +34,8 @@ export default async function MyLibraryPage() {
         </Link>
       </div>
 
-      {result.success ? (
-        <MyLibraryGrid decks={result.decks} />
+      {result.ok ? (
+        <MyLibraryGrid decks={decks} />
       ) : (
         <div className="text-center py-12">
           <p className="text-red-600 dark:text-red-400">
