@@ -49,7 +49,7 @@ test.describe('Landing Page', () => {
 
   test('footer shows copyright and sign-in link', async ({ page }) => {
     const footer = page.locator('footer')
-    await expect(footer.getByText('Cekatan')).toBeVisible()
+    await expect(footer.getByText('Cekatan', { exact: true })).toBeVisible()
     await expect(footer.getByRole('link', { name: /sign in/i })).toBeVisible()
   })
 })
