@@ -17,6 +17,7 @@
     "test:e2e:headed": "npx playwright test --headed"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.3.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.85.0",
     "@tailwindcss/typography": "^0.5.19",
