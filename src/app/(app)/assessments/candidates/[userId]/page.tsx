@@ -22,6 +22,7 @@ import {
   Download,
   Calendar,
   User,
+  FileText,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
@@ -33,6 +34,7 @@ import {
   getCandidateScoreProgression,
 } from '@/actions/assessment-actions'
 import { getEmployeeRoleGapAnalysis } from '@/actions/role-actions'
+import { exportCandidateReportPdf } from '@/actions/candidate-report-actions'
 import { EmployeeSkillRadar } from '@/components/skills/EmployeeSkillRadar'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
@@ -193,6 +195,18 @@ export default function CandidateProgressPage() {
     })
   }
 
+  function handleExportPdf() {
+    startTransition(async () => {
+      const result = await exportCandidateReportPdf(userId)
+      if (result.ok && result.data) {
+        window.open(result.data.url, '_blank')
+        showToast('PDF report generated', 'success')
+      } else if (!result.ok) {
+        showToast(result.error, 'error')
+      }
+    })
+  }
+
   if (!isCreator) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-500">
@@ -289,6 +303,10 @@ export default function CandidateProgressPage() {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button size="sm" variant="secondary" onClick={handleExportPdf} disabled={isPending}>
+              <FileText className="h-4 w-4 mr-1" />
+              Export PDF
+            </Button>
             <Button size="sm" variant="secondary" onClick={handleExportProfile} disabled={isPending}>
               <Download className="h-4 w-4 mr-1" />
               Export
