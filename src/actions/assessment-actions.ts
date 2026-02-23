@@ -17,6 +17,7 @@ import type { ActionResultV2 } from '@/types/actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { notifyOrgCandidates } from '@/actions/notification-actions'
 import { logAuditEvent } from '@/actions/audit-actions'
+import { generateCertificate } from '@/actions/certificate-actions'
 import type {
   Assessment,
   AssessmentSession,
@@ -797,6 +798,13 @@ export async function completeSession(
 
     if (error) {
       return { ok: false, error: error.message }
+    }
+
+    // Auto-generate certificate if passed
+    if (passed) {
+      generateCertificate(sessionId).catch((err) => {
+        console.warn('[completeSession] Certificate generation failed:', err)
+      })
     }
 
     // V19: Update skill scores if skills_mapping is enabled
