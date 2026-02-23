@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "supabase.atmando.app",
       },
+      {
+        protocol: "https",
+        hostname: "hltuqxtemjpwfwjolyey.supabase.co",
+      },
     ],
   },
   // Allow larger file uploads for PDF sources (default is 1MB)
