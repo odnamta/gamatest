@@ -94,8 +94,8 @@ export function LibraryGrid({ decks }: LibraryGridProps) {
         ) : (
           <EmptyState
             icon={<Library className="h-12 w-12" />}
-            title="No decks available yet"
-            description="Check back later for new study materials."
+            title="Belum ada deck"
+            description="Belum ada materi belajar yang tersedia."
           />
         )
       ) : (

@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -33,6 +34,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { AssessmentWithDeck, SessionWithAssessment } from '@/types/database'
 
 export default function AssessmentsPage() {
@@ -394,13 +396,22 @@ export default function AssessmentsPage() {
 
       {/* Available Assessments */}
       {assessments.length === 0 ? (
-        <div className="text-center py-16 text-slate-500 dark:text-slate-400">
-          <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="text-lg font-medium">No assessments yet</p>
-          {isCreator && (
-            <p className="mt-1">Create your first assessment to get started.</p>
-          )}
-        </div>
+        <EmptyState
+          icon={<BarChart3 className="h-12 w-12" />}
+          title="Belum ada asesmen"
+          description={isCreator
+            ? "Buat asesmen pertama untuk menguji kompetensi tim"
+            : "Belum ada asesmen yang tersedia saat ini"
+          }
+          action={isCreator ? (
+            <Link href="/assessments/create">
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Buat Asesmen
+              </Button>
+            </Link>
+          ) : undefined}
+        />
       ) : (() => {
         const filtered = assessments.filter((a) => {
           if (statusFilter !== 'all' && a.status !== statusFilter) return false

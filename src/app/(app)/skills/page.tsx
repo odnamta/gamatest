@@ -29,6 +29,7 @@ import { canManageSkillDomains, canManageRoleProfiles } from '@/lib/skill-author
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { SkillDomainCard } from '@/components/skills/SkillDomainCard'
 import { RoleProfileCard } from '@/components/skills/RoleProfileCard'
 import { SkillHeatmap } from '@/components/skills/SkillHeatmap'
@@ -390,13 +391,20 @@ export default function SkillsPage() {
       {activeTab === 'domains' && (
         <>
           {domains.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 dark:text-slate-400">
-              <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No skill domains yet</p>
-              {canManage && (
-                <p className="mt-1">Create your first skill domain to start mapping employee competencies.</p>
-              )}
-            </div>
+            <EmptyState
+              icon={<Target className="h-12 w-12" />}
+              title="Belum ada domain keahlian"
+              description={canManage
+                ? "Buat domain keahlian pertama untuk memetakan kompetensi tim"
+                : "Belum ada domain keahlian yang tersedia saat ini"
+              }
+              action={canManage ? (
+                <Button size="sm" onClick={openCreateForm}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Domain Keahlian
+                </Button>
+              ) : undefined}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {domains.map((domain) => (
@@ -435,13 +443,20 @@ export default function SkillsPage() {
       {activeTab === 'roles' && (
         <>
           {roleProfiles.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 dark:text-slate-400">
-              <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No role profiles yet</p>
-              {canManageRoles && (
-                <p className="mt-1">Create role profiles to define competency requirements per position.</p>
-              )}
-            </div>
+            <EmptyState
+              icon={<Users className="h-12 w-12" />}
+              title="Belum ada role profile"
+              description={canManageRoles
+                ? "Buat role profile untuk menentukan kebutuhan kompetensi per posisi"
+                : "Belum ada role profile yang tersedia saat ini"
+              }
+              action={canManageRoles ? (
+                <Button size="sm" onClick={openCreateRoleForm}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Role Profile
+                </Button>
+              ) : undefined}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {roleProfiles.map((profile) => (
