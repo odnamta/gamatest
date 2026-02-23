@@ -9,10 +9,11 @@
 
 import { useState, useEffect, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Search, TrendingUp, Target, Clock, Download, Upload, CheckSquare, X, Send } from 'lucide-react'
+import { ArrowLeft, Users, Search, TrendingUp, Target, Clock, Download, Upload, CheckSquare, X, Send, Filter } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getOrgCandidateList, getOrgAssessments, exportCandidatesCsv, importCandidatesCsv } from '@/actions/assessment-actions'
+import { getOrgRoleProfiles } from '@/actions/role-actions'
 import { bulkAssignAssessment } from '@/actions/notification-actions'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/Button'
@@ -47,6 +48,11 @@ export default function CandidateListPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Filter state
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [passFilter, setPassFilter] = useState<'all' | 'passed' | 'failed'>('all')
+  const [roleProfiles, setRoleProfiles] = useState<Array<{ id: string; name: string }>>([])
+
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -61,6 +67,11 @@ export default function CandidateListPage() {
         setCandidates(result.data)
       }
       setLoading(false)
+    })
+    getOrgRoleProfiles().then((result) => {
+      if (result.ok && result.data) {
+        setRoleProfiles(result.data.map((r) => ({ id: r.id, name: r.name })))
+      }
     })
   }, [isCreator])
 
@@ -147,9 +158,27 @@ export default function CandidateListPage() {
   }
 
   const filtered = candidates.filter((c) => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return c.email.toLowerCase().includes(q) || (c.fullName?.toLowerCase().includes(q) ?? false)
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      if (!c.email.toLowerCase().includes(q) && !(c.fullName?.toLowerCase().includes(q) ?? false)) {
+        return false
+      }
+    }
+
+    // Pass/fail filter: "passed" = avgScore >= 60 with at least 1 completed,
+    // "failed" = totalCompleted > 0 but avgScore < 60
+    if (passFilter === 'passed') {
+      if (c.totalCompleted === 0 || c.avgScore < 60) return false
+    } else if (passFilter === 'failed') {
+      if (c.totalCompleted === 0 || c.avgScore >= 60) return false
+    }
+
+    // TODO: Role filter — requires candidate-role association data from backend.
+    // Currently the dropdown is present as UI but filtering is a no-op until
+    // getOrgCandidateList() returns role assignment IDs per candidate.
+
+    return true
   })
 
   const visibleIds = filtered.slice(0, displayLimit).map((c) => c.userId)
@@ -256,6 +285,50 @@ export default function CandidateListPage() {
         />
       </div>
 
+      {/* Filters */}
+      <div className="flex items-center gap-3 mb-4">
+        <Filter className="h-4 w-4 text-slate-400 shrink-0" />
+
+        {/* Role filter */}
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">Semua Role</option>
+          {roleProfiles.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
+
+        {/* Pass/Fail toggle */}
+        <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+          {(['all', 'passed', 'failed'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setPassFilter(status)}
+              className={`px-3 py-2 text-xs font-medium transition-colors ${
+                passFilter === status
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              {status === 'all' ? 'Semua' : status === 'passed' ? 'Lulus' : 'Gagal'}
+            </button>
+          ))}
+        </div>
+
+        {/* Active filter indicator */}
+        {(roleFilter !== 'all' || passFilter !== 'all') && (
+          <button
+            onClick={() => { setRoleFilter('all'); setPassFilter('all') }}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline"
+          >
+            Reset filter
+          </button>
+        )}
+      </div>
+
       {/* Import result feedback */}
       {importResult && (
         <div className="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10 text-sm">
@@ -290,7 +363,7 @@ export default function CandidateListPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-slate-500 dark:text-slate-400">
           <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-          <p>{searchQuery ? 'No candidates match your search.' : 'No candidates in this organization yet.'}</p>
+          <p>{searchQuery || passFilter !== 'all' || roleFilter !== 'all' ? 'No candidates match your filters.' : 'No candidates in this organization yet.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
