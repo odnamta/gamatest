@@ -17,6 +17,7 @@ import type { ActionResultV2 } from '@/types/actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { notifyOrgCandidates } from '@/actions/notification-actions'
 import { logAuditEvent } from '@/actions/audit-actions'
+import { generatePublicCode } from '@/lib/public-code'
 import { generateCertificate } from '@/actions/certificate-actions'
 import {
   dispatchResultEmail,
@@ -220,7 +221,7 @@ export async function publishAssessment(
     // Get assessment title before updating
     const { data: assessment } = await supabase
       .from('assessments')
-      .select('title')
+      .select('title, public_code')
       .eq('id', assessmentId)
       .eq('org_id', org.id)
       .eq('status', 'draft')
@@ -239,6 +240,18 @@ export async function publishAssessment(
 
     if (error) {
       return { ok: false, error: error.message }
+    }
+
+    // Auto-generate public code if not already set
+    if (!assessment.public_code) {
+      for (let i = 0; i < 5; i++) {
+        const candidate = generatePublicCode()
+        const { error: codeError } = await supabase
+          .from('assessments')
+          .update({ public_code: candidate })
+          .eq('id', assessmentId)
+        if (!codeError) break
+      }
     }
 
     logAuditEvent(supabase, org.id, user.id, 'assessment.published', {
@@ -271,7 +284,7 @@ export async function archiveAssessment(
 
     const { error } = await supabase
       .from('assessments')
-      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .update({ status: 'archived', public_code: null, updated_at: new Date().toISOString() })
       .eq('id', assessmentId)
       .eq('org_id', org.id)
       .eq('status', 'published')
