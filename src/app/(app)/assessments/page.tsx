@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
   Plus, Play, Eye, BarChart3, Clock, Target, CheckCircle2, XCircle,
-  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users, Bell, Link2, Trash2, RotateCcw, AlarmClock, UserPlus,
+  Pencil, Send, Archive, CalendarDays, Copy, ChevronDown, Search, Database, Users, Bell, Link2, Trash2, RotateCcw, AlarmClock, UserPlus, MessageCircle, QrCode,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import {
@@ -51,6 +51,7 @@ export default function AssessmentsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
   const [displayLimit, setDisplayLimit] = useState(20)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [qrAssessment, setQrAssessment] = useState<AssessmentWithDeck | null>(null)
 
   const { showToast } = useToast()
   const isCreator = hasMinimumRole(role, 'creator')
@@ -188,13 +189,29 @@ export default function AssessmentsPage() {
     })
   }
 
-  function handleCopyLink(assessment: AssessmentWithDeck) {
-    const base = `${window.location.origin}/assessments/${assessment.id}/take`
-    navigator.clipboard.writeText(base).then(() => {
-      showToast('Assessment link copied to clipboard', 'success')
+  function handleCopyPublicLink(assessment: AssessmentWithDeck) {
+    if (!assessment.public_code) {
+      showToast('Link publik belum tersedia', 'error')
+      return
+    }
+    const link = `${window.location.origin}/t/${assessment.public_code}`
+    navigator.clipboard.writeText(link).then(() => {
+      showToast('Link publik disalin!', 'success')
     }).catch(() => {
-      showToast('Failed to copy link', 'error')
+      showToast('Gagal menyalin link', 'error')
     })
+  }
+
+  function handleWhatsAppShare(assessment: AssessmentWithDeck) {
+    if (!assessment.public_code) return
+    const link = `${window.location.origin}/t/${assessment.public_code}`
+    const text = `Silakan kerjakan asesmen "${assessment.title}":\n${link}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  function handleShowQR(assessment: AssessmentWithDeck) {
+    if (!assessment.public_code) return
+    setQrAssessment(assessment)
   }
 
   function handleDeadlineReminders() {
@@ -601,17 +618,31 @@ export default function AssessmentsPage() {
                       )
                     )}
 
-                    {/* Creator: Copy shareable link */}
-                    {isCreator && assessment.status === 'published' && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleCopyLink(assessment)}
-                        title="Copy assessment link"
-                        aria-label="Copy assessment link"
-                      >
-                        <Link2 className="h-4 w-4" />
-                      </Button>
+                    {/* Creator: Share public link */}
+                    {isCreator && assessment.status === 'published' && assessment.public_code && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleCopyPublicLink(assessment)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                          title="Salin link publik"
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleWhatsAppShare(assessment)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                          title="Bagikan via WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleShowQR(assessment)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                          title="Tampilkan QR Code"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
 
                     {/* Creator: Archive published */}
@@ -791,6 +822,34 @@ export default function AssessmentsPage() {
             ))}
           </div>
         </>
+      )}
+
+      {/* QR Code Modal */}
+      {qrAssessment && qrAssessment.public_code && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setQrAssessment(null)}>
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-sm w-full space-y-4 text-center" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold text-lg">QR Code</h3>
+            <p className="text-sm text-muted-foreground">{qrAssessment.title}</p>
+            <div className="flex justify-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/t/${qrAssessment.public_code}`)}`}
+                alt="QR Code"
+                className="rounded-lg"
+                width={200}
+                height={200}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/t/{qrAssessment.public_code}
+            </p>
+            <button
+              onClick={() => setQrAssessment(null)}
+              className="w-full py-2 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 transition text-sm"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
