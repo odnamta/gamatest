@@ -1,4 +1,4 @@
-import type { DeckTemplate, UserDeck, DeckVisibility } from '@/types/database'
+import type { DeckTemplate, UserDeck } from '@/types/database'
 
 /**
  * Checks if a deck template is visible to a user.

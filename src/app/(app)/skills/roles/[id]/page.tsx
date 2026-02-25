@@ -335,7 +335,7 @@ export default function RoleProfileDetailPage({ params }: { params: Promise<{ id
           <div className="text-center py-8 text-slate-500 dark:text-slate-400">
             <Target className="h-10 w-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Belum ada skill requirement</p>
-            {canManage && <p className="text-xs mt-1">Klik "Tambah Skill" untuk menentukan kompetensi yang dibutuhkan.</p>}
+            {canManage && <p className="text-xs mt-1">Klik &quot;Tambah Skill&quot; untuk menentukan kompetensi yang dibutuhkan.</p>}
           </div>
         ) : (
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">

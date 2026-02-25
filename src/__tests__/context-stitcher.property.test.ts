@@ -139,7 +139,7 @@ describe('Property 2: Last Page Boundary Disables Controls', () => {
           const mockDoc = createMockPdfDocument(numPages);
           
           // On the last page
-          expect(isLastPage(mockDoc as any, numPages)).toBe(true);
+          expect(isLastPage(mockDoc as unknown as Parameters<typeof isLastPage>[0], numPages)).toBe(true);
         }
       ),
       { numRuns: 100 }
@@ -156,7 +156,7 @@ describe('Property 2: Last Page Boundary Disables Controls', () => {
           const validCurrentPage = Math.min(currentPage, numPages - 1);
           const mockDoc = createMockPdfDocument(numPages);
           
-          expect(isLastPage(mockDoc as any, validCurrentPage)).toBe(false);
+          expect(isLastPage(mockDoc as unknown as Parameters<typeof isLastPage>[0], validCurrentPage)).toBe(false);
         }
       ),
       { numRuns: 100 }
@@ -172,7 +172,7 @@ describe('Property 2: Last Page Boundary Disables Controls', () => {
           const mockDoc = createMockPdfDocument(numPages);
           
           // Page number exceeds total pages
-          expect(isLastPage(mockDoc as any, numPages + extra)).toBe(true);
+          expect(isLastPage(mockDoc as unknown as Parameters<typeof isLastPage>[0], numPages + extra)).toBe(true);
         }
       ),
       { numRuns: 100 }
