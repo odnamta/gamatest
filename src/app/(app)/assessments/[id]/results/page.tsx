@@ -28,6 +28,8 @@ import {
   FileText,
   RotateCcw,
   History,
+  Search,
+  Award,
 } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
@@ -635,6 +637,15 @@ type QuestionStat = {
   avgTimeSeconds: number | null
 }
 
+function computeMedian(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+}
+
 function buildScoreDistribution(sessions: Array<{ score: number | null }>) {
   const buckets = Array.from({ length: 10 }, (_, i) => ({
     range: `${i * 10 + 1}-${(i + 1) * 10}`,
@@ -664,6 +675,8 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [sessionLimit, setSessionLimit] = useState(20)
   const [expandedViolation, setExpandedViolation] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'passed' | 'failed'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [activeSessions, setActiveSessions] = useState<Array<{
     sessionId: string; userEmail: string; startedAt: string
     timeRemainingSeconds: number | null; questionsAnswered: number
@@ -752,6 +765,36 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
     )
   }
 
+  // Computed: median, filtered sessions, top/bottom performers
+  const completedSessions = sessions.filter(s => s.status === 'completed' || s.status === 'timed_out')
+  const scores = completedSessions.map(s => s.score).filter((s): s is number => s !== null)
+  const medianScore = computeMedian(scores)
+
+  const filteredSessions = sessions.filter(s => {
+    if (statusFilter === 'passed') {
+      if (s.passed !== true) return false
+    } else if (statusFilter === 'failed') {
+      if (s.passed !== false || (s.status !== 'completed' && s.status !== 'timed_out')) return false
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      if (
+        !(s.user_full_name?.toLowerCase().includes(q) ||
+          s.user_email.toLowerCase().includes(q) ||
+          s.user_phone?.toLowerCase().includes(q))
+      ) return false
+    }
+    return true
+  })
+
+  const topPerformers = [...completedSessions]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 5)
+
+  const bottomPerformers = [...completedSessions]
+    .sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
+    .slice(0, 5)
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Breadcrumbs items={[
@@ -797,7 +840,7 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
             <Users className="h-5 w-5 mx-auto text-slate-400 mb-1" />
             <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -811,6 +854,13 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
               {stats.avgScore}%
             </div>
             <div className="text-xs text-slate-500">Average Score</div>
+          </div>
+          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
+            <BarChart3 className="h-5 w-5 mx-auto text-purple-500 mb-1" />
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {medianScore}%
+            </div>
+            <div className="text-xs text-slate-500">Median Score</div>
           </div>
           <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center">
             <Target className="h-5 w-5 mx-auto text-green-500 mb-1" />
@@ -835,6 +885,46 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
               <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Top & Bottom Performers */}
+      {completedSessions.length >= 3 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          <div className="p-4 rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/30 dark:bg-green-900/10">
+            <h3 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-3 flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Top {Math.min(5, topPerformers.length)} Performers
+            </h3>
+            <div className="space-y-2">
+              {topPerformers.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-2 text-sm">
+                  <span className="w-5 text-right text-xs font-bold text-green-600 dark:text-green-400">{i + 1}.</span>
+                  <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">
+                    {s.user_full_name || s.user_email}
+                  </span>
+                  <span className="font-bold text-green-600 dark:text-green-400">{s.score}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-4 rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/30 dark:bg-red-900/10">
+            <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Bottom {Math.min(5, bottomPerformers.length)} Performers
+            </h3>
+            <div className="space-y-2">
+              {bottomPerformers.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-2 text-sm">
+                  <span className="w-5 text-right text-xs font-bold text-red-600 dark:text-red-400">{i + 1}.</span>
+                  <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">
+                    {s.user_full_name || s.user_email}
+                  </span>
+                  <span className="font-bold text-red-600 dark:text-red-400">{s.score}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1027,6 +1117,42 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
         </div>
       )}
 
+      {/* Filter & Search Bar */}
+      {sessions.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+          <div className="relative flex-1 w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari nama, email, atau telepon..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5">
+            {(['all', 'passed', 'failed'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  statusFilter === f
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                {f === 'all' ? 'Semua' : f === 'passed' ? 'Passed' : 'Failed'}
+              </button>
+            ))}
+          </div>
+          {(statusFilter !== 'all' || searchQuery) && (
+            <span className="text-xs text-slate-500">
+              {filteredSessions.length} dari {sessions.length}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Candidate Sessions Table */}
       {sessions.length === 0 ? (
         <div className="text-center py-12 text-slate-500 dark:text-slate-400">
@@ -1053,8 +1179,20 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {sessions.slice(0, sessionLimit).map((s) => (
-                  <tr key={s.id} className="bg-white dark:bg-slate-800">
+                {filteredSessions.slice(0, sessionLimit).map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => {
+                      if (s.status === 'completed' || s.status === 'timed_out') {
+                        router.push(`/assessments/${assessmentId}/results?sessionId=${s.id}`)
+                      }
+                    }}
+                    className={`bg-white dark:bg-slate-800 ${
+                      s.status === 'completed' || s.status === 'timed_out'
+                        ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors'
+                        : ''
+                    }`}
+                  >
                     <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
                       {s.user_full_name || '—'}
                     </td>
@@ -1120,12 +1258,12 @@ function CreatorResultsView({ assessmentId }: { assessmentId: string }) {
               </tbody>
             </table>
           </div>
-          {sessions.length > sessionLimit && (
+          {filteredSessions.length > sessionLimit && (
             <button
               onClick={() => setSessionLimit((l) => l + 20)}
               className="w-full py-2 mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
-              Show more ({sessions.length - sessionLimit} remaining)
+              Show more ({filteredSessions.length - sessionLimit} remaining)
             </button>
           )}
         </>

@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, BarChart3, Target, TrendingUp, CheckCircle2, XCircle, Trophy, Activity, Shield, PieChart, UserCheck } from 'lucide-react'
+import { Users, BarChart3, Target, TrendingUp, CheckCircle2, XCircle, Trophy, Activity, Shield, PieChart, UserCheck, Plus, FileText, ClipboardList } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getOrgDashboardStats } from '@/actions/assessment-actions'
@@ -22,11 +22,19 @@ type OrgStats = {
   activeCandidatesThisWeek: number
   topPerformers: Array<{ email: string; avgScore: number; totalCompleted: number }>
   recentSessions: Array<{
+    assessmentId: string
+    sessionId: string
     assessmentTitle: string
     userEmail: string
     score: number | null
     passed: boolean | null
     completedAt: string | null
+  }>
+  activeAssessments: Array<{
+    id: string
+    title: string
+    candidateCount: number
+    avgScore: number | null
   }>
 }
 
@@ -119,6 +127,13 @@ export function OrgStatsCard() {
       {/* Quick Actions */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <button
+          onClick={() => router.push('/assessments/new')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Create Assessment
+        </button>
+        <button
           onClick={() => router.push('/assessments/candidates')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
         >
@@ -142,6 +157,36 @@ export function OrgStatsCard() {
           </button>
         )}
       </div>
+
+      {/* Active Assessments */}
+      {stats.activeAssessments.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+            <ClipboardList className="h-3 w-3 text-blue-500" />
+            Active Assessments
+          </h3>
+          <div className="space-y-1.5">
+            {stats.activeAssessments.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => router.push(`/assessments/${a.id}/results`)}
+                className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+              >
+                <span className="text-slate-700 dark:text-slate-300 truncate flex-1 min-w-0">
+                  {a.title}
+                </span>
+                <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                  <span className="text-slate-400">{a.candidateCount} attempts</span>
+                  {a.avgScore !== null && (
+                    <span className="font-medium text-slate-600 dark:text-slate-300">{a.avgScore}%</span>
+                  )}
+                  <FileText className="h-3 w-3 text-slate-400" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top Performers & Recent Activity */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -178,17 +223,18 @@ export function OrgStatsCard() {
           </div>
         )}
 
-        {/* Recent Activity */}
+        {/* Recent Activity — clickable to results */}
         {stats.recentSessions.length > 0 && (
           <div>
             <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-              Recent Activity
+              Recent Results
             </h3>
             <div className="space-y-1.5">
               {stats.recentSessions.map((s, idx) => (
-                <div
+                <button
                   key={idx}
-                  className="flex items-center justify-between text-xs py-1"
+                  onClick={() => router.push(`/assessments/${s.assessmentId}/results?sessionId=${s.sessionId}`)}
+                  className="w-full flex items-center justify-between text-xs py-1 px-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {s.passed ? (
@@ -208,7 +254,7 @@ export function OrgStatsCard() {
                       {s.score ?? 0}%
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

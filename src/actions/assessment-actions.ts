@@ -1756,11 +1756,19 @@ export async function getOrgDashboardStats(): Promise<ActionResultV2<{
   activeCandidatesThisWeek: number
   topPerformers: Array<{ email: string; avgScore: number; totalCompleted: number }>
   recentSessions: Array<{
+    assessmentId: string
+    sessionId: string
     assessmentTitle: string
     userEmail: string
     score: number | null
     passed: boolean | null
     completedAt: string | null
+  }>
+  activeAssessments: Array<{
+    id: string
+    title: string
+    candidateCount: number
+    avgScore: number | null
   }>
 }>> {
   return withOrgUser(async ({ supabase, org, role }) => {
@@ -1784,7 +1792,7 @@ export async function getOrgDashboardStats(): Promise<ActionResultV2<{
     const { data: sessions } = await supabase
       .from('assessment_sessions')
       .select(`
-        id, score, passed, completed_at, user_id,
+        id, assessment_id, score, passed, completed_at, user_id,
         assessments!inner(org_id, title)
       `)
       .eq('status', 'completed')
@@ -1852,12 +1860,40 @@ export async function getOrgDashboardStats(): Promise<ActionResultV2<{
 
     // Recent 5 sessions
     const recentSessions = orgSessions.slice(0, 5).map((s) => ({
+      assessmentId: s.assessment_id,
+      sessionId: s.id,
       assessmentTitle: (s.assessments as unknown as { title: string }).title,
       userEmail: emailMap.get(s.user_id) ?? `user-${s.user_id.slice(0, 8)}`,
       score: s.score,
       passed: s.passed,
       completedAt: s.completed_at,
     }))
+
+    // Active assessments with candidate counts
+    const { data: assessments } = await supabase
+      .from('assessments')
+      .select('id, title')
+      .eq('org_id', org.id)
+      .eq('is_published', true)
+      .limit(5)
+
+    const assessmentMap = new Map<string, { count: number; totalScore: number }>()
+    for (const s of orgSessions) {
+      const entry = assessmentMap.get(s.assessment_id) ?? { count: 0, totalScore: 0 }
+      entry.count++
+      entry.totalScore += s.score ?? 0
+      assessmentMap.set(s.assessment_id, entry)
+    }
+
+    const activeAssessments = (assessments ?? []).map((a) => {
+      const stats = assessmentMap.get(a.id)
+      return {
+        id: a.id,
+        title: a.title,
+        candidateCount: stats?.count ?? 0,
+        avgScore: stats ? Math.round(stats.totalScore / stats.count) : null,
+      }
+    })
 
     return {
       ok: true,
@@ -1869,6 +1905,7 @@ export async function getOrgDashboardStats(): Promise<ActionResultV2<{
         activeCandidatesThisWeek,
         topPerformers,
         recentSessions,
+        activeAssessments,
       },
     }
   })
