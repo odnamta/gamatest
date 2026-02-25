@@ -157,7 +157,7 @@ describe('Answer Submission', () => {
     fc.assert(fc.property(
       fc.uuid(), questionsArb, timeLimitArb, passScoreArb,
       (sessionId, questions, timeLimit, passScore) => {
-        let session = createSession(sessionId, questions, timeLimit)
+        const session = createSession(sessionId, questions, timeLimit)
         const completed = completeSession(session, passScore)
         const q = questions[0]
         const afterAnswer = submitAnswer(completed, q.id, 0)

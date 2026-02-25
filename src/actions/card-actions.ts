@@ -737,7 +737,7 @@ export async function bulkPublishCards(input: BulkPublishInput): Promise<BulkPub
     }
 
     // Build query for draft cards in this deck
-    let query = supabase
+    const query = supabase
       .from('card_templates')
       .select('id')
       .eq('deck_template_id', filterDeckId)
