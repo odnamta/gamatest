@@ -7,6 +7,7 @@
  */
 
 import { withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 

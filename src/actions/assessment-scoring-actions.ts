@@ -5,6 +5,7 @@
  */
 
 import { withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 import type { AssessmentSession, AssessmentAnswer } from '@/types/database'
@@ -66,7 +67,7 @@ export async function getSessionResults(
       ok: true,
       data: { session: session as AssessmentSession, answers: enrichedAnswers },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -106,7 +107,7 @@ export async function getSessionPercentile(
     const percentile = Math.round((belowCount / scores.length) * 100)
 
     return { ok: true, data: { percentile, rank, totalSessions: scores.length } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -131,7 +132,7 @@ export async function getAssessmentResults(
     }
 
     return { ok: true, data: (data ?? []) as AssessmentSession[] }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -212,7 +213,7 @@ export async function getAssessmentResultsDetailed(
         stats: { avgScore, passRate, totalAttempts: sessions.length },
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -274,7 +275,7 @@ export async function exportResultsCsv(
 
     const csv = BOM + [header, ...rows].join('\n')
     return { ok: true, data: csv }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -363,7 +364,7 @@ export async function getSessionWeakAreas(
       .sort((a, b) => a.percent - b.percent)
 
     return { ok: true, data: { topics } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -455,5 +456,5 @@ export async function getOrgQuestionBank(
     })
 
     return { ok: true, data: { questions, decks } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }

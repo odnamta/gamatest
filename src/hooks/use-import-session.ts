@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { generateImportSessionId } from '@/lib/import-session'
 import { getSessionStats } from '@/actions/session-actions'
 
@@ -19,30 +19,50 @@ interface ImportSessionState {
  * Generates and persists session ID per deck, tracks session stats.
  */
 export function useImportSession(deckId: string) {
-  const [state, setState] = useState<ImportSessionState>({
-    sessionId: null,
-    draftCount: 0,
-    publishedCount: 0,
-    questionNumbers: [],
-    isLoading: true,
+  const [state, setState] = useState<ImportSessionState>(() => {
+    // Initialize session ID from localStorage synchronously
+    if (typeof window !== 'undefined') {
+      const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
+      let sid = localStorage.getItem(storageKey)
+      if (!sid) {
+        sid = generateImportSessionId()
+        localStorage.setItem(storageKey, sid)
+      }
+      return {
+        sessionId: sid,
+        draftCount: 0,
+        publishedCount: 0,
+        questionNumbers: [],
+        isLoading: false,
+      }
+    }
+    return {
+      sessionId: null,
+      draftCount: 0,
+      publishedCount: 0,
+      questionNumbers: [],
+      isLoading: true,
+    }
   })
 
-  // Load or create session ID on mount
-  useEffect(() => {
+  // Handle deckId changes after initial mount
+  const [prevDeckId, setPrevDeckId] = useState(deckId)
+  if (prevDeckId !== deckId) {
+    setPrevDeckId(deckId)
     const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
     let sid = localStorage.getItem(storageKey)
-
     if (!sid) {
       sid = generateImportSessionId()
       localStorage.setItem(storageKey, sid)
     }
-
-    const loadedSessionId = sid
-    setState(prev => {
-      if (prev.sessionId === loadedSessionId && !prev.isLoading) return prev
-      return { ...prev, sessionId: loadedSessionId, isLoading: false }
+    setState({
+      sessionId: sid,
+      draftCount: 0,
+      publishedCount: 0,
+      questionNumbers: [],
+      isLoading: false,
     })
-  }, [deckId])
+  }
 
   // Refresh session stats
   const refreshStats = useCallback(async () => {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { withUser } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { calculateLessonStatus, buildProgressMap } from '@/lib/lesson-status'
 import {

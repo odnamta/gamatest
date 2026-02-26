@@ -49,8 +49,17 @@ export function DeckDraftsPanel({ deckId, isAuthor, onRefresh }: DeckDraftsPanel
 
   useEffect(() => {
     // Loading is already initialized to true, so skip setting it again here
-    fetchDrafts(false)
-  }, [fetchDrafts])
+    if (!isAuthor) return
+
+    getDeckDrafts(deckId).then((result) => {
+      if (result.ok && result.data) {
+        setDrafts(result.data.drafts)
+      } else if (!result.ok) {
+        setError(result.error)
+      }
+      setLoading(false)
+    })
+  }, [deckId, isAuthor])
 
   // Don't render for non-authors or when no drafts
   if (!isAuthor) return null

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useEffect } from 'react'
 import { createMCQAction } from '@/actions/mcq-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
@@ -62,12 +62,11 @@ export function CreateMCQForm({
   }
 
   // Reset form on successful submission
-  // Track previous state to detect transitions
+  // Track state transitions during render for React state resets
   const [prevState, setPrevState] = useState(state)
   if (prevState !== state) {
     setPrevState(state)
-    if (state.ok && formRef.current) {
-      formRef.current.reset()
+    if (state.ok) {
       setOptions(Array(DEFAULT_OPTIONS).fill(''))
       setCorrectIndex(0)
       setStem('')
@@ -76,6 +75,13 @@ export function CreateMCQForm({
       onSuccess?.()
     }
   }
+
+  // Reset the DOM form element via ref in an effect (refs can't be accessed during render)
+  useEffect(() => {
+    if (state.ok && formRef.current) {
+      formRef.current.reset()
+    }
+  }, [state])
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options]

@@ -17,6 +17,7 @@ import type {
 } from '@/types/database'
 import type { ActionResultV2, DashboardInsightsResult, WeakestConceptSummary } from '@/types/actions'
 import { withUser, withOrgUser, type AuthContext, type OrgAuthContext } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getAdminChecklist, getCandidateChecklist, type ChecklistItem } from '@/lib/setup-checklist'
 import { logger } from '@/lib/logger'
@@ -372,7 +373,7 @@ export async function getSetupChecklistData(): Promise<
     })
 
     return { ok: true, data: { role, items } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 // ============================================
@@ -495,5 +496,5 @@ export async function getDashboardInsights(): Promise<DashboardInsightsResult> {
     }
 
     return { ok: true, data: result }
-  })
+  }, RATE_LIMITS.standard)
 }

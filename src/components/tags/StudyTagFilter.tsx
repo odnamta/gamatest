@@ -71,41 +71,27 @@ export function StudyTagFilter({
   onSelectionChange,
   initialSelection,
 }: StudyTagFilterProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [pendingNotify, setPendingNotify] = useState<string[] | null>(null)
-
   // Filter to topic/source tags only
   const filteredTags = filterStudyTags(tags)
 
-  // Initialize selection from localStorage or props
-  useEffect(() => {
-    if (isInitialized) return
-    
+  // Initialize selection from localStorage or props (computed once)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     const savedSelection = loadSavedSelection()
     const initial = initialSelection?.length ? initialSelection : savedSelection
-    
-    // Only include IDs that exist in filtered tags
-    const validIds = initial.filter(id => 
-      filteredTags.some(tag => tag.id === id)
+    const validIds = initial.filter(id =>
+      tags.some(tag => (tag.category === 'topic' || tag.category === 'source') && tag.id === id)
     )
-    
-    setSelectedIds(new Set(validIds))
-    setIsInitialized(true)
-    
-    // Queue parent notification for next tick to avoid setState during render
-    if (validIds.length > 0) {
-      setPendingNotify(validIds)
-    }
-  }, [filteredTags, initialSelection, isInitialized])
+    return new Set(validIds)
+  })
 
-  // Notify parent after initialization (separate effect to avoid setState during render)
+  // Notify parent of initial selection on mount
   useEffect(() => {
-    if (pendingNotify !== null) {
-      onSelectionChange(pendingNotify)
-      setPendingNotify(null)
+    if (selectedIds.size > 0) {
+      onSelectionChange(Array.from(selectedIds))
     }
-  }, [pendingNotify, onSelectionChange])
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Toggle tag selection
   const toggleTag = useCallback((tagId: string) => {

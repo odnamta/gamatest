@@ -1,6 +1,7 @@
 'use server'
 
 import { withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import type { Card, CardTemplate, UserCardProgress } from '@/types/database'
 import type { SessionMode } from '@/lib/custom-session-params'

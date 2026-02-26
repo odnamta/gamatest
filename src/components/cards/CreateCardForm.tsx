@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useEffect } from 'react'
 import { createCardAction } from '@/actions/card-actions'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
@@ -25,15 +25,21 @@ export function CreateCardForm({ deckId }: CreateCardFormProps) {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   // Reset form on successful submission
-  // Track previous state to detect transitions
+  // Track state transitions during render for React state resets
   const [prevState, setPrevState] = useState(state)
   if (prevState !== state) {
     setPrevState(state)
-    if (state.ok && formRef.current) {
-      formRef.current.reset()
+    if (state.ok) {
       setSelectedTagIds([])
     }
   }
+
+  // Reset the DOM form element via ref in an effect (refs can't be accessed during render)
+  useEffect(() => {
+    if (state.ok && formRef.current) {
+      formRef.current.reset()
+    }
+  }, [state])
 
   return (
     <form ref={formRef} action={formAction} className="space-y-4">

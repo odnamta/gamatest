@@ -6,6 +6,7 @@
  */
 
 import { withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
 
@@ -162,7 +163,7 @@ export async function getAssessmentAnalyticsSummary(
         scoreTrend,
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -301,7 +302,7 @@ export async function getQuestionAnalytics(
       .sort((a, b) => a.percentCorrect - b.percentCorrect)
 
     return { ok: true, data: { questions } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -468,7 +469,7 @@ export async function getOrgDashboardStats(): Promise<ActionResultV2<{
         activeAssessments,
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -521,7 +522,7 @@ export async function getCandidateScoreProgression(
     }))
 
     return { ok: true, data: progression }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
 
 /**
@@ -655,5 +656,5 @@ export async function getViolationHeatmap(
         flaggedSessionCount: orgSessions.length,
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }

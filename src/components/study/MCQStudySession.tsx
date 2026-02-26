@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { MCQQuestion } from './MCQQuestion'
 import { Button } from '@/components/ui/Button'
@@ -94,11 +94,11 @@ export function MCQStudySession({ initialCards, deckId }: MCQStudySessionProps) 
   }
 
   // Keyboard shortcuts: 1-5 for options, Enter for next
-  const handleKeyOption = useCallback((index: number) => {
+  const handleKeyOption = (index: number) => {
     if (!sessionState.isAnswered && !isLoading && index < currentCard.options.length) {
       handleAnswer(index)
     }
-  }, [sessionState.isAnswered, isLoading, currentCard?.options?.length])
+  }
 
   useHotkeys([
     { key: '1', handler: () => handleKeyOption(0), enabled: !sessionState.isComplete && !sessionState.isAnswered },

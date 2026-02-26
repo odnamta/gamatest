@@ -66,17 +66,14 @@ export function GlobalStudySession({
   // V8.2: Feedback display state - disables buttons during auto-advance countdown
   const [isShowingFeedback, setIsShowingFeedback] = useState(false)
 
-  // V6.3: Auto-advance state
-  const [autoAdvance, setAutoAdvance] = useState(false)
-  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Load auto-advance preference on mount
-  useEffect(() => {
+  // V6.3: Auto-advance state - initialize from localStorage
+  const [autoAdvance, setAutoAdvance] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(AUTO_ADVANCE_KEY)
-      setAutoAdvance(saved === 'true')
+      return localStorage.getItem(AUTO_ADVANCE_KEY) === 'true'
     }
-  }, [])
+    return false
+  })
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Save auto-advance preference when changed
   const toggleAutoAdvance = useCallback(() => {

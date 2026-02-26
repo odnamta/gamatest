@@ -1,6 +1,7 @@
 'use server'
 
 import { withOrgUser } from '@/actions/_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import type { Card, CardTemplate, UserCardProgress } from '@/types/database'
 import type { ActionResultV2 } from '@/types/actions'
 
