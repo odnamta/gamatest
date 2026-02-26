@@ -105,7 +105,7 @@ export type BulkCreateInput = z.infer<typeof bulkCreateInputSchema>
  * V12: Extended with quality scanner data
  */
 export type DraftBatchResult =
-  | { 
+  | {
       ok: true
       drafts: MCQBatchItemWithQuality[]
       // V12: Quality scanner metadata
@@ -114,6 +114,8 @@ export type DraftBatchResult =
       aiDraftCount?: number
       numQuestionsWithMissingOptions?: number
       numQuestionsWithExtraOptions?: number
+      // V13: Deduplication metadata
+      dedupedCount?: number
     }
   | { ok: false; error: { message: string; code?: string } }
 

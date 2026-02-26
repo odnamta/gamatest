@@ -7,13 +7,14 @@
  * Creator+ only.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, BookmarkPlus, FileDown } from 'lucide-react'
+import { ArrowLeft, BookmarkPlus, FileDown, Target, Link2, Unlink } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getUserDeckTemplates } from '@/actions/deck-actions'
 import { createAssessment, getAssessmentTemplates, saveAssessmentTemplate } from '@/actions/assessment-actions'
+import { getSkillDomainsForDeck, linkDeckToSkill, unlinkDeckFromSkill } from '@/actions/skill-actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { getAssessmentDefaults } from '@/actions/org-actions'
 import { Button } from '@/components/ui/Button'
@@ -23,7 +24,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function CreateAssessmentPage() {
   usePageTitle('Create Assessment')
-  const { role } = useOrg()
+  const { org, role } = useOrg()
   const router = useRouter()
   const isCreator = hasMinimumRole(role, 'creator')
 
@@ -34,6 +35,13 @@ export default function CreateAssessmentPage() {
   const [error, setError] = useState<string | null>(null)
   const [saveTemplateName, setSaveTemplateName] = useState('')
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+
+  // V19: Skill domain linking state
+  const skillsEnabled = org.settings?.features?.skills_mapping ?? false
+  const [linkedSkills, setLinkedSkills] = useState<{ id: string; name: string; color: string }[]>([])
+  const [availableSkills, setAvailableSkills] = useState<{ id: string; name: string; color: string }[]>([])
+  const [skillLinking, startSkillTransition] = useTransition()
+  const [showSkillDropdown, setShowSkillDropdown] = useState(false)
 
   // Form state
   const [deckTemplateId, setDeckTemplateId] = useState('')
@@ -109,6 +117,46 @@ export default function CreateAssessmentPage() {
       setSaveTemplateName('')
       setShowSaveTemplate(false)
     }
+  }
+
+  // V19: Load skill domains when deck selection changes
+  async function loadSkillDomainsForDeck(deckId: string) {
+    if (!skillsEnabled || !deckId) {
+      setLinkedSkills([])
+      setAvailableSkills([])
+      return
+    }
+    const skillResult = await getSkillDomainsForDeck(deckId)
+    if (skillResult.ok && skillResult.data) {
+      setLinkedSkills(skillResult.data.linked)
+      setAvailableSkills(skillResult.data.available)
+    }
+  }
+
+  function handleDeckChange(deckId: string) {
+    setDeckTemplateId(deckId)
+    loadSkillDomainsForDeck(deckId)
+  }
+
+  function handleLinkSkill(skillDomainId: string) {
+    if (!deckTemplateId) return
+    startSkillTransition(async () => {
+      const result = await linkDeckToSkill(deckTemplateId, skillDomainId)
+      if (result.ok) {
+        setShowSkillDropdown(false)
+        await loadSkillDomainsForDeck(deckTemplateId)
+      }
+    })
+  }
+
+  function handleUnlinkSkill(skillDomainId: string) {
+    if (!deckTemplateId) return
+    startSkillTransition(async () => {
+      const result = await unlinkDeckFromSkill(deckTemplateId, skillDomainId)
+      if (result.ok) {
+        await loadSkillDomainsForDeck(deckTemplateId)
+      }
+    })
   }
 
   if (!isCreator) {
@@ -210,7 +258,7 @@ export default function CreateAssessmentPage() {
           ) : (
             <select
               value={deckTemplateId}
-              onChange={(e) => setDeckTemplateId(e.target.value)}
+              onChange={(e) => handleDeckChange(e.target.value)}
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a deck...</option>
@@ -399,6 +447,92 @@ export default function CreateAssessmentPage() {
             </span>
           </label>
         </div>
+
+        {/* V19: Skill Domain Linking Section */}
+        {skillsEnabled && deckTemplateId && (
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                  Skill Domains
+                </h3>
+              </div>
+              {availableSkills.length > 0 && (
+                <div className="relative">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setShowSkillDropdown(!showSkillDropdown)}
+                    disabled={skillLinking}
+                  >
+                    <Link2 className="h-3.5 w-3.5 mr-1" />
+                    Link Skill
+                  </Button>
+                  {showSkillDropdown && (
+                    <div className="absolute right-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20">
+                      {availableSkills.map((skill) => (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          onClick={() => handleLinkSkill(skill.id)}
+                          disabled={skillLinking}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2"
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: skill.color }}
+                          />
+                          <span className="truncate">{skill.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Linked skill domains receive score updates when candidates complete this assessment.
+            </p>
+
+            {linkedSkills.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-3 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                No skill domains linked yet. Link skill domains to track competencies.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {linkedSkills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: skill.color }}
+                      />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                        {skill.name}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleUnlinkSkill(skill.id)}
+                      disabled={skillLinking}
+                      title="Unlink skill domain"
+                    >
+                      <Unlink className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Save as Template */}
         <div className="border-t border-slate-200 dark:border-slate-700 pt-4">

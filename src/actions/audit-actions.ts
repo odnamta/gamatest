@@ -99,5 +99,5 @@ export async function getAuditLogs(opts?: {
     }))
 
     return { ok: true, data: { logs: enriched, total: count ?? 0 } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }

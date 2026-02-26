@@ -23,6 +23,7 @@ import {
   compareWithAIDrafts,
   getIssuesForDraft,
 } from '@/lib/mcq-quality-scanner'
+import { deduplicateMCQBatch } from '@/lib/deduplication'
 
 /**
  * V6.1 Data Integrity Rules - shared across all modes
@@ -385,7 +386,7 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
     // V8.6: Process ALL items without artificial cap
     const itemsToValidate = questionsArray
     let filteredCount = 0
-    
+
     for (const item of itemsToValidate) {
       const itemResult = mcqBatchItemSchema.safeParse(item)
       if (itemResult.success) {
@@ -394,20 +395,26 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
         filteredCount++
       }
     }
-    
+
+    // V13: Deduplicate drafts by normalized stem (cross-page duplicates)
+    const { unique: dedupedDrafts, removedCount: dedupedCount } = deduplicateMCQBatch(validDrafts)
+    if (dedupedCount > 0) {
+      console.info(`[draftBatchMCQFromText] V13: Removed ${dedupedCount} duplicate draft(s) by stem`)
+    }
+
     // V12: Quality Scanner Integration (advisory only, never blocks)
     let scanResult = null
     let numQuestionsWithMissingOptions = 0
     let numQuestionsWithExtraOptions = 0
-    
+
     try {
       // Step 1: Scan the raw text chunk
       scanResult = scanChunkForQuestionsAndOptions(text)
 
-      // Step 2: Compare with AI drafts
-      const aiDraftOptionCounts = validDrafts.map(d => d.options.length)
-      scanResult = compareWithAIDrafts(scanResult, validDrafts.length, aiDraftOptionCounts)
-      
+      // Step 2: Compare with AI drafts (use deduped count)
+      const aiDraftOptionCounts = dedupedDrafts.map(d => d.options.length)
+      scanResult = compareWithAIDrafts(scanResult, dedupedDrafts.length, aiDraftOptionCounts)
+
       // Step 3: Count issues by type
       for (const question of scanResult.questions) {
         for (const issue of question.issues) {
@@ -415,26 +422,27 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
           if (issue.code === 'EXTRA_OPTIONS') numQuestionsWithExtraOptions++
         }
       }
-      
+
     } catch (scanError) {
       // V12: Fail soft - log and continue without quality data
       console.warn('[draftBatchMCQFromText] V12: Quality scan failed, continuing without quality data:', scanError)
     }
-    
+
     // V12: Attach quality issues to each draft (in-memory only)
-    const draftsWithQuality: MCQBatchItemWithQuality[] = validDrafts.map((draft, index) => ({
+    const draftsWithQuality: MCQBatchItemWithQuality[] = dedupedDrafts.map((draft, index) => ({
       ...draft,
       qualityIssues: scanResult ? getIssuesForDraft(scanResult, index) : undefined,
       rawTextChunk: text, // Store source text for viewer
     }))
-    
-    return { 
-      ok: true, 
+
+    return {
+      ok: true,
       drafts: draftsWithQuality,
       // V12: Quality metadata for metrics
       rawTextChunk: text,
       rawQuestionCount: scanResult?.rawQuestionCount,
-      aiDraftCount: validDrafts.length,
+      aiDraftCount: dedupedDrafts.length,
+      dedupedCount, // V13: Number of duplicates removed
       numQuestionsWithMissingOptions,
       numQuestionsWithExtraOptions,
     }

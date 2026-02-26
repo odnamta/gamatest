@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844">
+  <rect width="390" height="844" fill="#f8fafc"/>
+  <rect width="390" height="48" fill="#1e40af"/>
+  <text x="16" y="32" fill="white" font-family="system-ui" font-size="16" font-weight="600">Cekatan</text>
+  <text x="310" y="32" fill="white" font-family="system-ui" font-size="12">15:00</text>
+  <rect x="16" y="64" width="358" height="80" rx="12" fill="white" stroke="#e2e8f0"/>
+  <text x="32" y="92" fill="#1e293b" font-family="system-ui" font-size="14" font-weight="600">Question 3 of 20</text>
+  <rect x="32" y="104" width="280" height="8" rx="4" fill="#e2e8f0"/>
+  <rect x="32" y="104" width="42" height="8" rx="4" fill="#1e40af"/>
+  <rect x="16" y="160" width="358" height="120" rx="12" fill="white" stroke="#e2e8f0"/>
+  <text x="32" y="192" fill="#1e293b" font-family="system-ui" font-size="14">Which of the following best</text>
+  <text x="32" y="212" fill="#1e293b" font-family="system-ui" font-size="14">describes the concept of...</text>
+  <rect x="16" y="296" width="358" height="56" rx="12" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="32" y="328" fill="#1e40af" font-family="system-ui" font-size="14">A. First option</text>
+  <rect x="16" y="364" width="358" height="56" rx="12" fill="white" stroke="#e2e8f0"/>
+  <text x="32" y="396" fill="#1e293b" font-family="system-ui" font-size="14">B. Second option</text>
+  <rect x="16" y="432" width="358" height="56" rx="12" fill="white" stroke="#e2e8f0"/>
+  <text x="32" y="464" fill="#1e293b" font-family="system-ui" font-size="14">C. Third option</text>
+  <rect x="16" y="500" width="358" height="56" rx="12" fill="white" stroke="#e2e8f0"/>
+  <text x="32" y="532" fill="#1e293b" font-family="system-ui" font-size="14">D. Fourth option</text>
+</svg>

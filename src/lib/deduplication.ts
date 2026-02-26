@@ -1,14 +1,63 @@
 /**
  * V8.3: Deduplication utility functions
  * Pure functions for identifying duplicate cards.
+ * V13: Added deduplicateMCQBatch for batch MCQ pipeline dedup.
  */
 
 /**
  * V8.3: Normalize stem for comparison.
- * Converts to lowercase and trims whitespace.
+ * Converts to lowercase, trims whitespace, and collapses internal whitespace.
  */
 export function normalizeStem(stem: string | null): string {
-  return (stem || '').toLowerCase().trim()
+  return (stem || '').toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/**
+ * Result type for batch MCQ deduplication.
+ */
+export interface DeduplicateMCQBatchResult<T extends { stem: string }> {
+  /** Deduplicated array with first occurrence of each unique stem kept */
+  unique: T[]
+  /** Number of duplicates removed from the input */
+  removedCount: number
+}
+
+/**
+ * V13: Deduplicate an array of MCQ objects by normalized stem.
+ *
+ * - Normalizes stems (lowercase, trim, collapse whitespace)
+ * - Keeps the first occurrence of each unique normalized stem
+ * - Preserves original array order
+ * - Optionally checks against a set of existing stems to skip
+ *
+ * @param items - Array of objects with a `stem` field
+ * @param existingStems - Optional set of already-normalized stems to skip (e.g., from DB)
+ * @returns Deduplicated array and count of removed duplicates
+ */
+export function deduplicateMCQBatch<T extends { stem: string }>(
+  items: T[],
+  existingStems?: Set<string>,
+): DeduplicateMCQBatchResult<T> {
+  const seen = new Set<string>(existingStems)
+  const unique: T[] = []
+  let removedCount = 0
+
+  for (const item of items) {
+    const normalized = normalizeStem(item.stem)
+    if (!normalized) {
+      // Keep items with empty stems (they won't match anything meaningful)
+      unique.push(item)
+      continue
+    }
+    if (seen.has(normalized)) {
+      removedCount++
+    } else {
+      seen.add(normalized)
+      unique.push(item)
+    }
+  }
+
+  return { unique, removedCount }
 }
 
 /**

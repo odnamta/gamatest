@@ -386,20 +386,26 @@ export async function completeSession(
         if (skillMappings && skillMappings.length > 0) {
           const serviceClient = await createSupabaseServiceClient()
 
-          for (const mapping of skillMappings) {
-            const { data: existing } = await serviceClient
-              .from('employee_skill_scores')
-              .select('score, assessments_taken')
-              .eq('org_id', assessment.org_id)
-              .eq('user_id', user.id)
-              .eq('skill_domain_id', mapping.skill_domain_id)
-              .single()
+          // Batch-fetch all existing skill scores for this user+org in one query
+          const skillDomainIds = skillMappings.map((m) => m.skill_domain_id)
+          const { data: existingScores } = await serviceClient
+            .from('employee_skill_scores')
+            .select('skill_domain_id, score, assessments_taken')
+            .eq('org_id', assessment.org_id)
+            .eq('user_id', user.id)
+            .in('skill_domain_id', skillDomainIds)
 
+          const existingScoreMap = new Map(
+            (existingScores ?? []).map((s) => [s.skill_domain_id, { score: s.score, assessments_taken: s.assessments_taken }])
+          )
+
+          const upsertRows = skillMappings.map((mapping) => {
+            const existing = existingScoreMap.get(mapping.skill_domain_id)
             const oldScore = existing?.score ?? 0
             const oldCount = existing?.assessments_taken ?? 0
             const newScore = (oldScore * oldCount + score) / (oldCount + 1)
 
-            await serviceClient.from('employee_skill_scores').upsert({
+            return {
               org_id: assessment.org_id,
               user_id: user.id,
               skill_domain_id: mapping.skill_domain_id,
@@ -407,10 +413,12 @@ export async function completeSession(
               assessments_taken: oldCount + 1,
               last_assessed_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'org_id,user_id,skill_domain_id',
-            })
-          }
+            }
+          })
+
+          await serviceClient.from('employee_skill_scores').upsert(upsertRows, {
+            onConflict: 'org_id,user_id,skill_domain_id',
+          })
         }
       }
     } catch (skillError) {
@@ -543,19 +551,30 @@ export async function expireStaleSessions(): Promise<ActionResultV2<{ expired: n
       return { ok: true, data: { expired: 0 } }
     }
 
-    // Process each stale session
+    // Batch-fetch all answers for stale sessions in a single query
+    const staleSessionIds = stale.map((s) => s.id)
+    const { data: allAnswers } = await supabase
+      .from('assessment_answers')
+      .select('session_id, is_correct')
+      .in('session_id', staleSessionIds)
+
+    // Group answers by session_id
+    const answersBySession = new Map<string, Array<{ is_correct: boolean | null }>>()
+    for (const a of allAnswers ?? []) {
+      const arr = answersBySession.get(a.session_id) ?? []
+      arr.push({ is_correct: a.is_correct })
+      answersBySession.set(a.session_id, arr)
+    }
+
+    // Build batch update data
+    const nowIso = new Date().toISOString()
     let expiredCount = 0
     for (const s of stale) {
       const a = s.assessments as unknown as { pass_score: number }
+      const answers = answersBySession.get(s.id) ?? []
 
-      // Get answers to calculate score
-      const { data: answers } = await supabase
-        .from('assessment_answers')
-        .select('is_correct')
-        .eq('session_id', s.id)
-
-      const total = answers?.length ?? 0
-      const correct = answers?.filter((ans) => ans.is_correct === true).length ?? 0
+      const total = answers.length
+      const correct = answers.filter((ans) => ans.is_correct === true).length
       const score = total > 0 ? Math.round((correct / total) * 100) : 0
       const passed = score >= a.pass_score
 
@@ -563,7 +582,7 @@ export async function expireStaleSessions(): Promise<ActionResultV2<{ expired: n
         .from('assessment_sessions')
         .update({
           status: 'timed_out',
-          completed_at: new Date().toISOString(),
+          completed_at: nowIso,
           score,
           passed,
           time_remaining_seconds: 0,

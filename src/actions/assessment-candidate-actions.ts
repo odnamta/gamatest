@@ -555,17 +555,8 @@ export async function importCandidatesCsv(
     const nameIdx = header.indexOf('name')
     const roleIdx = header.indexOf('role')
 
-    // Get existing members
-    const { data: existingMembers } = await supabase
-      .from('organization_members')
-      .select('user_id')
-      .eq('org_id', org.id)
-
-    // Get existing profiles by email
-    const existingUserIds = new Set((existingMembers ?? []).map((m) => m.user_id))
-
-    let imported = 0
-    let skipped = 0
+    // Parse all rows first to collect emails
+    const parsedRows: Array<{ rowNum: number; email: string; name: string | null; role: string }> = []
     const errors: string[] = []
 
     for (let i = 1; i < lines.length; i++) {
@@ -585,12 +576,35 @@ export async function importCandidatesCsv(
       }
       const validRole = ['candidate', 'creator', 'admin'].includes(memberRole) ? memberRole : 'candidate'
 
-      // Check if user with this email exists in profiles
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle()
+      parsedRows.push({ rowNum: i + 1, email, name, role: validRole })
+    }
+
+    // Get existing members
+    const { data: existingMembers } = await supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('org_id', org.id)
+
+    const existingUserIds = new Set((existingMembers ?? []).map((m) => m.user_id))
+
+    // Batch-fetch all profiles by email in one query instead of N queries
+    const allEmails = parsedRows.map((r) => r.email)
+    const { data: existingProfiles } = allEmails.length > 0
+      ? await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('email', allEmails)
+      : { data: [] as { id: string; email: string }[] }
+
+    const profileByEmail = new Map(
+      (existingProfiles ?? []).map((p) => [p.email.toLowerCase(), p])
+    )
+
+    let imported = 0
+    let skipped = 0
+
+    for (const row of parsedRows) {
+      const existingProfile = profileByEmail.get(row.email)
 
       if (existingProfile) {
         // User exists — check if already a member
@@ -605,11 +619,11 @@ export async function importCandidatesCsv(
           .insert({
             org_id: org.id,
             user_id: existingProfile.id,
-            role: validRole,
+            role: row.role,
           })
 
         if (memberError) {
-          errors.push(`Row ${i + 1}: ${memberError.message}`)
+          errors.push(`Row ${row.rowNum}: ${memberError.message}`)
         } else {
           imported++
           existingUserIds.add(existingProfile.id)
@@ -624,8 +638,8 @@ export async function importCandidatesCsv(
           .from('invitations')
           .insert({
             org_id: org.id,
-            email,
-            role: validRole,
+            email: row.email,
+            role: row.role,
             invited_by: user.id,
             token,
             expires_at: expires.toISOString(),
@@ -636,7 +650,7 @@ export async function importCandidatesCsv(
           if (inviteError.message.includes('duplicate') || inviteError.message.includes('unique')) {
             skipped++
           } else {
-            errors.push(`Row ${i + 1}: ${inviteError.message}`)
+            errors.push(`Row ${row.rowNum}: ${inviteError.message}`)
           }
         } else {
           imported++

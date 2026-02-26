@@ -62,7 +62,7 @@ export async function checkHealthStatus(): Promise<ActionResultV2<HealthStatus>>
         missingCount,
       },
     }
-  })
+  }, RATE_LIMITS.standard)
 }
 
 /**
@@ -163,7 +163,7 @@ export async function healAuthorProgress(): Promise<ActionResultV2<{ healedCount
       logger.error('healAuthorProgress', error)
       return { ok: false, error: 'Failed to heal progress records' }
     }
-  })
+  }, RATE_LIMITS.standard)
 }
 
 
@@ -256,7 +256,7 @@ export async function findDuplicateDeckGroups(): Promise<ActionResultV2<Duplicat
         groups,
       },
     }
-  })
+  }, RATE_LIMITS.standard)
 }
 
 /**
@@ -374,5 +374,5 @@ export async function mergeDuplicateDecks(): Promise<ActionResultV2<{ mergedCoun
       logger.error('mergeDuplicateDecks', error)
       return { ok: false, error: 'Failed to merge duplicate decks' }
     }
-  })
+  }, RATE_LIMITS.standard)
 }

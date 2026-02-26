@@ -227,7 +227,7 @@ export async function getCustomSessionCardsV2(
       logger.error('getCustomSessionCards', error)
       return { ok: false as const, error: 'Failed to fetch cards' }
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 
   // withOrgUser already returns { ok: false, error } for auth/org errors
   return result as ActionResultV2<{ cards: Card[]; totalMatching: number }>

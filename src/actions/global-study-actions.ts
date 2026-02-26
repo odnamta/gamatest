@@ -158,7 +158,7 @@ export async function getGlobalDueCards(
 
     const isNewCardsFallback = dueProgressCount === 0 && newCardsCount > 0
     return { ok: true, data: { cards, totalDue, hasMoreBatches: totalDue > (offset + BATCH_SIZE), isNewCardsFallback } }
-  })
+  }, undefined, RATE_LIMITS.standard)
 
   // withOrgUser already returns ActionResultV2 format on auth/org errors
   return result as ActionResultV2<{ cards: Card[]; totalDue: number; hasMoreBatches: boolean; isNewCardsFallback: boolean }>
@@ -255,7 +255,7 @@ export async function getGlobalStats(): Promise<ActionResultV2<{ totalDueCount: 
         hasNewCards: (totalCardsCount || 0) > 0,
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 
   // withOrgUser already returns ActionResultV2 format on auth/org errors
   return result as ActionResultV2<{ totalDueCount: number; completedToday: number; currentStreak: number; hasNewCards: boolean }>
@@ -300,7 +300,7 @@ export async function upsertCardProgress(
     }, { onConflict: 'user_id,card_template_id' })
 
     return error ? { ok: false, error: error.message } : { ok: true }
-  })
+  }, undefined, RATE_LIMITS.standard)
 
   // withOrgUser already returns ActionResultV2 format on auth/org errors
   return result as ActionResultV2

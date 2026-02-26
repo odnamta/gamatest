@@ -284,6 +284,53 @@ export async function getSkillDeckMappings(
 }
 
 /**
+ * V19: Get skill domains linked to a specific deck template.
+ * Used by assessment create/edit pages to show skill context.
+ * Returns both linked skill domains and all available (unlinked) domains for quick linking.
+ */
+export async function getSkillDomainsForDeck(
+  deckTemplateId: string
+): Promise<ActionResultV2<{
+  linked: { id: string; name: string; color: string }[]
+  available: { id: string; name: string; color: string }[]
+}>> {
+  return withOrgUser(async ({ supabase, org }) => {
+    // Get all skill domains for this org
+    const { data: allDomains, error: domainError } = await supabase
+      .from('skill_domains')
+      .select('id, name, color')
+      .eq('org_id', org.id)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+
+    if (domainError) {
+      return { ok: false, error: domainError.message }
+    }
+
+    if (!allDomains || allDomains.length === 0) {
+      return { ok: true, data: { linked: [], available: [] } }
+    }
+
+    // Get linked skill domain IDs for this deck
+    const { data: mappings, error: mappingError } = await supabase
+      .from('deck_skill_mappings')
+      .select('skill_domain_id')
+      .eq('deck_template_id', deckTemplateId)
+
+    if (mappingError) {
+      return { ok: false, error: mappingError.message }
+    }
+
+    const linkedIds = new Set((mappings ?? []).map((m) => m.skill_domain_id))
+
+    const linked = allDomains.filter((d) => linkedIds.has(d.id))
+    const available = allDomains.filter((d) => !linkedIds.has(d.id))
+
+    return { ok: true, data: { linked, available } }
+  })
+}
+
+/**
  * V19: Get org-wide skill heatmap (employees × skills matrix).
  * Admin+ only.
  */

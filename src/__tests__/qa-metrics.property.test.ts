@@ -1,300 +1,216 @@
-import { describe, it, expect } from 'vitest'
-import * as fc from 'fast-check'
+import { describe, test, expect } from 'vitest';
+import fc from 'fast-check';
 import {
   formatQAMetrics,
-  calculateMissingNumbers,
-  createQAMetrics,
-  isImportComplete,
-  type QAMetrics,
-} from '@/lib/content-staging-metrics'
+  calculateCoverage,
+  formatSessionSummary,
+} from '@/lib/qa-metrics';
 
 /**
- * QA Metrics Property Tests
- * 
- * **Feature: v11.5-global-study-stabilization**
- * Tests for QA metrics formatting and calculation.
+ * QA Metrics Property-Based Tests
+ *
+ * Validates formatting and coverage calculation functions
+ * used in the content staging workflow.
  */
 
-describe('QA Metrics Property Tests', () => {
-  /**
-   * **Property 15: QA Metrics Formatting**
-   * For any QAMetrics input, formatQAMetrics SHALL return a string containing
-   * detected count, created count, and missing numbers list.
-   * **Validates: Requirements 11.2**
-   */
-  describe('Property 15: QA Metrics Formatting', () => {
-    it('should include detected and created counts in output', () => {
-      fc.assert(
-        fc.property(
-          fc.nat({ max: 100 }),
-          fc.nat({ max: 100 }),
-          fc.array(fc.nat({ max: 100 }), { maxLength: 20 }),
-          (detected, created, missing) => {
-            const metrics: QAMetrics = {
-              detectedCount: detected,
-              createdCount: created,
-              missingNumbers: missing,
-            }
+// Generators
+const countArb = fc.integer({ min: 0, max: 10000 });
+const positiveCountArb = fc.integer({ min: 1, max: 10000 });
+const missingNumbersArb = fc.array(fc.integer({ min: 1, max: 10000 }), { minLength: 0, maxLength: 100 });
 
-            const result = formatQAMetrics(metrics)
+describe('QA Metrics: calculateCoverage', () => {
+  test('coverage is always between 0 and 100 when created <= detected', () => {
+    fc.assert(
+      fc.property(positiveCountArb, (detected) => {
+        const created = fc.sample(fc.integer({ min: 0, max: detected }), 1)[0];
+        const coverage = calculateCoverage(detected, created);
+        expect(coverage).toBeGreaterThanOrEqual(0);
+        expect(coverage).toBeLessThanOrEqual(100);
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-            expect(result).toContain(`Detected ${detected}`)
-            expect(result).toContain(`Created ${created}`)
+  test('coverage is 100 when detected is 0', () => {
+    fc.assert(
+      fc.property(countArb, (created) => {
+        const coverage = calculateCoverage(0, created);
+        expect(coverage).toBe(100);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  test('coverage is 100 when created equals detected', () => {
+    fc.assert(
+      fc.property(positiveCountArb, (count) => {
+        const coverage = calculateCoverage(count, count);
+        expect(coverage).toBe(100);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  test('coverage is 0 when created is 0 and detected > 0', () => {
+    fc.assert(
+      fc.property(positiveCountArb, (detected) => {
+        const coverage = calculateCoverage(detected, 0);
+        expect(coverage).toBe(0);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  test('coverage is always an integer (Math.round applied)', () => {
+    fc.assert(
+      fc.property(positiveCountArb, countArb, (detected, created) => {
+        const coverage = calculateCoverage(detected, created);
+        expect(Number.isInteger(coverage)).toBe(true);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  test('coverage increases monotonically with created count for fixed detected', () => {
+    fc.assert(
+      fc.property(
+        positiveCountArb,
+        countArb,
+        countArb,
+        (detected, createdA, createdB) => {
+          const a = Math.min(createdA, detected);
+          const b = Math.min(createdB, detected);
+          const covA = calculateCoverage(detected, a);
+          const covB = calculateCoverage(detected, b);
+          if (a <= b) {
+            expect(covA).toBeLessThanOrEqual(covB);
+          } else {
+            expect(covA).toBeGreaterThanOrEqual(covB);
           }
-        ),
-        { numRuns: 100 }
-      )
-    })
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
 
-    it('should show "Complete ✓" when all detected are created and no missing', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 100 }),
-          (count) => {
-            const metrics: QAMetrics = {
-              detectedCount: count,
-              createdCount: count,
-              missingNumbers: [],
-            }
+describe('QA Metrics: formatQAMetrics', () => {
+  test('output always contains detected count and created count', () => {
+    fc.assert(
+      fc.property(countArb, countArb, missingNumbersArb, (detected, created, missing) => {
+        const result = formatQAMetrics(detected, created, missing);
+        expect(result).toContain(`Detected ${detected} questions`);
+        expect(result).toContain(`${created} cards created`);
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-            const result = formatQAMetrics(metrics)
+  test('output contains "Missing:" section only when there are missing numbers', () => {
+    fc.assert(
+      fc.property(countArb, countArb, missingNumbersArb, (detected, created, missing) => {
+        const result = formatQAMetrics(detected, created, missing);
+        if (missing.length > 0) {
+          expect(result).toContain('Missing:');
+        } else {
+          expect(result).not.toContain('Missing:');
+        }
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-            expect(result).toContain('Complete ✓')
+  test('output includes all missing numbers when present', () => {
+    fc.assert(
+      fc.property(
+        countArb,
+        countArb,
+        fc.array(fc.integer({ min: 1, max: 1000 }), { minLength: 1, maxLength: 20 }),
+        (detected, created, missing) => {
+          const result = formatQAMetrics(detected, created, missing);
+          for (const num of missing) {
+            expect(result).toContain(String(num));
           }
-        ),
-        { numRuns: 100 }
-      )
-    })
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
 
-    it('should show missing numbers when present', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 10,
-        createdCount: 7,
-        missingNumbers: [3, 5, 8],
-      }
+  test('output uses dot separator between sections', () => {
+    fc.assert(
+      fc.property(countArb, countArb, (detected, created) => {
+        const result = formatQAMetrics(detected, created, []);
+        expect(result).toContain(' \u00b7 ');
+      }),
+      { numRuns: 100 }
+    );
+  });
+});
 
-      const result = formatQAMetrics(metrics)
+describe('QA Metrics: formatSessionSummary', () => {
+  test('output always starts with draft card count', () => {
+    fc.assert(
+      fc.property(countArb, countArb, countArb, (draft, detected, missing) => {
+        const result = formatSessionSummary(draft, detected, missing);
+        expect(result).toMatch(new RegExp(`^${draft} draft cards`));
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-      expect(result).toContain('Missing:')
-      expect(result).toContain('3')
-      expect(result).toContain('5')
-      expect(result).toContain('8')
-    })
+  test('includes detected count only when detected > 0', () => {
+    fc.assert(
+      fc.property(countArb, countArb, countArb, (draft, detected, missing) => {
+        const result = formatSessionSummary(draft, detected, missing);
+        if (detected > 0) {
+          expect(result).toContain(`Detected ${detected}`);
+        } else {
+          expect(result).not.toContain('Detected');
+        }
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-    it('should truncate long missing lists with ellipsis', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 20,
-        createdCount: 5,
-        missingNumbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-      }
+  test('includes missing count only when missing > 0', () => {
+    fc.assert(
+      fc.property(countArb, countArb, countArb, (draft, detected, missing) => {
+        const result = formatSessionSummary(draft, detected, missing);
+        if (missing > 0) {
+          expect(result).toContain(`Missing ${missing}`);
+        } else {
+          expect(result).not.toContain('Missing');
+        }
+      }),
+      { numRuns: 100 }
+    );
+  });
 
-      const result = formatQAMetrics(metrics)
+  test('sections are separated by dot separator', () => {
+    fc.assert(
+      fc.property(
+        countArb,
+        positiveCountArb,
+        positiveCountArb,
+        (draft, detected, missing) => {
+          const result = formatSessionSummary(draft, detected, missing);
+          // When detected and missing are both > 0, there should be separators
+          const parts = result.split(' \u00b7 ');
+          expect(parts.length).toBe(3);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
 
-      expect(result).toContain('...')
-    })
-
-    it('should not show Complete when counts differ', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 100 }),
-          fc.integer({ min: 1, max: 100 }),
-          (detected, created) => {
-            fc.pre(detected !== created)
-
-            const metrics: QAMetrics = {
-              detectedCount: detected,
-              createdCount: created,
-              missingNumbers: [],
-            }
-
-            const result = formatQAMetrics(metrics)
-
-            expect(result).not.toContain('Complete ✓')
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-  })
-
-  /**
-   * calculateMissingNumbers tests
-   */
-  describe('calculateMissingNumbers', () => {
-    it('should return numbers in detected but not in created', () => {
-      fc.assert(
-        fc.property(
-          fc.array(fc.nat({ max: 100 }), { minLength: 1, maxLength: 20 }),
-          fc.array(fc.nat({ max: 100 }), { maxLength: 20 }),
-          (detected, created) => {
-            const missing = calculateMissingNumbers(detected, created)
-            const createdSet = new Set(created)
-
-            // All missing numbers should be in detected but not in created
-            for (const num of missing) {
-              expect(detected).toContain(num)
-              expect(createdSet.has(num)).toBe(false)
-            }
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-
-    it('should return sorted array', () => {
-      fc.assert(
-        fc.property(
-          fc.array(fc.nat({ max: 100 }), { minLength: 1, maxLength: 20 }),
-          fc.array(fc.nat({ max: 100 }), { maxLength: 10 }),
-          (detected, created) => {
-            const missing = calculateMissingNumbers(detected, created)
-
-            // Verify sorted ascending
-            for (let i = 1; i < missing.length; i++) {
-              expect(missing[i]).toBeGreaterThanOrEqual(missing[i - 1])
-            }
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-
-    it('should return empty array when all detected are created', () => {
-      const detected = [1, 2, 3, 4, 5]
-      const created = [1, 2, 3, 4, 5]
-
-      const result = calculateMissingNumbers(detected, created)
-
-      expect(result).toEqual([])
-    })
-
-    it('should handle empty inputs', () => {
-      expect(calculateMissingNumbers([], [])).toEqual([])
-      expect(calculateMissingNumbers([], [1, 2, 3])).toEqual([])
-      expect(calculateMissingNumbers([1, 2, 3], [])).toEqual([1, 2, 3])
-    })
-  })
-
-  /**
-   * createQAMetrics tests
-   */
-  describe('createQAMetrics', () => {
-    it('should create correct metrics from number arrays', () => {
-      fc.assert(
-        fc.property(
-          fc.array(fc.nat({ max: 100 }), { maxLength: 20 }),
-          fc.array(fc.nat({ max: 100 }), { maxLength: 20 }),
-          (detected, created) => {
-            const metrics = createQAMetrics(detected, created)
-
-            expect(metrics.detectedCount).toBe(detected.length)
-            expect(metrics.createdCount).toBe(created.length)
-            expect(metrics.missingNumbers).toEqual(
-              calculateMissingNumbers(detected, created)
-            )
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-  })
-
-  /**
-   * isImportComplete tests
-   */
-  describe('isImportComplete', () => {
-    it('should return true when all conditions met', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 100 }),
-          (count) => {
-            const metrics: QAMetrics = {
-              detectedCount: count,
-              createdCount: count,
-              missingNumbers: [],
-            }
-
-            expect(isImportComplete(metrics)).toBe(true)
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-
-    it('should return false when counts differ', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 100 }),
-          fc.integer({ min: 1, max: 100 }),
-          (detected, created) => {
-            fc.pre(detected !== created)
-
-            const metrics: QAMetrics = {
-              detectedCount: detected,
-              createdCount: created,
-              missingNumbers: [],
-            }
-
-            expect(isImportComplete(metrics)).toBe(false)
-          }
-        ),
-        { numRuns: 100 }
-      )
-    })
-
-    it('should return false when missing numbers exist', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 10,
-        createdCount: 10,
-        missingNumbers: [5],
-      }
-
-      expect(isImportComplete(metrics)).toBe(false)
-    })
-
-    it('should return false when detected is 0', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 0,
-        createdCount: 0,
-        missingNumbers: [],
-      }
-
-      expect(isImportComplete(metrics)).toBe(false)
-    })
-  })
-
-  /**
-   * Format output examples
-   */
-  describe('Format output examples', () => {
-    it('should format complete import correctly', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 20,
-        createdCount: 20,
-        missingNumbers: [],
-      }
-
-      expect(formatQAMetrics(metrics)).toBe('Detected 20 · Created 20 · Complete ✓')
-    })
-
-    it('should format partial import with missing numbers', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 10,
-        createdCount: 7,
-        missingNumbers: [3, 5, 8],
-      }
-
-      expect(formatQAMetrics(metrics)).toBe('Detected 10 · Created 7 · Missing: 3, 5, 8')
-    })
-
-    it('should format import with no missing but different counts', () => {
-      const metrics: QAMetrics = {
-        detectedCount: 10,
-        createdCount: 8,
-        missingNumbers: [],
-      }
-
-      expect(formatQAMetrics(metrics)).toBe('Detected 10 · Created 8')
-    })
-  })
-})
+  test('output with zeros is just the draft count', () => {
+    fc.assert(
+      fc.property(countArb, (draft) => {
+        const result = formatSessionSummary(draft, 0, 0);
+        expect(result).toBe(`${draft} draft cards`);
+      }),
+      { numRuns: 100 }
+    );
+  });
+});

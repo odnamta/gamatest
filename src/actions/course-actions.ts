@@ -837,7 +837,7 @@ export async function getLessonDetail(
         isLocked: status === 'locked',
       },
     }
-  }) as Promise<ActionResultV2<{ lesson: Lesson; courseId: string; progress: LessonProgress | null; isLocked: boolean }>>
+  }, RATE_LIMITS.standard) as Promise<ActionResultV2<{ lesson: Lesson; courseId: string; progress: LessonProgress | null; isLocked: boolean }>>
 }
 
 // ============================================

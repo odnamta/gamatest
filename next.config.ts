@@ -8,6 +8,35 @@ const withPWA = require("next-pwa")({
   disable: process.env.NODE_ENV === "development",
   buildExcludes: [/middleware-manifest\.json$/], // CRITICAL: Prevents Vercel WorkerError crash
   publicExcludes: ["!robots.txt", "!sitemap.xml"],
+  fallbacks: {
+    document: "/offline.html",
+  },
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "supabase-api",
+        expiration: { maxEntries: 64, maxAgeSeconds: 60 * 5 },
+      },
+    },
+    {
+      urlPattern: /\.(?:js|css|woff2?)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "static-assets",
+        expiration: { maxEntries: 128, maxAgeSeconds: 60 * 60 * 24 * 30 },
+      },
+    },
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "images",
+        expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 },
+      },
+    },
+  ],
 });
 
 const nextConfig: NextConfig = {

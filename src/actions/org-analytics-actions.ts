@@ -239,5 +239,5 @@ export async function getOrgAnalytics(): Promise<ActionResultV2<OrgAnalytics>> {
         },
       },
     }
-  })
+  }, undefined, RATE_LIMITS.standard)
 }
