@@ -75,13 +75,13 @@ export function OrgStatsCard() {
     <div className="mb-6 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-none">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          Organization Overview
+          Ringkasan Organisasi
         </h2>
         <button
           onClick={() => router.push('/assessments')}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
-          View Assessments
+          Lihat Asesmen
         </button>
       </div>
 
@@ -92,7 +92,7 @@ export function OrgStatsCard() {
           <div className="text-lg font-bold text-slate-900 dark:text-slate-100">
             {stats.memberCount}
           </div>
-          <div className="text-[10px] text-slate-500">Members</div>
+          <div className="text-[10px] text-slate-500">Anggota</div>
         </div>
         <div className="text-center p-2 rounded-lg bg-slate-50 dark:bg-slate-800">
           <BarChart3 className="h-4 w-4 mx-auto text-blue-500 mb-1" />
@@ -131,21 +131,21 @@ export function OrgStatsCard() {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
-          Create Assessment
+          Buat Asesmen
         </button>
         <button
           onClick={() => router.push('/assessments/candidates')}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
         >
           <UserCheck className="h-3.5 w-3.5" />
-          Candidates
+          Kandidat
         </button>
         <button
           onClick={() => router.push(`/orgs/${org.slug}/analytics`)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
         >
           <PieChart className="h-3.5 w-3.5" />
-          Org Analytics
+          Analitik Organisasi
         </button>
         {isAdmin && (
           <button
@@ -163,7 +163,7 @@ export function OrgStatsCard() {
         <div className="mb-4">
           <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
             <ClipboardList className="h-3 w-3 text-blue-500" />
-            Active Assessments
+            Asesmen Aktif
           </h3>
           <div className="space-y-1.5">
             {stats.activeAssessments.map((a) => (
@@ -195,7 +195,7 @@ export function OrgStatsCard() {
           <div>
             <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
               <Trophy className="h-3 w-3 text-amber-500" />
-              Top Performers
+              Performa Terbaik
             </h3>
             <div className="space-y-1.5">
               {stats.topPerformers.map((p, idx) => (
@@ -227,7 +227,7 @@ export function OrgStatsCard() {
         {stats.recentSessions.length > 0 && (
           <div>
             <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
-              Recent Results
+              Hasil Terbaru
             </h3>
             <div className="space-y-1.5">
               {stats.recentSessions.map((s, idx) => (

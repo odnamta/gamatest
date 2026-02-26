@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withUser } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResultV2 } from '@/types/actions'
 
 /**
@@ -13,37 +14,36 @@ import type { ActionResultV2 } from '@/types/actions'
 export async function updateUserProfile(
   displayName: string
 ): Promise<ActionResultV2> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withUser(async ({ user, supabase }) => {
+    try {
+      const updateData: Record<string, unknown> = {}
+      if (displayName !== undefined) {
+        updateData.full_name = displayName
+        updateData.name = displayName
+      }
 
-  const supabase = await createSupabaseServerClient()
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { ...user.user_metadata, ...updateData },
+      })
 
-  const updateData: Record<string, unknown> = {}
-  if (displayName !== undefined) {
-    updateData.full_name = displayName
-    updateData.name = displayName
-  }
+      if (updateError) {
+        return { ok: false, error: 'Unable to update profile. Please try again.' }
+      }
 
-  const { error: updateError } = await supabase.auth.updateUser({
-    data: { ...user.user_metadata, ...updateData },
-  })
+      // Sync full_name to profiles table
+      if (displayName !== undefined) {
+        await supabase
+          .from('profiles')
+          .update({ full_name: displayName })
+          .eq('id', user.id)
+      }
 
-  if (updateError) {
-    return { ok: false, error: 'Unable to update profile. Please try again.' }
-  }
+      revalidatePath('/profile')
+      revalidatePath('/dashboard')
 
-  // Sync full_name to profiles table
-  if (displayName !== undefined) {
-    await supabase
-      .from('profiles')
-      .update({ full_name: displayName })
-      .eq('id', user.id)
-  }
-
-  revalidatePath('/profile')
-  revalidatePath('/dashboard')
-
-  return { ok: true }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Terjadi kesalahan' }
+    }
+  }, RATE_LIMITS.sensitive)
 }

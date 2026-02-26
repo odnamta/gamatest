@@ -112,9 +112,9 @@ export default function ProfilePage() {
           .eq('id', user.id)
       }
 
-      setSuccess('Profile updated successfully!')
+      setSuccess('Profil berhasil diperbarui!')
     } catch {
-      setError('Failed to update profile. Please try again.')
+      setError('Gagal memperbarui profil. Silakan coba lagi.')
     } finally {
       setIsSaving(false)
     }
@@ -140,7 +140,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-md mx-auto px-4 py-8 pb-24">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
-        Profile Settings
+        Pengaturan Profil
       </h1>
 
       <Card variant="elevated" padding="lg" className="mb-6">
@@ -209,7 +209,7 @@ export default function ProfilePage() {
           loading={isSaving}
           className="w-full mt-6"
         >
-          Save Changes
+          Simpan Perubahan
         </Button>
       </Card>
 
@@ -337,7 +337,7 @@ export default function ProfilePage() {
         className="w-full flex items-center justify-center gap-2 p-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
       >
         <LogOut className="h-5 w-5" />
-        Sign Out
+        Keluar
       </button>
     </div>
   )
@@ -381,7 +381,7 @@ function ChangePasswordCard() {
     <Card variant="elevated" padding="lg" className="mb-6">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
         <Lock className="h-4 w-4 text-slate-500" />
-        Change Password
+        Ubah Password
       </h2>
       {message && (
         <div className={`mb-3 p-2.5 rounded-lg text-sm ${
@@ -421,7 +421,7 @@ function ChangePasswordCard() {
         </div>
       </div>
       <Button onClick={handleChangePassword} loading={saving} variant="secondary" className="w-full mt-4">
-        Update Password
+        Perbarui Password
       </Button>
     </Card>
   )

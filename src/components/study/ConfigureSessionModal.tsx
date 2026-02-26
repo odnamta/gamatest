@@ -247,7 +247,7 @@ export function ConfigureSessionModal({ isOpen, onClose }: ConfigureSessionModal
         {/* Footer */}
         <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            Batal
           </Button>
           <Button onClick={handleStartSession} disabled={!isValid}>
             <Play className="w-4 h-4 mr-2" />

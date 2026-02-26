@@ -93,7 +93,7 @@ export default function AssessmentResultsPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12 text-center text-slate-500">
-      No results to display.
+      Tidak ada hasil untuk ditampilkan.
     </div>
   )
 }

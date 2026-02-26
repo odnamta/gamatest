@@ -98,13 +98,13 @@ export function OrgSwitcher() {
             <DropdownMenuItem asChild>
               <a href={`/orgs/${org.slug}/settings`} className="cursor-pointer">
                 <Settings className="h-4 w-4 mr-2" />
-                Settings
+                Pengaturan
               </a>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a href={`/orgs/${org.slug}/members`} className="cursor-pointer">
                 <Users className="h-4 w-4 mr-2" />
-                Members
+                Anggota
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -114,7 +114,7 @@ export function OrgSwitcher() {
         <DropdownMenuItem asChild>
           <a href="/orgs/create" className="cursor-pointer">
             <Plus className="h-4 w-4 mr-2" />
-            Create new organization
+            Buat organisasi baru
           </a>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -56,6 +56,7 @@ export function PublicExam({ code }: { code: string }) {
   const [showTimeWarning, setShowTimeWarning] = useState(false)
 
   const sessionIdRef = useRef<string>('')
+  const sessionTokenRef = useRef<string>('')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const completingRef = useRef(false)
   const questionStartRef = useRef<number>(Date.now())
@@ -81,11 +82,12 @@ export function PublicExam({ code }: { code: string }) {
         return
       }
 
-      const { sessionId, timeRemainingSeconds } = sessionData
+      const { sessionId, sessionToken, timeRemainingSeconds } = sessionData
       sessionIdRef.current = sessionId
+      sessionTokenRef.current = sessionToken || sessionId
 
-      // Load questions from server
-      const result = await getPublicQuestions(sessionId)
+      // Load questions from server (use signed token)
+      const result = await getPublicQuestions(sessionTokenRef.current)
       if (!result.ok || !result.data) {
         setError(result.ok ? 'Gagal memuat soal' : result.error)
         setPhase('exam')
@@ -134,9 +136,10 @@ export function PublicExam({ code }: { code: string }) {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
 
     const sid = sessionIdRef.current
+    const token = sessionTokenRef.current
     if (!sid) return
 
-    const result = await completePublicSession(sid)
+    const result = await completePublicSession(token)
     if (result.ok) {
       router.push('/t/' + code + '/results/' + sid)
     } else {
@@ -319,7 +322,7 @@ export function PublicExam({ code }: { code: string }) {
 
     // Fire and forget — submit answer in background
     const timeSpent = Math.round((Date.now() - questionStartRef.current) / 1000)
-    submitPublicAnswer(sessionIdRef.current, q.cardTemplateId, idx, timeRemaining, timeSpent)
+    submitPublicAnswer(sessionTokenRef.current, q.cardTemplateId, idx, timeRemaining, timeSpent)
       .catch((err) => console.error('[submitPublicAnswer]', err))
   }
 
@@ -332,7 +335,8 @@ export function PublicExam({ code }: { code: string }) {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
 
     const sid = sessionIdRef.current
-    const result = await completePublicSession(sid)
+    const token = sessionTokenRef.current
+    const result = await completePublicSession(token)
     if (result.ok) {
       router.push('/t/' + code + '/results/' + sid)
     } else {

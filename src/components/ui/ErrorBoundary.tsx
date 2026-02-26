@@ -49,13 +49,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
           </div>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            Something went wrong
+            Terjadi kesalahan
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-md">
-            An unexpected error occurred. Please try again.
+            Terjadi kesalahan tak terduga. Silakan coba lagi.
           </p>
           <Button onClick={this.handleRetry} variant="secondary">
-            Try Again
+            Coba Lagi
           </Button>
         </div>
       )

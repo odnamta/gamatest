@@ -17,14 +17,14 @@ export default function CustomStudyError({
     <div className="max-w-md mx-auto px-4 py-16 text-center">
       <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
       <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        Study session interrupted
+        Sesi belajar terputus
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-        Something went wrong during your custom study session. Please try again.
+        Terjadi kesalahan saat sesi belajar kustom Anda. Silakan coba lagi.
       </p>
       <Button onClick={reset}>
         <RefreshCw className="h-4 w-4 mr-2" />
-        Retry
+        Coba Lagi
       </Button>
       {error.digest && (
         <p className="mt-4 text-xs text-slate-400">Error ID: {error.digest}</p>

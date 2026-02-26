@@ -1,10 +1,17 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { loginSchema, registerSchema } from '@/lib/validations'
 import { formatZodErrors } from '@/lib/zod-utils'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResultV2 } from '@/types/actions'
+
+async function getClientIp(): Promise<string> {
+  const h = await headers()
+  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown'
+}
 
 /**
  * Server Action for user login.
@@ -12,6 +19,13 @@ import type { ActionResultV2 } from '@/types/actions'
  * Requirements: 1.1, 1.2, 9.3
  */
 export async function loginAction(formData: FormData): Promise<ActionResultV2> {
+  // Rate limit by IP — 10 attempts per 5 minutes
+  const ip = await getClientIp()
+  const rl = await checkRateLimit(`auth:login:${ip}`, RATE_LIMITS.auth)
+  if (!rl.allowed) {
+    return { ok: false, error: 'Terlalu banyak percobaan login. Coba lagi nanti.' }
+  }
+
   const rawData = {
     email: formData.get('email'),
     password: formData.get('password'),
@@ -19,7 +33,7 @@ export async function loginAction(formData: FormData): Promise<ActionResultV2> {
 
   // Server-side Zod validation (Requirement 9.3)
   const validationResult = loginSchema.safeParse(rawData)
-  
+
   if (!validationResult.success) {
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
@@ -48,6 +62,13 @@ export async function loginAction(formData: FormData): Promise<ActionResultV2> {
  * Requirements: 1.1, 9.3
  */
 export async function registerAction(formData: FormData): Promise<ActionResultV2> {
+  // Rate limit by IP — 5 registrations per hour
+  const ip = await getClientIp()
+  const rl = await checkRateLimit(`auth:register:${ip}`, RATE_LIMITS.publicRegistration)
+  if (!rl.allowed) {
+    return { ok: false, error: 'Terlalu banyak percobaan registrasi. Coba lagi nanti.' }
+  }
+
   const rawData = {
     email: formData.get('email'),
     password: formData.get('password'),
@@ -56,7 +77,7 @@ export async function registerAction(formData: FormData): Promise<ActionResultV2
 
   // Server-side Zod validation (Requirement 9.3)
   const validationResult = registerSchema.safeParse(rawData)
-  
+
   if (!validationResult.success) {
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }

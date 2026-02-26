@@ -38,18 +38,18 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             </div>
             
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-              Something went wrong
+              Terjadi kesalahan
             </h1>
-            
+
             <p className="text-slate-600 dark:text-slate-400 mb-6">
-              A critical error occurred. Please try refreshing the page.
+              Terjadi kesalahan kritis. Silakan muat ulang halaman.
             </p>
 
             <button
               onClick={reset}
               className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
-              Try Again
+              Coba Lagi
             </button>
 
             {error.digest && (

@@ -1,9 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { withUser } from './_helpers'
+import { withOrgUser } from './_helpers'
 import { RATE_LIMITS } from '@/lib/rate-limit'
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
 import { calculateLessonStatus, buildProgressMap } from '@/lib/lesson-status'
 import {
   createCourseSchema,
@@ -49,31 +48,27 @@ export async function createCourseAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
   const { title, description } = validationResult.data
-  const supabase = await createSupabaseServerClient()
 
-  const { data, error } = await supabase
-    .from('courses')
-    .insert({
-      user_id: user.id,
-      title,
-      description: description || null,
-    })
-    .select()
-    .single()
+  return withOrgUser(async ({ user, supabase }) => {
+    const { data, error } = await supabase
+      .from('courses')
+      .insert({
+        user_id: user.id,
+        title,
+        description: description || null,
+      })
+      .select()
+      .single()
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  revalidatePath('/dashboard')
+    revalidatePath('/dashboard')
 
-  return { ok: true, data }
+    return { ok: true, data }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 
@@ -93,13 +88,6 @@ export async function updateCourseAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
   if (data.description !== undefined) updateData.description = data.description
@@ -108,21 +96,23 @@ export async function updateCourseAction(
     return { ok: false, error: 'No fields to update' }
   }
 
-  const { data: updatedCourse, error } = await supabase
-    .from('courses')
-    .update(updateData)
-    .eq('id', courseId)
-    .select()
-    .single()
+  return withOrgUser(async ({ supabase }) => {
+    const { data: updatedCourse, error } = await supabase
+      .from('courses')
+      .update(updateData)
+      .eq('id', courseId)
+      .select()
+      .single()
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  revalidatePath('/dashboard')
-  revalidatePath(`/course/${courseId}`)
+    revalidatePath('/dashboard')
+    revalidatePath(`/course/${courseId}`)
 
-  return { ok: true, data: updatedCourse }
+    return { ok: true, data: updatedCourse }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -136,25 +126,20 @@ export async function deleteCourseAction(courseId: string): Promise<ActionResult
     return { ok: false, error: 'Invalid course ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', courseId)
 
-  const supabase = await createSupabaseServerClient()
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { error } = await supabase
-    .from('courses')
-    .delete()
-    .eq('id', courseId)
+    revalidatePath('/dashboard')
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  revalidatePath('/dashboard')
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 // ============================================
@@ -182,46 +167,42 @@ export async function createUnitAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
   const { courseId, title, orderIndex } = validationResult.data
-  const supabase = await createSupabaseServerClient()
 
-  // If no orderIndex provided, get the next available index
-  let finalOrderIndex = orderIndex
-  if (finalOrderIndex === undefined) {
-    const { data: existingUnits } = await supabase
+  return withOrgUser(async ({ supabase }) => {
+    // If no orderIndex provided, get the next available index
+    let finalOrderIndex = orderIndex
+    if (finalOrderIndex === undefined) {
+      const { data: existingUnits } = await supabase
+        .from('units')
+        .select('order_index')
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      finalOrderIndex = existingUnits && existingUnits.length > 0
+        ? existingUnits[0].order_index + 1
+        : 0
+    }
+
+    const { data, error } = await supabase
       .from('units')
-      .select('order_index')
-      .eq('course_id', courseId)
-      .order('order_index', { ascending: false })
-      .limit(1)
+      .insert({
+        course_id: courseId,
+        title,
+        order_index: finalOrderIndex,
+      })
+      .select()
+      .single()
 
-    finalOrderIndex = existingUnits && existingUnits.length > 0
-      ? existingUnits[0].order_index + 1
-      : 0
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { data, error } = await supabase
-    .from('units')
-    .insert({
-      course_id: courseId,
-      title,
-      order_index: finalOrderIndex,
-    })
-    .select()
-    .single()
+    revalidatePath(`/course/${courseId}`)
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  revalidatePath(`/course/${courseId}`)
-
-  return { ok: true, data }
+    return { ok: true, data }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 
@@ -240,13 +221,6 @@ export async function updateUnitAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
   if (data.orderIndex !== undefined) updateData.order_index = data.orderIndex
@@ -255,23 +229,25 @@ export async function updateUnitAction(
     return { ok: false, error: 'No fields to update' }
   }
 
-  const { data: updatedUnit, error } = await supabase
-    .from('units')
-    .update(updateData)
-    .eq('id', unitId)
-    .select('*, courses!inner(id)')
-    .single()
+  return withOrgUser(async ({ supabase }) => {
+    const { data: updatedUnit, error } = await supabase
+      .from('units')
+      .update(updateData)
+      .eq('id', unitId)
+      .select('*, courses!inner(id)')
+      .single()
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const courseId = (updatedUnit as unknown as UnitWithCourse).courses?.id
-  if (courseId) {
-    revalidatePath(`/course/${courseId}`)
-  }
+    const courseId = (updatedUnit as unknown as UnitWithCourse).courses?.id
+    if (courseId) {
+      revalidatePath(`/course/${courseId}`)
+    }
 
-  return { ok: true, data: updatedUnit }
+    return { ok: true, data: updatedUnit }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -285,34 +261,29 @@ export async function deleteUnitAction(unitId: string): Promise<ActionResultV2> 
     return { ok: false, error: 'Invalid unit ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Get course ID for revalidation before deleting
+    const { data: unit } = await supabase
+      .from('units')
+      .select('course_id')
+      .eq('id', unitId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    const { error } = await supabase
+      .from('units')
+      .delete()
+      .eq('id', unitId)
 
-  // Get course ID for revalidation before deleting
-  const { data: unit } = await supabase
-    .from('units')
-    .select('course_id')
-    .eq('id', unitId)
-    .single()
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { error } = await supabase
-    .from('units')
-    .delete()
-    .eq('id', unitId)
+    if (unit?.course_id) {
+      revalidatePath(`/course/${unit.course_id}`)
+    }
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  if (unit?.course_id) {
-    revalidatePath(`/course/${unit.course_id}`)
-  }
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 // ============================================
@@ -341,50 +312,46 @@ export async function createLessonAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
   const { unitId, title, orderIndex, targetItemCount } = validationResult.data
-  const supabase = await createSupabaseServerClient()
 
-  // If no orderIndex provided, get the next available index
-  let finalOrderIndex = orderIndex
-  if (finalOrderIndex === undefined) {
-    const { data: existingLessons } = await supabase
+  return withOrgUser(async ({ supabase }) => {
+    // If no orderIndex provided, get the next available index
+    let finalOrderIndex = orderIndex
+    if (finalOrderIndex === undefined) {
+      const { data: existingLessons } = await supabase
+        .from('lessons')
+        .select('order_index')
+        .eq('unit_id', unitId)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      finalOrderIndex = existingLessons && existingLessons.length > 0
+        ? existingLessons[0].order_index + 1
+        : 0
+    }
+
+    const { data, error } = await supabase
       .from('lessons')
-      .select('order_index')
-      .eq('unit_id', unitId)
-      .order('order_index', { ascending: false })
-      .limit(1)
+      .insert({
+        unit_id: unitId,
+        title,
+        order_index: finalOrderIndex,
+        target_item_count: targetItemCount ?? 10,
+      })
+      .select('*, units!inner(course_id)')
+      .single()
 
-    finalOrderIndex = existingLessons && existingLessons.length > 0
-      ? existingLessons[0].order_index + 1
-      : 0
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { data, error } = await supabase
-    .from('lessons')
-    .insert({
-      unit_id: unitId,
-      title,
-      order_index: finalOrderIndex,
-      target_item_count: targetItemCount ?? 10,
-    })
-    .select('*, units!inner(course_id)')
-    .single()
+    const courseId = (data as unknown as LessonWithUnit).units?.course_id
+    if (courseId) {
+      revalidatePath(`/course/${courseId}`)
+    }
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  const courseId = (data as unknown as LessonWithUnit).units?.course_id
-  if (courseId) {
-    revalidatePath(`/course/${courseId}`)
-  }
-
-  return { ok: true, data }
+    return { ok: true, data }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 
@@ -403,13 +370,6 @@ export async function updateLessonAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
   if (data.orderIndex !== undefined) updateData.order_index = data.orderIndex
@@ -419,24 +379,26 @@ export async function updateLessonAction(
     return { ok: false, error: 'No fields to update' }
   }
 
-  const { data: updatedLesson, error } = await supabase
-    .from('lessons')
-    .update(updateData)
-    .eq('id', lessonId)
-    .select('*, units!inner(course_id)')
-    .single()
+  return withOrgUser(async ({ supabase }) => {
+    const { data: updatedLesson, error } = await supabase
+      .from('lessons')
+      .update(updateData)
+      .eq('id', lessonId)
+      .select('*, units!inner(course_id)')
+      .single()
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const courseId = (updatedLesson as unknown as LessonWithUnit).units?.course_id
-  if (courseId) {
-    revalidatePath(`/course/${courseId}`)
-  }
-  revalidatePath(`/lesson/${lessonId}`)
+    const courseId = (updatedLesson as unknown as LessonWithUnit).units?.course_id
+    if (courseId) {
+      revalidatePath(`/course/${courseId}`)
+    }
+    revalidatePath(`/lesson/${lessonId}`)
 
-  return { ok: true, data: updatedLesson }
+    return { ok: true, data: updatedLesson }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -450,35 +412,30 @@ export async function deleteLessonAction(lessonId: string): Promise<ActionResult
     return { ok: false, error: 'Invalid lesson ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Get course ID for revalidation before deleting
+    const { data: lesson } = await supabase
+      .from('lessons')
+      .select('units!inner(course_id)')
+      .eq('id', lessonId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    const { error } = await supabase
+      .from('lessons')
+      .delete()
+      .eq('id', lessonId)
 
-  // Get course ID for revalidation before deleting
-  const { data: lesson } = await supabase
-    .from('lessons')
-    .select('units!inner(course_id)')
-    .eq('id', lessonId)
-    .single()
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { error } = await supabase
-    .from('lessons')
-    .delete()
-    .eq('id', lessonId)
+    const courseId = (lesson as unknown as LessonWithUnit | null)?.units?.course_id
+    if (courseId) {
+      revalidatePath(`/course/${courseId}`)
+    }
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  const courseId = (lesson as unknown as LessonWithUnit | null)?.units?.course_id
-  if (courseId) {
-    revalidatePath(`/course/${courseId}`)
-  }
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 // ============================================
@@ -502,57 +459,52 @@ export async function addLessonItemAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Verify the item (card) exists and user owns it
+    const { data: card, error: cardError } = await supabase
+      .from('cards')
+      .select('id, deck_id, decks!inner(user_id)')
+      .eq('id', itemId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (cardError || !card) {
+      return { ok: false, error: 'Item not found or access denied' }
+    }
 
-  // Verify the item (card) exists and user owns it
-  const { data: card, error: cardError } = await supabase
-    .from('cards')
-    .select('id, deck_id, decks!inner(user_id)')
-    .eq('id', itemId)
-    .single()
+    // If no orderIndex provided, get the next available index
+    let finalOrderIndex = orderIndex
+    if (finalOrderIndex === undefined) {
+      const { data: existingItems } = await supabase
+        .from('lesson_items')
+        .select('order_index')
+        .eq('lesson_id', lessonId)
+        .order('order_index', { ascending: false })
+        .limit(1)
 
-  if (cardError || !card) {
-    return { ok: false, error: 'Item not found or access denied' }
-  }
+      finalOrderIndex = existingItems && existingItems.length > 0
+        ? existingItems[0].order_index + 1
+        : 0
+    }
 
-  // If no orderIndex provided, get the next available index
-  let finalOrderIndex = orderIndex
-  if (finalOrderIndex === undefined) {
-    const { data: existingItems } = await supabase
+    const { data, error } = await supabase
       .from('lesson_items')
-      .select('order_index')
-      .eq('lesson_id', lessonId)
-      .order('order_index', { ascending: false })
-      .limit(1)
+      .insert({
+        lesson_id: lessonId,
+        item_type: itemType,
+        item_id: itemId,
+        order_index: finalOrderIndex,
+      })
+      .select()
+      .single()
 
-    finalOrderIndex = existingItems && existingItems.length > 0
-      ? existingItems[0].order_index + 1
-      : 0
-  }
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { data, error } = await supabase
-    .from('lesson_items')
-    .insert({
-      lesson_id: lessonId,
-      item_type: itemType,
-      item_id: itemId,
-      order_index: finalOrderIndex,
-    })
-    .select()
-    .single()
+    revalidatePath(`/lesson/${lessonId}`)
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  revalidatePath(`/lesson/${lessonId}`)
-
-  return { ok: true, data }
+    return { ok: true, data }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 
@@ -566,34 +518,29 @@ export async function removeLessonItemAction(lessonItemId: string): Promise<Acti
     return { ok: false, error: 'Invalid lesson item ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Get lesson ID for revalidation before deleting
+    const { data: lessonItem } = await supabase
+      .from('lesson_items')
+      .select('lesson_id')
+      .eq('id', lessonItemId)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    const { error } = await supabase
+      .from('lesson_items')
+      .delete()
+      .eq('id', lessonItemId)
 
-  // Get lesson ID for revalidation before deleting
-  const { data: lessonItem } = await supabase
-    .from('lesson_items')
-    .select('lesson_id')
-    .eq('id', lessonItemId)
-    .single()
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  const { error } = await supabase
-    .from('lesson_items')
-    .delete()
-    .eq('id', lessonItemId)
+    if (lessonItem?.lesson_id) {
+      revalidatePath(`/lesson/${lessonItem.lesson_id}`)
+    }
 
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  if (lessonItem?.lesson_id) {
-    revalidatePath(`/lesson/${lessonItem.lesson_id}`)
-  }
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -611,32 +558,27 @@ export async function reorderLessonItemsAction(
     return { ok: false, error: formatZodErrors(validationResult.error) }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Update each item's order_index
+    const updates = itemIds.map((itemId, index) =>
+      supabase
+        .from('lesson_items')
+        .update({ order_index: index })
+        .eq('id', itemId)
+        .eq('lesson_id', lessonId)
+    )
 
-  const supabase = await createSupabaseServerClient()
+    const results = await Promise.all(updates)
 
-  // Update each item's order_index
-  const updates = itemIds.map((itemId, index) =>
-    supabase
-      .from('lesson_items')
-      .update({ order_index: index })
-      .eq('id', itemId)
-      .eq('lesson_id', lessonId)
-  )
+    const errors = results.filter(r => r.error)
+    if (errors.length > 0) {
+      return { ok: false, error: 'Failed to reorder some items' }
+    }
 
-  const results = await Promise.all(updates)
+    revalidatePath(`/lesson/${lessonId}`)
 
-  const errors = results.filter(r => r.error)
-  if (errors.length > 0) {
-    return { ok: false, error: 'Failed to reorder some items' }
-  }
-
-  revalidatePath(`/lesson/${lessonId}`)
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 // ============================================
@@ -658,60 +600,55 @@ export async function getLessonItems(lessonId: string): Promise<ActionResultV2<L
     return { ok: false, error: 'Invalid lesson ID' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase }) => {
+    // Fetch lesson items ordered by order_index
+    const { data: lessonItems, error: itemsError } = await supabase
+      .from('lesson_items')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .order('order_index', { ascending: true })
 
-  const supabase = await createSupabaseServerClient()
-
-  // Fetch lesson items ordered by order_index
-  const { data: lessonItems, error: itemsError } = await supabase
-    .from('lesson_items')
-    .select('*')
-    .eq('lesson_id', lessonId)
-    .order('order_index', { ascending: true })
-
-  if (itemsError) {
-    return { ok: false, error: itemsError.message }
-  }
-
-  if (!lessonItems || lessonItems.length === 0) {
-    return { ok: true, data: [] }
-  }
-
-  // Fetch all cards for the lesson items
-  const itemIds = lessonItems.map(item => item.item_id)
-  const { data: cards, error: cardsError } = await supabase
-    .from('cards')
-    .select('*')
-    .in('id', itemIds)
-
-  if (cardsError) {
-    return { ok: false, error: cardsError.message }
-  }
-
-  // Create a map of card id to card for efficient lookup
-  const cardMap = new Map<string, Card>()
-  if (cards) {
-    for (const card of cards) {
-      cardMap.set(card.id, card as Card)
+    if (itemsError) {
+      return { ok: false, error: itemsError.message }
     }
-  }
 
-  // Combine lesson items with their cards, maintaining order
-  const result: LessonItemWithCard[] = []
-  for (const item of lessonItems) {
-    const card = cardMap.get(item.item_id)
-    if (card) {
-      result.push({
-        item: item as LessonItem,
-        card,
-      })
+    if (!lessonItems || lessonItems.length === 0) {
+      return { ok: true, data: [] }
     }
-  }
 
-  return { ok: true, data: result }
+    // Fetch all cards for the lesson items
+    const itemIds = lessonItems.map(item => item.item_id)
+    const { data: cards, error: cardsError } = await supabase
+      .from('cards')
+      .select('*')
+      .in('id', itemIds)
+
+    if (cardsError) {
+      return { ok: false, error: cardsError.message }
+    }
+
+    // Create a map of card id to card for efficient lookup
+    const cardMap = new Map<string, Card>()
+    if (cards) {
+      for (const card of cards) {
+        cardMap.set(card.id, card as Card)
+      }
+    }
+
+    // Combine lesson items with their cards, maintaining order
+    const result: LessonItemWithCard[] = []
+    for (const item of lessonItems) {
+      const card = cardMap.get(item.item_id)
+      if (card) {
+        result.push({
+          item: item as LessonItem,
+          card,
+        })
+      }
+    }
+
+    return { ok: true, data: result }
+  }, undefined, RATE_LIMITS.standard)
 }
 
 
@@ -732,7 +669,7 @@ export async function getLessonDetail(
   progress: LessonProgress | null
   isLocked: boolean
 }>> {
-  return withUser(async ({ user, supabase }) => {
+  return withOrgUser(async ({ user, supabase }) => {
     // Fetch the lesson with unit and course info
     const { data: lesson, error: lessonError } = await supabase
       .from('lessons')
@@ -837,7 +774,7 @@ export async function getLessonDetail(
         isLocked: status === 'locked',
       },
     }
-  }, RATE_LIMITS.standard) as Promise<ActionResultV2<{ lesson: Lesson; courseId: string; progress: LessonProgress | null; isLocked: boolean }>>
+  }, undefined, RATE_LIMITS.standard) as Promise<ActionResultV2<{ lesson: Lesson; courseId: string; progress: LessonProgress | null; isLocked: boolean }>>
 }
 
 // ============================================
@@ -866,13 +803,7 @@ export async function completeLessonAction(
     return { ok: false, error: 'Invalid score' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
+  return withOrgUser(async ({ user, supabase }) => {
   // Verify the lesson exists and user has access (via RLS)
   const { data: lesson, error: lessonError } = await supabase
     .from('lessons')
@@ -1061,4 +992,5 @@ export async function completeLessonAction(
       longestStreak: newLongestStreak,
     },
   }
+  }, undefined, RATE_LIMITS.sensitive)
 }

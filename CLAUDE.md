@@ -4,6 +4,9 @@
 
 **Cekatan** is a domain-agnostic organizational assessment, study, and skills mapping platform.
 
+**Deployment:** Vercel project `prj_VzSkaTL6PpWj2qfxag7QNUoJ6L7B` — **PAUSED** (freed Supabase slot for GLS-ERP). Supabase `hltuqxtemjpwfwjolyey` also paused.
+**Pending deploy:** `ed20747` — fixed all 43 react-hooks/* lint errors (19 files, React Compiler compliance). Resume Vercel + Supabase to deploy.
+
 **Architecture:** ONE platform, TWO modes (Study Mode + Assessment Mode).
 **Multi-tenant:** Each organization is a tenant with its own content, users, and configuration.
 **Domain-agnostic:** ZERO sector-specific code. The domain lives in content and org configuration, not in code.

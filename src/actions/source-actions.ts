@@ -38,7 +38,8 @@
  */
 
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withOrgUser } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { validatePdfFile, createSourceSchema } from '@/lib/pdf-validation'
 import { formatZodErrors } from '@/lib/zod-utils'
 import type { ActionResultV2 } from '@/types/actions'
@@ -188,17 +189,13 @@ async function resolveDeckTemplateId(
 export async function uploadSourceAction(
   formData: FormData
 ): Promise<ActionResultV2<{ source: Source; sourceId: string }>> {
-  try {
-    // Get authenticated user
-    const user = await getUser()
-    if (!user) {
-      return { ok: false, error: 'Authentication required' }
-    }
+  // Extract form data before entering withOrgUser (FormData can't be passed across async boundaries in some cases)
+  const file = formData.get('file') as File | null
+  const title = formData.get('title') as string | null
+  const deckId = formData.get('deckId') as string | null
 
-    // Extract form data
-    const file = formData.get('file') as File | null
-    const title = formData.get('title') as string | null
-    const deckId = formData.get('deckId') as string | null
+  return withOrgUser(async ({ user, supabase }) => {
+  try {
 
     // Validate file exists
     if (!file || !(file instanceof File)) {
@@ -222,7 +219,6 @@ export async function uploadSourceAction(
     }
 
     const { title: validatedTitle, deckId: validatedDeckId } = validationResult.data
-    const supabase = await createSupabaseServerClient()
 
     // V8.2.3: Robust ID resolution with 3-step lookup
     let resolvedTemplateId: string | null = null
@@ -356,6 +352,7 @@ export async function uploadSourceAction(
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during upload'
     return { ok: false, error: errorMessage }
   }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -363,43 +360,44 @@ export async function uploadSourceAction(
  * Requirements: 8.3
  */
 export async function getSourcesForDeck(deckId: string): Promise<Source[]> {
-  const user = await getUser()
-  if (!user) {
-    return []
-  }
-
   // Validate deckId
   if (!deckId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deckId)) {
     return []
   }
 
-  const supabase = await createSupabaseServerClient()
+  const result = await withOrgUser(async ({ supabase }) => {
+    // Fetch sources linked to the deck via deck_sources join table
+    const { data, error } = await supabase
+      .from('deck_sources')
+      .select(`
+        source_id,
+        sources (
+          id,
+          user_id,
+          title,
+          type,
+          file_url,
+          metadata,
+          created_at
+        )
+      `)
+      .eq('deck_id', deckId)
 
-  // Fetch sources linked to the deck via deck_sources join table
-  const { data, error } = await supabase
-    .from('deck_sources')
-    .select(`
-      source_id,
-      sources (
-        id,
-        user_id,
-        title,
-        type,
-        file_url,
-        metadata,
-        created_at
-      )
-    `)
-    .eq('deck_id', deckId)
+    if (error || !data) {
+      return []
+    }
 
-  if (error || !data) {
+    // Extract and return the source objects
+    return data
+      .map((ds) => ds.sources as unknown as Source)
+      .filter((source): source is Source => source !== null)
+  }, undefined, RATE_LIMITS.standard)
+
+  // If auth/org error, return empty
+  if ('error' in result && (result as { ok: false; error: string }).ok === false) {
     return []
   }
-
-  // Extract and return the source objects
-  return data
-    .map((ds) => ds.sources as unknown as Source)
-    .filter((source): source is Source => source !== null)
+  return result as Source[]
 }
 
 /**
@@ -410,67 +408,62 @@ export async function linkSourceToDeckAction(
   sourceId: string,
   deckId: string
 ): Promise<ActionResultV2> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
   // Validate UUIDs
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!uuidRegex.test(sourceId) || !uuidRegex.test(deckId)) {
     return { ok: false, error: 'Invalid source or deck ID' }
   }
 
-  const supabase = await createSupabaseServerClient()
+  return withOrgUser(async ({ user, supabase }) => {
+    // Verify user owns the source
+    const { data: source, error: sourceError } = await supabase
+      .from('sources')
+      .select('id')
+      .eq('id', sourceId)
+      .single()
 
-  // Verify user owns the source
-  const { data: source, error: sourceError } = await supabase
-    .from('sources')
-    .select('id')
-    .eq('id', sourceId)
-    .single()
-
-  if (sourceError || !source) {
-    return { ok: false, error: 'Source not found or access denied' }
-  }
-
-  // V8.2.3: Robust ID resolution with 3-step lookup
-  const resolved = await resolveDeckTemplateId(supabase, deckId, user.id)
-
-  if (!resolved) {
-    console.warn('[linkSourceToDeckAction] Deck not found after 4-step lookup:', deckId, 'User:', user.id)
-    return { ok: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
-  }
-
-  if (resolved.authorId !== user.id) {
-    console.warn('[linkSourceToDeckAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
-    return { ok: false, error: 'Only the deck author can link source materials' }
-  }
-
-  // Create the link using resolved template ID
-  const { error: linkError } = await supabase
-    .from('deck_sources')
-    .insert({
-      deck_id: resolved.templateId,
-      source_id: sourceId,
-    })
-
-  if (linkError) {
-    // Check if it's a duplicate
-    if (linkError.code === '23505') {
-      return { ok: false, error: 'Source is already linked to this deck' }
+    if (sourceError || !source) {
+      return { ok: false, error: 'Source not found or access denied' }
     }
-    return { ok: false, error: `Failed to link source: ${linkError.message}` }
-  }
 
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath(`/decks/${deckId}/add-bulk`)
-  if (resolved.templateId !== deckId) {
-    revalidatePath(`/decks/${resolved.templateId}`)
-    revalidatePath(`/decks/${resolved.templateId}/add-bulk`)
-  }
+    // V8.2.3: Robust ID resolution with 3-step lookup
+    const resolved = await resolveDeckTemplateId(supabase, deckId, user.id)
 
-  return { ok: true }
+    if (!resolved) {
+      console.warn('[linkSourceToDeckAction] Deck not found after 4-step lookup:', deckId, 'User:', user.id)
+      return { ok: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
+    }
+
+    if (resolved.authorId !== user.id) {
+      console.warn('[linkSourceToDeckAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
+      return { ok: false, error: 'Only the deck author can link source materials' }
+    }
+
+    // Create the link using resolved template ID
+    const { error: linkError } = await supabase
+      .from('deck_sources')
+      .insert({
+        deck_id: resolved.templateId,
+        source_id: sourceId,
+      })
+
+    if (linkError) {
+      // Check if it's a duplicate
+      if (linkError.code === '23505') {
+        return { ok: false, error: 'Source is already linked to this deck' }
+      }
+      return { ok: false, error: `Failed to link source: ${linkError.message}` }
+    }
+
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath(`/decks/${deckId}/add-bulk`)
+    if (resolved.templateId !== deckId) {
+      revalidatePath(`/decks/${resolved.templateId}`)
+      revalidatePath(`/decks/${resolved.templateId}/add-bulk`)
+    }
+
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -480,32 +473,27 @@ export async function unlinkSourceFromDeckAction(
   sourceId: string,
   deckId: string
 ): Promise<ActionResultV2> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
   // Validate UUIDs
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!uuidRegex.test(sourceId) || !uuidRegex.test(deckId)) {
     return { ok: false, error: 'Invalid source or deck ID' }
   }
 
-  const supabase = await createSupabaseServerClient()
+  return withOrgUser(async ({ supabase }) => {
+    // Delete the link (RLS will ensure user owns the deck)
+    const { error } = await supabase
+      .from('deck_sources')
+      .delete()
+      .eq('deck_id', deckId)
+      .eq('source_id', sourceId)
 
-  // Delete the link (RLS will ensure user owns the deck)
-  const { error } = await supabase
-    .from('deck_sources')
-    .delete()
-    .eq('deck_id', deckId)
-    .eq('source_id', sourceId)
+    if (error) {
+      return { ok: false, error: `Failed to unlink source: ${error.message}` }
+    }
 
-  if (error) {
-    return { ok: false, error: `Failed to unlink source: ${error.message}` }
-  }
+    revalidatePath(`/decks/${deckId}`)
+    revalidatePath(`/decks/${deckId}/add-bulk`)
 
-  revalidatePath(`/decks/${deckId}`)
-  revalidatePath(`/decks/${deckId}/add-bulk`)
-
-  return { ok: true }
+    return { ok: true }
+  }, undefined, RATE_LIMITS.sensitive)
 }

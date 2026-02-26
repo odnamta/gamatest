@@ -77,21 +77,21 @@ export function NotesSection({
         return (
           <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
             <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            Saving...
+            Menyimpan...
           </span>
         )
       case 'saved':
         return (
           <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
             <Check className="w-3 h-3" />
-            Saved
+            Tersimpan
           </span>
         )
       case 'error':
         return (
           <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
             <AlertCircle className="w-3 h-3" />
-            Failed to save
+            Gagal menyimpan
           </span>
         )
       default:

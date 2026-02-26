@@ -3,6 +3,8 @@
 import { openai } from '@/lib/openai-client'
 import { MCQ_MODEL, MCQ_TEMPERATURE } from '@/lib/ai-config'
 import { logger } from '@/lib/logger'
+import { withUser } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import {
   draftMCQInputSchema,
   mcqDraftSchema,
@@ -235,64 +237,66 @@ export async function draftMCQFromText(input: DraftMCQInput): Promise<MCQDraftRe
 
   // Validate input with Zod schema (FR-2.1, FR-2.2)
   const validationResult = draftMCQInputSchema.safeParse(input)
-  
+
   if (!validationResult.success) {
     return { ok: false, error: 'TEXT_TOO_SHORT' }
   }
-  
-  const { sourceText, deckName, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
-  
-  try {
-    // Build message content (with optional image for Vision MVP)
-    const userContent = buildMessageContent(
-      buildUserPrompt(sourceText, deckName, mode),
-      imageBase64,
-      imageUrl
-    )
 
-    // Call OpenAI API (FR-2.3, FR-2.4)
-    // V9.1: Pass subject to getSystemPrompt for dynamic specialty
-    const response = await openai.chat.completions.create({
-      model: MCQ_MODEL,
-      temperature: MCQ_TEMPERATURE,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: getSystemPrompt(mode, subject) },
-        { role: 'user', content: userContent as string },
-      ],
-    })
-    
-    // Extract content from response
-    const content = response.choices[0]?.message?.content
-    
-    if (!content) {
-      logger.error('draftMCQFromText', 'OpenAI returned empty content')
+  return withUser(async () => {
+    const { sourceText, deckName, mode = 'extract', subject, imageBase64, imageUrl } = validationResult.data
+
+    try {
+      // Build message content (with optional image for Vision MVP)
+      const userContent = buildMessageContent(
+        buildUserPrompt(sourceText, deckName, mode),
+        imageBase64,
+        imageUrl
+      )
+
+      // Call OpenAI API (FR-2.3, FR-2.4)
+      // V9.1: Pass subject to getSystemPrompt for dynamic specialty
+      const response = await openai.chat.completions.create({
+        model: MCQ_MODEL,
+        temperature: MCQ_TEMPERATURE,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: getSystemPrompt(mode, subject) },
+          { role: 'user', content: userContent as string },
+        ],
+      })
+
+      // Extract content from response
+      const content = response.choices[0]?.message?.content
+
+      if (!content) {
+        logger.error('draftMCQFromText', 'OpenAI returned empty content')
+        return { ok: false, error: 'OPENAI_ERROR' }
+      }
+
+      // Parse JSON response
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(content)
+      } catch {
+        logger.error('draftMCQFromText.parseJSON', content)
+        return { ok: false, error: 'PARSE_ERROR' }
+      }
+
+      // Validate against MCQ schema (FR-2.5)
+      const draftResult = mcqDraftSchema.safeParse(parsed)
+
+      if (!draftResult.success) {
+        logger.error('draftMCQFromText.validation', draftResult.error.issues)
+        return { ok: false, error: 'PARSE_ERROR' }
+      }
+
+      // Success! Return the validated draft (FR-2.6)
+      return { ok: true, draft: draftResult.data }
+
+    } catch (error) {
+      // Handle API errors (network, auth, rate limits, etc.)
+      logger.error('draftMCQFromText', error)
       return { ok: false, error: 'OPENAI_ERROR' }
     }
-    
-    // Parse JSON response
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(content)
-    } catch {
-      logger.error('draftMCQFromText.parseJSON', content)
-      return { ok: false, error: 'PARSE_ERROR' }
-    }
-    
-    // Validate against MCQ schema (FR-2.5)
-    const draftResult = mcqDraftSchema.safeParse(parsed)
-    
-    if (!draftResult.success) {
-      logger.error('draftMCQFromText.validation', draftResult.error.issues)
-      return { ok: false, error: 'PARSE_ERROR' }
-    }
-    
-    // Success! Return the validated draft (FR-2.6)
-    return { ok: true, draft: draftResult.data }
-    
-  } catch (error) {
-    // Handle API errors (network, auth, rate limits, etc.)
-    logger.error('draftMCQFromText', error)
-    return { ok: false, error: 'OPENAI_ERROR' }
-  }
+  }, RATE_LIMITS.sensitive) as Promise<MCQDraftResult>
 }

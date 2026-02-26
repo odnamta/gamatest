@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { createSupabaseServerClient, getUser } from '@/lib/supabase/server'
+import { withOrgUser } from './_helpers'
+import { RATE_LIMITS } from '@/lib/rate-limit'
 import { getCategoryColor } from '@/lib/tag-colors'
 import { logger } from '@/lib/logger'
 import { toTitleCase } from '@/lib/string-utils'
@@ -93,42 +94,37 @@ export async function updateTagCategory(
     return { ok: false, error: validation.error.issues[0].message }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase, org }) => {
+    // Verify ownership via org
+    const { data: existingTag } = await supabase
+      .from('tags')
+      .select('id, category')
+      .eq('id', tagId)
+      .eq('org_id', org.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (!existingTag) {
+      return { ok: false, error: 'Tag not found' }
+    }
 
-  // Verify ownership
-  const { data: existingTag } = await supabase
-    .from('tags')
-    .select('id, category')
-    .eq('id', tagId)
-    .eq('user_id', user.id)
-    .single()
+    // V9: Enforce color based on new category
+    const newColor = getCategoryColor(newCategory)
 
-  if (!existingTag) {
-    return { ok: false, error: 'Tag not found' }
-  }
+    // Update category and color atomically
+    const { data: tag, error } = await supabase
+      .from('tags')
+      .update({ category: newCategory, color: newColor })
+      .eq('id', tagId)
+      .select()
+      .single()
 
-  // V9: Enforce color based on new category
-  const newColor = getCategoryColor(newCategory)
+    if (error) {
+      return { ok: false, error: error.message }
+    }
 
-  // Update category and color atomically
-  const { data: tag, error } = await supabase
-    .from('tags')
-    .update({ category: newCategory, color: newColor })
-    .eq('id', tagId)
-    .select()
-    .single()
-
-  if (error) {
-    return { ok: false, error: error.message }
-  }
-
-  revalidatePath('/admin/tags')
-  return { ok: true, tag }
+    revalidatePath('/admin/tags')
+    return { ok: true, tag }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -149,106 +145,109 @@ export async function mergeTags(
     return { ok: false, error: 'Cannot merge a tag with itself' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase, org }) => {
+    // Verify ownership of both tags via org
+    const { data: sourcetag } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('id', sourceTagId)
+      .eq('org_id', org.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    const { data: targetTag } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('id', targetTagId)
+      .eq('org_id', org.id)
+      .single()
 
-  // Verify ownership of both tags
-  const { data: sourcetag } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('id', sourceTagId)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: targetTag } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('id', targetTagId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!sourcetag || !targetTag) {
-    return { ok: false, error: 'One or both tags not found' }
-  }
-
-  // Get all card_template_tags associations for source and target tags in parallel
-  const [{ data: sourceAssociations }, { data: targetAssociations }] = await Promise.all([
-    supabase.from('card_template_tags').select('card_template_id').eq('tag_id', sourceTagId),
-    supabase.from('card_template_tags').select('card_template_id').eq('tag_id', targetTagId),
-  ])
-
-  let mergedCount = 0
-  const targetCardIds = new Set((targetAssociations ?? []).map((a) => a.card_template_id))
-
-  if (sourceAssociations && sourceAssociations.length > 0) {
-    const toTransfer = sourceAssociations.filter((a) => !targetCardIds.has(a.card_template_id))
-    const toDedupe = sourceAssociations.filter((a) => targetCardIds.has(a.card_template_id))
-
-    // Batch transfer: update non-duplicate associations to target tag
-    for (const assoc of toTransfer) {
-      await supabase
-        .from('card_template_tags')
-        .update({ tag_id: targetTagId })
-        .eq('card_template_id', assoc.card_template_id)
-        .eq('tag_id', sourceTagId)
-      mergedCount++
+    if (!sourcetag || !targetTag) {
+      return { ok: false, error: 'One or both tags not found' }
     }
 
-    // Batch delete: remove duplicate associations
-    for (const assoc of toDedupe) {
-      await supabase
-        .from('card_template_tags')
-        .delete()
-        .eq('card_template_id', assoc.card_template_id)
-        .eq('tag_id', sourceTagId)
+    // Get all card_template_tags associations for source and target tags in parallel
+    const [{ data: sourceAssociations }, { data: targetAssociations }] = await Promise.all([
+      supabase.from('card_template_tags').select('card_template_id').eq('tag_id', sourceTagId),
+      supabase.from('card_template_tags').select('card_template_id').eq('tag_id', targetTagId),
+    ])
+
+    let mergedCount = 0
+    const targetCardIds = new Set((targetAssociations ?? []).map((a) => a.card_template_id))
+
+    if (sourceAssociations && sourceAssociations.length > 0) {
+      const toTransferIds = sourceAssociations
+        .filter((a) => !targetCardIds.has(a.card_template_id))
+        .map((a) => a.card_template_id)
+      const toDedupeIds = sourceAssociations
+        .filter((a) => targetCardIds.has(a.card_template_id))
+        .map((a) => a.card_template_id)
+
+      // Batch transfer: update non-duplicate associations to target tag
+      if (toTransferIds.length > 0) {
+        await supabase
+          .from('card_template_tags')
+          .update({ tag_id: targetTagId })
+          .in('card_template_id', toTransferIds)
+          .eq('tag_id', sourceTagId)
+        mergedCount += toTransferIds.length
+      }
+
+      // Batch delete: remove duplicate associations
+      if (toDedupeIds.length > 0) {
+        await supabase
+          .from('card_template_tags')
+          .delete()
+          .in('card_template_id', toDedupeIds)
+          .eq('tag_id', sourceTagId)
+      }
     }
-  }
 
-  // Also handle legacy card_tags table (batched)
-  const [{ data: legacyAssociations }, { data: legacyTargetAssocs }] = await Promise.all([
-    supabase.from('card_tags').select('card_id').eq('tag_id', sourceTagId),
-    supabase.from('card_tags').select('card_id').eq('tag_id', targetTagId),
-  ])
-  const legacyTargetIds = new Set((legacyTargetAssocs ?? []).map((a) => a.card_id))
+    // Also handle legacy card_tags table (batched)
+    const [{ data: legacyAssociations }, { data: legacyTargetAssocs }] = await Promise.all([
+      supabase.from('card_tags').select('card_id').eq('tag_id', sourceTagId),
+      supabase.from('card_tags').select('card_id').eq('tag_id', targetTagId),
+    ])
+    const legacyTargetIds = new Set((legacyTargetAssocs ?? []).map((a) => a.card_id))
 
-  if (legacyAssociations && legacyAssociations.length > 0) {
-    const toTransfer = legacyAssociations.filter((a) => !legacyTargetIds.has(a.card_id))
-    const toDedupe = legacyAssociations.filter((a) => legacyTargetIds.has(a.card_id))
+    if (legacyAssociations && legacyAssociations.length > 0) {
+      const legacyToTransferIds = legacyAssociations
+        .filter((a) => !legacyTargetIds.has(a.card_id))
+        .map((a) => a.card_id)
+      const legacyToDedupeIds = legacyAssociations
+        .filter((a) => legacyTargetIds.has(a.card_id))
+        .map((a) => a.card_id)
 
-    for (const assoc of toTransfer) {
-      await supabase
-        .from('card_tags')
-        .update({ tag_id: targetTagId })
-        .eq('card_id', assoc.card_id)
-        .eq('tag_id', sourceTagId)
-      mergedCount++
+      if (legacyToTransferIds.length > 0) {
+        await supabase
+          .from('card_tags')
+          .update({ tag_id: targetTagId })
+          .in('card_id', legacyToTransferIds)
+          .eq('tag_id', sourceTagId)
+        mergedCount += legacyToTransferIds.length
+      }
+
+      if (legacyToDedupeIds.length > 0) {
+        await supabase
+          .from('card_tags')
+          .delete()
+          .in('card_id', legacyToDedupeIds)
+          .eq('tag_id', sourceTagId)
+      }
     }
 
-    for (const assoc of toDedupe) {
-      await supabase
-        .from('card_tags')
-        .delete()
-        .eq('card_id', assoc.card_id)
-        .eq('tag_id', sourceTagId)
+    // Delete the source tag
+    const { error: deleteError } = await supabase
+      .from('tags')
+      .delete()
+      .eq('id', sourceTagId)
+
+    if (deleteError) {
+      return { ok: false, error: deleteError.message }
     }
-  }
 
-  // Delete the source tag
-  const { error: deleteError } = await supabase
-    .from('tags')
-    .delete()
-    .eq('id', sourceTagId)
-
-  if (deleteError) {
-    return { ok: false, error: deleteError.message }
-  }
-
-  revalidatePath('/admin/tags')
-  return { ok: true, mergedCount }
+    revalidatePath('/admin/tags')
+    return { ok: true, mergedCount }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 // ============================================
@@ -285,127 +284,158 @@ export async function mergeMultipleTags(
     return { ok: false, error: 'Cannot merge a tag into itself' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
+  return withOrgUser(async ({ supabase, org }) => {
+    // Verify target tag exists and belongs to org
+    const { data: targetTag, error: targetError } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('id', targetTagId)
+      .eq('org_id', org.id)
+      .single()
 
-  const supabase = await createSupabaseServerClient()
+    if (targetError || !targetTag) {
+      return { ok: false, error: 'Target tag not found' }
+    }
 
-  // Verify target tag exists and belongs to user
-  const { data: targetTag, error: targetError } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('id', targetTagId)
-    .eq('user_id', user.id)
-    .single()
+    // Verify all source tags exist and belong to org
+    const { data: sourceTags, error: sourceError } = await supabase
+      .from('tags')
+      .select('id, name')
+      .in('id', sourceTagIds)
+      .eq('org_id', org.id)
 
-  if (targetError || !targetTag) {
-    return { ok: false, error: 'Target tag not found' }
-  }
+    if (sourceError || !sourceTags || sourceTags.length !== sourceTagIds.length) {
+      return { ok: false, error: 'One or more source tags not found' }
+    }
 
-  // Verify all source tags exist and belong to user
-  const { data: sourceTags, error: sourceError } = await supabase
-    .from('tags')
-    .select('id, name')
-    .in('id', sourceTagIds)
-    .eq('user_id', user.id)
+    let totalAffectedCards = 0
+    let deletedTags = 0
 
-  if (sourceError || !sourceTags || sourceTags.length !== sourceTagIds.length) {
-    return { ok: false, error: 'One or more source tags not found' }
-  }
+    // Batch-fetch ALL associations for target + all source tags in parallel
+    const [
+      { data: targetTemplateAssocs },
+      { data: targetLegacyAssocs },
+      { data: allSourceTemplateAssocs },
+      { data: allSourceLegacyAssocs },
+    ] = await Promise.all([
+      supabase.from('card_template_tags').select('card_template_id').eq('tag_id', targetTagId),
+      supabase.from('card_tags').select('card_id').eq('tag_id', targetTagId),
+      supabase.from('card_template_tags').select('card_template_id, tag_id').in('tag_id', sourceTagIds),
+      supabase.from('card_tags').select('card_id, tag_id').in('tag_id', sourceTagIds),
+    ])
 
-  let totalAffectedCards = 0
-  let deletedTags = 0
+    const targetTemplateCardIds = new Set((targetTemplateAssocs ?? []).map((a) => a.card_template_id))
+    const targetLegacyCardIds = new Set((targetLegacyAssocs ?? []).map((a) => a.card_id))
 
-  // Process each source tag
-  for (const sourceTagId of sourceTagIds) {
-    // Get all card_template_tags associations for this source tag
-    const { data: sourceAssociations } = await supabase
-      .from('card_template_tags')
-      .select('card_template_id')
-      .eq('tag_id', sourceTagId)
+    // Group source associations by tag_id in-memory
+    const sourceTemplateByTag = new Map<string, string[]>()
+    for (const a of allSourceTemplateAssocs ?? []) {
+      const list = sourceTemplateByTag.get(a.tag_id) ?? []
+      list.push(a.card_template_id)
+      sourceTemplateByTag.set(a.tag_id, list)
+    }
 
-    if (sourceAssociations && sourceAssociations.length > 0) {
-      for (const assoc of sourceAssociations) {
-        // Check if target already has this card
-        const { data: existing } = await supabase
+    const sourceLegacyByTag = new Map<string, string[]>()
+    for (const a of allSourceLegacyAssocs ?? []) {
+      const list = sourceLegacyByTag.get(a.tag_id) ?? []
+      list.push(a.card_id)
+      sourceLegacyByTag.set(a.tag_id, list)
+    }
+
+    // Collect all transfer/dedupe/delete operations across source tags
+    const allTemplateTransfers: Array<{ cardIds: string[]; sourceTagId: string }> = []
+    const allTemplateDedupes: Array<{ cardIds: string[]; sourceTagId: string }> = []
+    const allLegacyTransfers: Array<{ cardIds: string[]; sourceTagId: string }> = []
+    const allLegacyDedupes: Array<{ cardIds: string[]; sourceTagId: string }> = []
+
+    for (const sourceTagId of sourceTagIds) {
+      // Process card_template_tags
+      const sourceAssociations = sourceTemplateByTag.get(sourceTagId) ?? []
+      if (sourceAssociations.length > 0) {
+        const toTransferIds = sourceAssociations.filter((id) => !targetTemplateCardIds.has(id))
+        const toDedupeIds = sourceAssociations.filter((id) => targetTemplateCardIds.has(id))
+
+        if (toTransferIds.length > 0) {
+          allTemplateTransfers.push({ cardIds: toTransferIds, sourceTagId })
+          totalAffectedCards += toTransferIds.length
+          for (const id of toTransferIds) targetTemplateCardIds.add(id)
+        }
+        if (toDedupeIds.length > 0) {
+          allTemplateDedupes.push({ cardIds: toDedupeIds, sourceTagId })
+        }
+      }
+
+      // Process legacy card_tags
+      const legacyAssociations = sourceLegacyByTag.get(sourceTagId) ?? []
+      if (legacyAssociations.length > 0) {
+        const legacyToTransferIds = legacyAssociations.filter((id) => !targetLegacyCardIds.has(id))
+        const legacyToDedupeIds = legacyAssociations.filter((id) => targetLegacyCardIds.has(id))
+
+        if (legacyToTransferIds.length > 0) {
+          allLegacyTransfers.push({ cardIds: legacyToTransferIds, sourceTagId })
+          totalAffectedCards += legacyToTransferIds.length
+          for (const id of legacyToTransferIds) targetLegacyCardIds.add(id)
+        }
+        if (legacyToDedupeIds.length > 0) {
+          allLegacyDedupes.push({ cardIds: legacyToDedupeIds, sourceTagId })
+        }
+      }
+    }
+
+    // Execute all transfer/dedupe operations in parallel batches
+    const dbOps: PromiseLike<unknown>[] = []
+
+    for (const { cardIds, sourceTagId } of allTemplateTransfers) {
+      dbOps.push(
+        supabase
           .from('card_template_tags')
-          .select('card_template_id')
-          .eq('card_template_id', assoc.card_template_id)
-          .eq('tag_id', targetTagId)
-          .single()
-
-        if (!existing) {
-          // Transfer association to target tag
-          const { error: updateError } = await supabase
-            .from('card_template_tags')
-            .update({ tag_id: targetTagId })
-            .eq('card_template_id', assoc.card_template_id)
-            .eq('tag_id', sourceTagId)
-
-          if (!updateError) {
-            totalAffectedCards++
-          }
-        } else {
-          // Delete duplicate association (card already has target tag)
-          await supabase
-            .from('card_template_tags')
-            .delete()
-            .eq('card_template_id', assoc.card_template_id)
-            .eq('tag_id', sourceTagId)
-        }
-      }
+          .update({ tag_id: targetTagId })
+          .in('card_template_id', cardIds)
+          .eq('tag_id', sourceTagId)
+      )
     }
-
-    // Also handle legacy card_tags table
-    const { data: legacyAssociations } = await supabase
-      .from('card_tags')
-      .select('card_id')
-      .eq('tag_id', sourceTagId)
-
-    if (legacyAssociations && legacyAssociations.length > 0) {
-      for (const assoc of legacyAssociations) {
-        const { data: existing } = await supabase
+    for (const { cardIds, sourceTagId } of allTemplateDedupes) {
+      dbOps.push(
+        supabase
+          .from('card_template_tags')
+          .delete()
+          .in('card_template_id', cardIds)
+          .eq('tag_id', sourceTagId)
+      )
+    }
+    for (const { cardIds, sourceTagId } of allLegacyTransfers) {
+      dbOps.push(
+        supabase
           .from('card_tags')
-          .select('card_id')
-          .eq('card_id', assoc.card_id)
-          .eq('tag_id', targetTagId)
-          .single()
-
-        if (!existing) {
-          const { error: updateError } = await supabase
-            .from('card_tags')
-            .update({ tag_id: targetTagId })
-            .eq('card_id', assoc.card_id)
-            .eq('tag_id', sourceTagId)
-
-          if (!updateError) {
-            totalAffectedCards++
-          }
-        } else {
-          await supabase
-            .from('card_tags')
-            .delete()
-            .eq('card_id', assoc.card_id)
-            .eq('tag_id', sourceTagId)
-        }
-      }
+          .update({ tag_id: targetTagId })
+          .in('card_id', cardIds)
+          .eq('tag_id', sourceTagId)
+      )
+    }
+    for (const { cardIds, sourceTagId } of allLegacyDedupes) {
+      dbOps.push(
+        supabase
+          .from('card_tags')
+          .delete()
+          .in('card_id', cardIds)
+          .eq('tag_id', sourceTagId)
+      )
     }
 
-    // Delete the source tag
-    const { error: deleteError } = await supabase
+    await Promise.all(dbOps)
+
+    // Batch-delete all source tags in one query
+    const { data: deletedData } = await supabase
       .from('tags')
       .delete()
-      .eq('id', sourceTagId)
+      .in('id', sourceTagIds)
+      .select('id')
 
-    if (!deleteError) {
-      deletedTags++
-    }
-  }
+    deletedTags = deletedData?.length ?? 0
 
-  revalidatePath('/admin/tags')
-  return { ok: true, affectedCards: totalAffectedCards, deletedTags }
+    revalidatePath('/admin/tags')
+    return { ok: true, affectedCards: totalAffectedCards, deletedTags }
+  }, undefined, RATE_LIMITS.bulk)
 }
 
 /**
@@ -414,29 +444,30 @@ export async function mergeMultipleTags(
  * Req: V9-3.1
  */
 export async function getTagsByCategory(): Promise<TagsByCategory> {
-  const user = await getUser()
-  if (!user) {
+  const result = await withOrgUser(async ({ supabase, org }) => {
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('org_id', org.id)
+      .order('name')
+
+    if (!tags) {
+      return { source: [], topic: [], concept: [] }
+    }
+
+    // Group by category
+    return {
+      source: tags.filter(t => t.category === 'source'),
+      topic: tags.filter(t => t.category === 'topic'),
+      concept: tags.filter(t => t.category === 'concept'),
+    }
+  }, undefined, RATE_LIMITS.standard)
+
+  // If auth/org error, return empty result
+  if ('error' in result && result.ok === false) {
     return { source: [], topic: [], concept: [] }
   }
-
-  const supabase = await createSupabaseServerClient()
-
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('name')
-
-  if (!tags) {
-    return { source: [], topic: [], concept: [] }
-  }
-
-  // Group by category
-  return {
-    source: tags.filter(t => t.category === 'source'),
-    topic: tags.filter(t => t.category === 'topic'),
-    concept: tags.filter(t => t.category === 'concept'),
-  }
+  return result as TagsByCategory
 }
 
 /**
@@ -445,21 +476,22 @@ export async function getTagsByCategory(): Promise<TagsByCategory> {
  * Req: V9-4.1
  */
 export async function getGoldenTopics(): Promise<string[]> {
-  const user = await getUser()
-  if (!user) {
+  const result = await withOrgUser(async ({ supabase, org }) => {
+    const { data: topics } = await supabase
+      .from('tags')
+      .select('name')
+      .eq('org_id', org.id)
+      .eq('category', 'topic')
+      .order('name')
+
+    return topics?.map(t => t.name) || []
+  }, undefined, RATE_LIMITS.standard)
+
+  // If auth/org error, return empty result
+  if ('error' in result && (result as { ok: false; error: string }).ok === false) {
     return []
   }
-
-  const supabase = await createSupabaseServerClient()
-
-  const { data: topics } = await supabase
-    .from('tags')
-    .select('name')
-    .eq('user_id', user.id)
-    .eq('category', 'topic')
-    .order('name')
-
-  return topics?.map(t => t.name) || []
+  return result as string[]
 }
 
 /**
@@ -467,21 +499,22 @@ export async function getGoldenTopics(): Promise<string[]> {
  * V9: Used by session presets.
  */
 export async function getGoldenSources(): Promise<Tag[]> {
-  const user = await getUser()
-  if (!user) {
+  const result = await withOrgUser(async ({ supabase, org }) => {
+    const { data: sources } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('org_id', org.id)
+      .eq('category', 'source')
+      .order('name')
+
+    return sources || []
+  }, undefined, RATE_LIMITS.standard)
+
+  // If auth/org error, return empty result
+  if ('error' in result && (result as { ok: false; error: string }).ok === false) {
     return []
   }
-
-  const supabase = await createSupabaseServerClient()
-
-  const { data: sources } = await supabase
-    .from('tags')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('category', 'source')
-    .order('name')
-
-  return sources || []
+  return result as Tag[]
 }
 
 // ============================================
@@ -508,67 +541,62 @@ export async function renameTag(
     return { ok: false, error: 'Tag name cannot be empty' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // Verify the tag exists and belongs to user
-  const { data: existingTag, error: tagError } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('id', tagId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (tagError || !existingTag) {
-    return { ok: false, error: 'Tag not found' }
-  }
-
-  // If name hasn't changed, return success
-  if (existingTag.name === trimmedName) {
-    const { data: tag } = await supabase
+  return withOrgUser(async ({ supabase, org }) => {
+    // Verify the tag exists and belongs to org
+    const { data: existingTag, error: tagError } = await supabase
       .from('tags')
-      .select('*')
+      .select('id, name')
       .eq('id', tagId)
+      .eq('org_id', org.id)
       .single()
-    return { ok: true, tag: tag as Tag }
-  }
 
-  // Check for existing tag with same name (case-insensitive)
-  const { data: conflictingTag } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .ilike('name', trimmedName)
-    .neq('id', tagId)
-    .single()
-
-  if (conflictingTag) {
-    return {
-      ok: false,
-      conflict: true,
-      existingTagId: conflictingTag.id,
-      existingTagName: conflictingTag.name,
+    if (tagError || !existingTag) {
+      return { ok: false, error: 'Tag not found' }
     }
-  }
 
-  // Update the tag name
-  const { data: updatedTag, error: updateError } = await supabase
-    .from('tags')
-    .update({ name: trimmedName })
-    .eq('id', tagId)
-    .select()
-    .single()
+    // If name hasn't changed, return success
+    if (existingTag.name === trimmedName) {
+      const { data: tag } = await supabase
+        .from('tags')
+        .select('*')
+        .eq('id', tagId)
+        .single()
+      return { ok: true, tag: tag as Tag }
+    }
 
-  if (updateError) {
-    return { ok: false, error: updateError.message }
-  }
+    // Check for existing tag with same name (case-insensitive)
+    const { data: conflictingTag } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('org_id', org.id)
+      .ilike('name', trimmedName)
+      .neq('id', tagId)
+      .single()
 
-  revalidatePath('/admin/tags')
-  return { ok: true, tag: updatedTag as Tag }
+    if (conflictingTag) {
+      return {
+        ok: false,
+        conflict: true,
+        existingTagId: conflictingTag.id,
+        existingTagName: conflictingTag.name,
+      }
+    }
+
+    // Update the tag name
+    const { data: updatedTag, error: updateError } = await supabase
+      .from('tags')
+      .update({ name: trimmedName })
+      .eq('id', tagId)
+      .select()
+      .single()
+
+    if (updateError) {
+      return { ok: false, error: updateError.message }
+    }
+
+    revalidatePath('/admin/tags')
+    return { ok: true, tag: updatedTag as Tag }
+  }, undefined, RATE_LIMITS.sensitive)
 }
 
 /**
@@ -580,90 +608,86 @@ export async function renameTag(
  * @returns AutoFormatResult with counts of updated and skipped tags
  */
 export async function autoFormatTags(): Promise<AutoFormatResult> {
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'Authentication required' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // Fetch all tags for the user
-  const { data: tags, error: fetchError } = await supabase
-    .from('tags')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('name')
-
-  if (fetchError) {
-    return { ok: false, error: fetchError.message }
-  }
-
-  if (!tags || tags.length === 0) {
-    return { ok: true, updated: 0, skipped: [] }
-  }
-
-  // Build a map of formatted names to detect collisions
-  const formattedNames = new Map<string, string>() // lowercase formatted -> original tag id
-  const skipped: Array<{ tagId: string; tagName: string; reason: string }> = []
-  const toUpdate: Array<{ id: string; newName: string }> = []
-
-  // First pass: identify what needs updating and detect collisions
-  for (const tag of tags) {
-    const formatted = toTitleCase(tag.name)
-    const formattedLower = formatted.toLowerCase()
-
-    // Skip if already formatted
-    if (tag.name === formatted) {
-      formattedNames.set(formattedLower, tag.id)
-      continue
-    }
-
-    // Check if formatted name would collide with existing tag
-    const existingTagWithName = tags.find(
-      t => t.id !== tag.id && t.name.toLowerCase() === formattedLower
-    )
-
-    if (existingTagWithName) {
-      skipped.push({
-        tagId: tag.id,
-        tagName: tag.name,
-        reason: `Would collide with existing tag "${existingTagWithName.name}"`,
-      })
-      continue
-    }
-
-    // Check if formatted name would collide with another tag being formatted
-    if (formattedNames.has(formattedLower)) {
-      skipped.push({
-        tagId: tag.id,
-        tagName: tag.name,
-        reason: `Would collide after formatting`,
-      })
-      continue
-    }
-
-    formattedNames.set(formattedLower, tag.id)
-    toUpdate.push({ id: tag.id, newName: formatted })
-  }
-
-  // Second pass: update tags
-  let updated = 0
-  for (const { id, newName } of toUpdate) {
-    const { error: updateError } = await supabase
+  return withOrgUser(async ({ supabase, org }) => {
+    // Fetch all tags for the org
+    const { data: tags, error: fetchError } = await supabase
       .from('tags')
-      .update({ name: newName })
-      .eq('id', id)
+      .select('*')
+      .eq('org_id', org.id)
+      .order('name')
 
-    if (!updateError) {
-      updated++
+    if (fetchError) {
+      return { ok: false, error: fetchError.message }
     }
-  }
 
-  if (updated > 0) {
-    revalidatePath('/admin/tags')
-  }
+    if (!tags || tags.length === 0) {
+      return { ok: true, updated: 0, skipped: [] }
+    }
 
-  return { ok: true, updated, skipped }
+    // Build a map of formatted names to detect collisions
+    const formattedNames = new Map<string, string>() // lowercase formatted -> original tag id
+    const skipped: Array<{ tagId: string; tagName: string; reason: string }> = []
+    const toUpdate: Array<{ id: string; newName: string }> = []
+
+    // First pass: identify what needs updating and detect collisions
+    for (const tag of tags) {
+      const formatted = toTitleCase(tag.name)
+      const formattedLower = formatted.toLowerCase()
+
+      // Skip if already formatted
+      if (tag.name === formatted) {
+        formattedNames.set(formattedLower, tag.id)
+        continue
+      }
+
+      // Check if formatted name would collide with existing tag
+      const existingTagWithName = tags.find(
+        t => t.id !== tag.id && t.name.toLowerCase() === formattedLower
+      )
+
+      if (existingTagWithName) {
+        skipped.push({
+          tagId: tag.id,
+          tagName: tag.name,
+          reason: `Would collide with existing tag "${existingTagWithName.name}"`,
+        })
+        continue
+      }
+
+      // Check if formatted name would collide with another tag being formatted
+      if (formattedNames.has(formattedLower)) {
+        skipped.push({
+          tagId: tag.id,
+          tagName: tag.name,
+          reason: `Would collide after formatting`,
+        })
+        continue
+      }
+
+      formattedNames.set(formattedLower, tag.id)
+      toUpdate.push({ id: tag.id, newName: formatted })
+    }
+
+    // Second pass: batch-update tags in parallel
+    let updated = 0
+    if (toUpdate.length > 0) {
+      const updateResults = await Promise.all(
+        toUpdate.map(({ id, newName }) =>
+          supabase
+            .from('tags')
+            .update({ name: newName })
+            .eq('id', id)
+        )
+      )
+      updated = updateResults.filter((r) => !r.error).length
+    }
+
+    if (updated > 0) {
+      revalidatePath('/admin/tags')
+    }
+
+    return { ok: true, updated, skipped }
+  }, undefined, RATE_LIMITS.bulk)
 }
 
 // ============================================
@@ -692,19 +716,13 @@ export async function analyzeTagConsolidation(): Promise<AnalyzeTagConsolidation
     return { ok: false, error: 'NOT_CONFIGURED' }
   }
 
-  const user = await getUser()
-  if (!user) {
-    return { ok: false, error: 'AUTH_ERROR' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // Fetch all tags for the user
-  const { data: tags, error: fetchError } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .order('name')
+  const result = await withOrgUser(async ({ supabase, org }) => {
+    // Fetch all tags for the org
+    const { data: tags, error: fetchError } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('org_id', org.id)
+      .order('name')
 
   if (fetchError) {
     logger.error('analyzeTagConsolidation.fetchTags', fetchError)
@@ -782,5 +800,12 @@ If no duplicates/synonyms are found, return: {"groups": []}`,
     }
   }
 
-  return { ok: true, suggestions: allSuggestions }
+    return { ok: true, suggestions: allSuggestions }
+  }, undefined, RATE_LIMITS.sensitive)
+
+  // Map auth/org/rate-limit errors to AUTH_ERROR
+  if ('error' in result && (result as { ok: false; error: string }).ok === false) {
+    return { ok: false, error: 'AUTH_ERROR' }
+  }
+  return result as AnalyzeTagConsolidationResult
 }

@@ -62,7 +62,7 @@ function AppLogo() {
         <span className="text-4xl font-bold text-white">C</span>
       </div>
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-        Welcome to Cekatan
+        Selamat Datang di Cekatan
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
         Platform asesmen & pemetaan kompetensi
@@ -98,7 +98,7 @@ function GoogleSignInButton({
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
         </svg>
       )}
-      <span className="font-medium text-sm">Continue with Google</span>
+      <span className="font-medium text-sm">Lanjutkan dengan Google</span>
     </button>
   )
 }
@@ -148,7 +148,7 @@ export default function LoginPage() {
         setIsGoogleLoading(false)
       }
     } catch {
-      setError('Failed to connect to Google. Please try again.')
+      setError('Gagal terhubung ke Google. Silakan coba lagi.')
       setIsGoogleLoading(false)
     }
   }
@@ -164,12 +164,12 @@ export default function LoginPage() {
 
       if (mode === 'register') {
         if (password !== confirmPassword) {
-          setError('Passwords do not match')
+          setError('Password tidak cocok')
           setEmailLoading(false)
           return
         }
         if (password.length < 6) {
-          setError('Password must be at least 6 characters')
+          setError('Password harus minimal 6 karakter')
           setEmailLoading(false)
           return
         }
@@ -185,7 +185,7 @@ export default function LoginPage() {
         if (error) {
           setError(error.message)
         } else {
-          setSuccess('Check your email for a confirmation link to complete registration.')
+          setSuccess('Periksa email Anda untuk link konfirmasi untuk menyelesaikan pendaftaran.')
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -197,7 +197,7 @@ export default function LoginPage() {
         }
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError('Terjadi kesalahan. Silakan coba lagi.')
     }
     setEmailLoading(false)
   }
@@ -228,7 +228,7 @@ export default function LoginPage() {
             <div className="w-full border-t border-slate-200 dark:border-slate-700" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="px-2 bg-white dark:bg-slate-800 text-slate-500">or continue with email</span>
+            <span className="px-2 bg-white dark:bg-slate-800 text-slate-500">atau lanjutkan dengan email</span>
           </div>
         </div>
 
@@ -243,7 +243,7 @@ export default function LoginPage() {
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
-            Sign In
+            Masuk
           </button>
           <button
             type="button"
@@ -254,7 +254,7 @@ export default function LoginPage() {
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
-            Sign Up
+            Daftar
           </button>
         </div>
 
@@ -331,7 +331,7 @@ export default function LoginPage() {
             disabled={emailLoading || !email || !password}
             className="w-full"
           >
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
+            {mode === 'login' ? 'Masuk' : 'Buat Akun'}
           </Button>
         </form>
 

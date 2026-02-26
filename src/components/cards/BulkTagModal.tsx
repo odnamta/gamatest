@@ -131,7 +131,7 @@ export function BulkTagModal({
             onClick={handleClose}
             disabled={isLoading}
           >
-            Cancel
+            Batal
           </Button>
           <Button
             onClick={handleApplyTag}
@@ -140,10 +140,10 @@ export function BulkTagModal({
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Applying...
+                Menerapkan...
               </>
             ) : (
-              'Apply Tag'
+              'Terapkan Tag'
             )}
           </Button>
         </div>

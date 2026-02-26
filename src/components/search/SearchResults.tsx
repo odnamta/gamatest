@@ -38,7 +38,7 @@ export function SearchResults({
       <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-4">
         <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
           <AlertCircle className="w-4 h-4" />
-          <span className="text-sm">Search unavailable</span>
+          <span className="text-sm">Pencarian tidak tersedia</span>
         </div>
       </div>
     )
@@ -48,7 +48,7 @@ export function SearchResults({
     return (
       <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-4">
         <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
-          No results found for &quot;{query}&quot;
+          Tidak ada hasil untuk &quot;{query}&quot;
         </p>
       </div>
     )

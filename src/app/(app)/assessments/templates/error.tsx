@@ -17,14 +17,14 @@ export default function TemplatesError({
     <div className="max-w-md mx-auto px-4 py-16 text-center">
       <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
       <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        Failed to load templates
+        Gagal memuat template
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-        {error.message || 'An unexpected error occurred.'}
+        {error.message || 'Terjadi kesalahan tak terduga.'}
       </p>
       <Button onClick={reset}>
         <RefreshCw className="h-4 w-4 mr-2" />
-        Try Again
+        Coba Lagi
       </Button>
     </div>
   )

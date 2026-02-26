@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Pencil, Trash2, Users, Target } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { RoleProfile } from '@/types/database'
@@ -14,7 +15,7 @@ interface RoleProfileCardProps {
   onClick?: (profile: RoleProfile) => void
 }
 
-export function RoleProfileCard({
+export const RoleProfileCard = memo(function RoleProfileCard({
   profile,
   employeeCount = 0,
   skillCount = 0,
@@ -82,4 +83,4 @@ export function RoleProfileCard({
       </div>
     </div>
   )
-}
+})

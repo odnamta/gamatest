@@ -81,7 +81,7 @@ export default function OrgAnalyticsPage() {
         className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Settings
+        Kembali ke Pengaturan
       </button>
 
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
@@ -276,7 +276,7 @@ export default function OrgAnalyticsPage() {
         <div className="text-center py-16 text-slate-500 dark:text-slate-400">
           <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
           <p className="text-lg font-medium">No assessments yet</p>
-          <p className="mt-1">Create assessments to see analytics here.</p>
+          <p className="mt-1">Buat asesmen untuk melihat analitik di sini.</p>
         </div>
       )}
     </div>

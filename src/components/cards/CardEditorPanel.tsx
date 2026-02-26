@@ -117,7 +117,7 @@ export function CardEditorPanel({
         showToast(result.error || 'Could not save card', 'error')
       }
     } catch {
-      showToast('Something went wrong', 'error')
+      showToast('Terjadi kesalahan', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -151,7 +151,7 @@ export function CardEditorPanel({
         showToast(result.error || 'Could not save card', 'error')
       }
     } catch {
-      showToast('Something went wrong', 'error')
+      showToast('Terjadi kesalahan', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -281,10 +281,10 @@ export function CardEditorPanel({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  Menyimpan...
                 </>
               ) : (
-                'Save (⌘S)'
+                'Simpan (⌘S)'
               )}
             </Button>
             <Button
@@ -295,12 +295,12 @@ export function CardEditorPanel({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  Menyimpan...
                 </>
               ) : isLastCard ? (
-                'Save (Last Card)'
+                'Simpan (Kartu Terakhir)'
               ) : (
-                'Save & Next (⌘↵)'
+                'Simpan & Lanjut (⌘↵)'
               )}
             </Button>
           </div>

@@ -147,7 +147,7 @@ export function ChapterSelector({
           {isDisabled
             ? 'Select a book first'
             : isLoading
-            ? 'Loading...'
+            ? 'Memuat...'
             : selectedChapter
             ? `Ch. ${selectedChapter.chapter_number}: ${selectedChapter.title}`
             : 'Select a chapter...'}
@@ -284,10 +284,10 @@ export function ChapterSelector({
                   setError(null)
                 }}
               >
-                Cancel
+                Batal
               </Button>
               <Button onClick={handleCreateNew} loading={isCreating}>
-                Create
+                Buat
               </Button>
             </div>
           </div>

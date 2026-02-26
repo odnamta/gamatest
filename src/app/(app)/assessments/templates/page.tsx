@@ -128,7 +128,7 @@ export default function AssessmentTemplatesPage() {
       {/* Create form */}
       {showCreate && (
         <div className="mb-8 p-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create Template</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Buat Template</h2>
 
           <div className="space-y-1">
             <Label htmlFor="tpl-name">Name</Label>
@@ -238,15 +238,15 @@ export default function AssessmentTemplatesPage() {
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleCreate} loading={isPending}>Create Template</Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Batal</Button>
+            <Button size="sm" onClick={handleCreate} loading={isPending}>Buat Template</Button>
           </div>
         </div>
       )}
 
       {/* Template list */}
       {loading ? (
-        <div className="text-center py-12 text-slate-500">Loading templates...</div>
+        <div className="text-center py-12 text-slate-500">Memuat template...</div>
       ) : templates.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-slate-500 dark:text-slate-400 mb-2">No templates yet</p>

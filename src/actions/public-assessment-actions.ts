@@ -16,6 +16,35 @@ import type { ActionResultV2 } from '@/types/actions'
 import type { Assessment } from '@/types/database'
 
 // ============================================
+// Session Token Helpers (HMAC-signed)
+// ============================================
+
+const SESSION_TOKEN_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'dev-fallback-secret'
+
+/** Create an HMAC-signed session token: base64url(sessionId:hmac) */
+function createSessionToken(sessionId: string): string {
+  const hmac = crypto.createHmac('sha256', SESSION_TOKEN_SECRET).update(sessionId).digest('hex')
+  return Buffer.from(`${sessionId}:${hmac}`).toString('base64url')
+}
+
+/** Verify and extract session ID from a signed token. Returns null if invalid. */
+function verifySessionToken(token: string): string | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8')
+    const colonIdx = decoded.indexOf(':')
+    if (colonIdx === -1) return null
+    const sessionId = decoded.slice(0, colonIdx)
+    const providedHmac = decoded.slice(colonIdx + 1)
+    const expectedHmac = crypto.createHmac('sha256', SESSION_TOKEN_SECRET).update(sessionId).digest('hex')
+    if (providedHmac.length !== expectedHmac.length) return null
+    if (!crypto.timingSafeEqual(Buffer.from(providedHmac), Buffer.from(expectedHmac))) return null
+    return sessionId
+  } catch {
+    return null
+  }
+}
+
+// ============================================
 // 1. getPublicAssessment
 // ============================================
 
@@ -278,7 +307,7 @@ export async function registerAndStartSession(
         ok: true,
         data: {
           sessionId: existingSession.id,
-          sessionToken: existingSession.id, // session ID doubles as token for public flow
+          sessionToken: createSessionToken(existingSession.id),
           timeRemainingSeconds: existingSession.time_remaining_seconds ?? assessment.time_limit_minutes * 60,
           questionCount: questionOrder.length,
         },
@@ -298,7 +327,13 @@ export async function registerAndStartSession(
     // Shuffle if needed, then slice to question_count
     let questionIds = cards.map((c) => c.id)
     if (assessment.shuffle_questions) {
-      questionIds = questionIds.sort(() => Math.random() - 0.5)
+      // Fisher-Yates with crypto.getRandomValues for unbiased shuffle
+      const arr = questionIds
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(0, i + 1)
+        ;[arr[i], arr[j]] = [arr[j]!, arr[i]!]
+      }
+      questionIds = arr
     }
     questionIds = questionIds.slice(0, assessment.question_count)
 
@@ -333,7 +368,7 @@ export async function registerAndStartSession(
       ok: true,
       data: {
         sessionId: session.id,
-        sessionToken: session.id,
+        sessionToken: createSessionToken(session.id),
         timeRemainingSeconds: assessment.time_limit_minutes * 60,
         questionCount: questionIds.length,
       },
@@ -353,7 +388,7 @@ export async function registerAndStartSession(
  * Returns questions with existing answers (for resume).
  */
 export async function getPublicQuestions(
-  sessionId: string
+  sessionIdOrToken: string
 ): Promise<ActionResultV2<{
   questions: Array<{
     cardTemplateId: string
@@ -367,6 +402,9 @@ export async function getPublicQuestions(
   shuffleOptions: boolean
 }>> {
   try {
+    // Accept both signed tokens and raw session IDs (backwards compat)
+    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+
     const supabase = await createSupabaseServiceClient()
 
     // Fetch session with assessment info
@@ -452,13 +490,15 @@ export async function getPublicQuestions(
  * Verifies session is active, card belongs to session, scores answer.
  */
 export async function submitPublicAnswer(
-  sessionId: string,
+  sessionIdOrToken: string,
   cardTemplateId: string,
   selectedIndex: number,
   timeRemainingSeconds?: number,
   timeSpentSeconds?: number
 ): Promise<ActionResultV2<{ isCorrect: boolean }>> {
   try {
+    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+
     const supabase = await createSupabaseServiceClient()
 
     // Verify session is active
@@ -531,7 +571,7 @@ export async function submitPublicAnswer(
  * Complete a public session. Calculates score, determines pass/fail.
  */
 export async function completePublicSession(
-  sessionId: string
+  sessionIdOrToken: string
 ): Promise<ActionResultV2<{
   score: number
   passed: boolean
@@ -539,6 +579,8 @@ export async function completePublicSession(
   correct: number
 }>> {
   try {
+    const sessionId = verifySessionToken(sessionIdOrToken) ?? sessionIdOrToken
+
     const supabase = await createSupabaseServiceClient()
 
     // Verify session

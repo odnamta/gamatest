@@ -49,7 +49,7 @@ const ROLE_COLORS: Record<OrgRole, string> = {
 }
 
 export default function OrgMembersPage() {
-  usePageTitle('Members')
+  usePageTitle('Anggota')
   const { org, role } = useOrg()
   const [members, setMembers] = useState<OrganizationMemberWithProfile[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
@@ -166,11 +166,11 @@ export default function OrgMembersPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Breadcrumbs items={[
         { label: org.name, href: `/orgs/${org.slug}/settings` },
-        { label: 'Members' },
+        { label: 'Anggota' },
       ]} />
 
       <div className="mb-8 mt-4">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Members</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Anggota</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">{org.name}</p>
       </div>
 
@@ -303,7 +303,7 @@ export default function OrgMembersPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-slate-500 dark:text-slate-400">Loading members...</div>
+        <div className="text-center py-12 text-slate-500 dark:text-slate-400">Memuat anggota...</div>
       ) : (
         <div className="space-y-2">
           {members.map((member) => (
@@ -386,17 +386,17 @@ export default function OrgMembersPage() {
       <Dialog open={!!confirmRemove} onOpenChange={() => setConfirmRemove(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove Member</DialogTitle>
+            <DialogTitle>Hapus Anggota</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove this member from {org.name}? They will lose access to all organization content.
+              Apakah Anda yakin ingin menghapus anggota ini dari {org.name}? Mereka akan kehilangan akses ke seluruh konten organisasi.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="ghost" onClick={() => setConfirmRemove(null)}>
-              Cancel
+              Batal
             </Button>
             <Button variant="destructive" onClick={confirmRemoveMember} loading={isPending}>
-              Remove
+              Hapus
             </Button>
           </div>
         </DialogContent>

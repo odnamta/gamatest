@@ -378,10 +378,10 @@ export default function SkillsPage() {
             </div>
             <div className="flex items-center gap-2 pt-2">
               <Button size="sm" onClick={handleSubmit} disabled={isPending}>
-                {(editingDomain || editingRole) ? 'Save Changes' : 'Create'}
+                {(editingDomain || editingRole) ? 'Simpan Perubahan' : 'Buat'}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>
-                Cancel
+                Batal
               </Button>
             </div>
           </div>
@@ -427,7 +427,7 @@ export default function SkillsPage() {
           {isAdmin && heatmapData && heatmapData.employees.length > 0 && (
             <div className="mt-8">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                Employee Skill Heatmap
+                Peta Keahlian Karyawan
               </h2>
               <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <SkillHeatmap

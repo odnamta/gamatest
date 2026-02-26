@@ -54,13 +54,13 @@ export function PublishAllConfirmDialog({
 
         {/* Title */}
         <h2 id="publish-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 text-center mb-2">
-          Publish All Draft Cards?
+          Terbitkan Semua Kartu Draft?
         </h2>
 
         {/* Description */}
         <p id="publish-dialog-description" className="text-slate-600 dark:text-slate-400 text-center mb-6">
-          This will publish all <span className="font-semibold text-blue-600 dark:text-blue-400">{draftCount}</span> draft card{draftCount !== 1 ? 's' : ''} in this deck. 
-          Published cards will be visible in study sessions.
+          Ini akan menerbitkan semua <span className="font-semibold text-blue-600 dark:text-blue-400">{draftCount}</span> kartu draft di deck ini.
+          Kartu yang diterbitkan akan terlihat di sesi belajar.
         </p>
 
         {/* Actions */}
@@ -71,7 +71,7 @@ export function PublishAllConfirmDialog({
             disabled={isPublishing}
             className="flex-1"
           >
-            Cancel
+            Batal
           </Button>
           <Button
             onClick={onConfirm}
@@ -81,12 +81,12 @@ export function PublishAllConfirmDialog({
             {isPublishing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Publishing...
+                Menerbitkan...
               </>
             ) : (
               <>
                 <Send className="w-4 h-4 mr-2" />
-                Publish All
+                Terbitkan Semua
               </>
             )}
           </Button>

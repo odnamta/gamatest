@@ -23,19 +23,19 @@ export default function RoleDetailError({ error, reset }: ErrorProps) {
         <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-400" />
       </div>
       <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-        Something went wrong
+        Terjadi kesalahan
       </h1>
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-        An error occurred while loading this role profile. Please try again.
+        Terjadi kesalahan saat memuat role profile ini. Silakan coba lagi.
       </p>
       <div className="flex gap-3 justify-center">
         <Button onClick={reset}>
           <RefreshCw className="h-4 w-4 mr-2" />
-          Try Again
+          Coba Lagi
         </Button>
         <Button variant="secondary" onClick={() => router.push('/skills')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Skills
+          Kembali ke Skills
         </Button>
       </div>
       {error.digest && (

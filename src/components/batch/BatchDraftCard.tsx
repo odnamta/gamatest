@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { X, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { MCQOptionsEditor } from '@/components/mcq/MCQOptionsEditor'
 import type { MCQBatchDraftUI } from '@/lib/batch-mcq-schema'
@@ -56,7 +56,7 @@ function QualityBadge({ issues }: { issues?: MCQIssue[] }) {
  * Requirements: R1.3 - Batch Review Panel
  * **Feature: v12-quality-scanner-unified-editor**
  */
-export function BatchDraftCard({
+export const BatchDraftCard = memo(function BatchDraftCard({
   draft,
   index,
   sessionTagNames,
@@ -275,4 +275,4 @@ export function BatchDraftCard({
       )}
     </div>
   )
-}
+})

@@ -29,23 +29,23 @@ export default function AppError({ error, reset }: ErrorProps) {
         </div>
         
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-          Something went wrong
+          Terjadi kesalahan
         </h1>
-        
+
         <p className="text-slate-600 dark:text-slate-400 mb-6">
-          We encountered an unexpected error. This has been logged and we&apos;ll look into it.
+          Terjadi kesalahan tak terduga. Kami akan segera menyelidikinya.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button onClick={reset} variant="primary">
             <RefreshCw className="w-4 h-4 mr-2" />
-            Try Again
+            Coba Lagi
           </Button>
-          
+
           <Link href="/dashboard">
             <Button variant="secondary">
               <Home className="w-4 h-4 mr-2" />
-              Go to Dashboard
+              Ke Dashboard
             </Button>
           </Link>
         </div>

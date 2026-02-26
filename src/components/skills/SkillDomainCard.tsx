@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Pencil, Trash2, LinkIcon } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { SkillDomain } from '@/types/database'
@@ -15,7 +16,7 @@ interface SkillDomainCardProps {
   onClick?: (domain: SkillDomain) => void
 }
 
-export function SkillDomainCard({
+export const SkillDomainCard = memo(function SkillDomainCard({
   domain,
   avgScore,
   deckCount = 0,
@@ -96,4 +97,4 @@ export function SkillDomainCard({
       </div>
     </div>
   )
-}
+})

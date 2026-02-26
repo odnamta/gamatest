@@ -32,7 +32,7 @@ const FEATURE_LABELS: Record<keyof OrgFeatures, { label: string; description: st
 }
 
 export default function OrgSettingsPage() {
-  usePageTitle('Organization Settings')
+  usePageTitle('Pengaturan Organisasi')
   const { org, role } = useOrg()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -86,7 +86,7 @@ export default function OrgSettingsPage() {
         settings: { features, branding, assessment_defaults: assessmentDefaults },
       })
       if (result.ok) {
-        setMessage({ type: 'success', text: 'Settings saved successfully' })
+        setMessage({ type: 'success', text: 'Pengaturan berhasil disimpan' })
       } else {
         setMessage({ type: 'error', text: result.error })
       }
@@ -103,7 +103,7 @@ export default function OrgSettingsPage() {
           <ArrowLeft className="h-5 w-5 text-slate-600 dark:text-slate-400" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Organization Settings</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Pengaturan Organisasi</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">{org.slug}</p>
         </div>
       </div>
@@ -324,7 +324,7 @@ export default function OrgSettingsPage() {
 
       <Button onClick={handleSave} loading={isPending}>
         <Save className="h-4 w-4 mr-2" />
-        Save Settings
+        Simpan Pengaturan
       </Button>
 
       {/* Danger Zone — Owner only */}
@@ -366,7 +366,7 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
       if (!result.ok) {
         setMessage({ type: 'error', text: result.error })
       } else {
-        setMessage({ type: 'success', text: 'Ownership transferred. You are now an admin.' })
+        setMessage({ type: 'success', text: 'Kepemilikan berhasil ditransfer. Anda sekarang menjadi admin.' })
         setShowTransfer(false)
         router.refresh()
       }
@@ -403,8 +403,8 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
       <div className="p-4 rounded-xl border border-red-200 dark:border-red-800/50">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">Transfer Ownership</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Hand over ownership to another member. You will become an admin.</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">Transfer Kepemilikan</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Serahkan kepemilikan ke anggota lain. Anda akan menjadi admin.</p>
           </div>
           <Button
             variant="secondary"
@@ -422,7 +422,7 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
               onChange={(e) => setTransferTarget(e.target.value)}
               className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select a member...</option>
+              <option value="">Pilih anggota...</option>
               {members.map(m => (
                 <option key={m.id} value={m.id}>
                   {m.email || m.user_id} ({m.role})
@@ -430,7 +430,7 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
               ))}
             </select>
             <Button size="sm" onClick={handleTransfer} loading={isPending} disabled={!transferTarget}>
-              Confirm Transfer
+              Konfirmasi Transfer
             </Button>
           </div>
         )}
@@ -440,8 +440,8 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
       <div className="p-4 rounded-xl border border-red-200 dark:border-red-800/50">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">Delete Organization</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Permanently delete this organization and all its data. This cannot be undone.</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">Hapus Organisasi</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Hapus organisasi ini beserta seluruh datanya secara permanen. Tindakan ini tidak dapat dibatalkan.</p>
           </div>
           <Button
             variant="secondary"
@@ -472,7 +472,7 @@ function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
               disabled={deleteConfirm !== orgName}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Delete Organization Permanently
+              Hapus Organisasi Permanen
             </Button>
           </div>
         )}

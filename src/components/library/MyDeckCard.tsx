@@ -110,14 +110,14 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
           {/* Unsubscribe Confirmation */}
           {showUnsubscribeConfirm && (
             <div className="flex items-center gap-2 w-full">
-              <span className="text-sm text-slate-600 dark:text-slate-400">Unsubscribe?</span>
+              <span className="text-sm text-slate-600 dark:text-slate-400">Berhenti langganan?</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowUnsubscribeConfirm(false)}
                 disabled={isPending}
               >
-                Cancel
+                Batal
               </Button>
               <Button
                 variant="ghost"
@@ -135,10 +135,10 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
           {showDeleteConfirm && (
             <div className="flex flex-col gap-2 w-full">
               <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                Delete this deck for ALL users?
+                Hapus deck ini untuk SEMUA pengguna?
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                This action cannot be undone.
+                Tindakan ini tidak dapat dibatalkan.
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -147,7 +147,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={isPending}
                 >
-                  Cancel
+                  Batal
                 </Button>
                 <Button
                   variant="ghost"
@@ -156,7 +156,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
                   disabled={isPending}
                   className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10"
                 >
-                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete Forever'}
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Hapus Permanen'}
                 </Button>
               </div>
             </div>
@@ -185,7 +185,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-t-lg"
                         >
-                          Unsubscribe
+                          Berhenti Langganan
                         </button>
                         <button
                           onClick={() => {
@@ -194,7 +194,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
                           }}
                           className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-b-lg"
                         >
-                          Delete Deck
+                          Hapus Deck
                         </button>
                       </div>
                     )}
@@ -204,7 +204,7 @@ export function MyDeckCard({ deck, onUnsubscribeSuccess, onDeleteSuccess }: MyDe
                     onClick={() => setShowUnsubscribeConfirm(true)}
                     className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                   >
-                    Unsubscribe
+                    Berhenti Langganan
                   </button>
                 )}
               </div>

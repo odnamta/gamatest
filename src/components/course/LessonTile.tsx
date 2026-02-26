@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lesson, LessonStatus } from '@/types/database';
 
 /**
  * LessonTile Component
- * 
+ *
  * Displays a lesson as a tappable tile with status indicator.
  * Navigates to lesson overview if unlocked, shows message if locked.
- * 
+ *
  * Requirements: 6.6, 6.7
  */
 
@@ -19,7 +19,7 @@ export interface LessonTileProps {
   bestScore: number | null;
 }
 
-export function LessonTile({ lesson, status, bestScore }: LessonTileProps) {
+export const LessonTile = memo(function LessonTile({ lesson, status, bestScore }: LessonTileProps) {
   const router = useRouter();
   const [showLockedMessage, setShowLockedMessage] = useState(false);
 
@@ -77,7 +77,7 @@ export function LessonTile({ lesson, status, bestScore }: LessonTileProps) {
       )}
     </div>
   );
-}
+})
 
 
 function getStatusStyles(status: LessonStatus): string {

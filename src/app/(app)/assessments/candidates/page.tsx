@@ -193,7 +193,7 @@ export default function CandidateListPage() {
         className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Assessments
+        Kembali ke Asesmen
       </button>
 
       <div className="flex items-start justify-between mb-6">
@@ -224,7 +224,7 @@ export default function CandidateListPage() {
             disabled={isPending}
           >
             <Upload className="h-4 w-4 mr-1" />
-            Import CSV
+            Impor CSV
           </Button>
           {candidates.length > 0 && (
             <Button
@@ -247,7 +247,7 @@ export default function CandidateListPage() {
               }}
             >
               <Download className="h-4 w-4 mr-1" />
-              Export CSV
+              Ekspor CSV
             </Button>
           )}
         </div>
@@ -508,7 +508,7 @@ export default function CandidateListPage() {
                 size="sm"
                 onClick={() => setShowAssignModal(false)}
               >
-                Cancel
+                Batal
               </Button>
               <Button
                 size="sm"

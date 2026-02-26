@@ -42,18 +42,18 @@ export function DeleteTagConfirmDialog({
 
         {/* Title */}
         <h2 className="text-lg font-semibold text-center text-slate-900 dark:text-white mb-2">
-          Delete Tag
+          Hapus Tag
         </h2>
 
         {/* Message */}
         <p className="text-center text-slate-600 dark:text-slate-400 mb-2">
-          Are you sure you want to delete <span className="font-medium text-slate-900 dark:text-white">&quot;{tag.name}&quot;</span>?
+          Apakah Anda yakin ingin menghapus <span className="font-medium text-slate-900 dark:text-white">&quot;{tag.name}&quot;</span>?
         </p>
 
         {/* Warning */}
         <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-6">
           <p className="text-sm text-amber-700 dark:text-amber-400">
-            This will remove the tag from all cards that currently use it. This action cannot be undone.
+            Ini akan menghapus tag dari semua kartu yang menggunakannya. Tindakan ini tidak dapat dibatalkan.
           </p>
         </div>
 
@@ -65,7 +65,7 @@ export function DeleteTagConfirmDialog({
             disabled={isDeleting}
             className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancel
+            Batal
           </button>
           <button
             type="button"
@@ -74,7 +74,7 @@ export function DeleteTagConfirmDialog({
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
           >
             {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isDeleting ? 'Deleting...' : 'Delete Tag'}
+            {isDeleting ? 'Menghapus...' : 'Hapus Tag'}
           </button>
         </div>
       </div>

@@ -83,7 +83,7 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
         showToast(result.error || 'Could not save changes', 'error')
       }
     } catch {
-      showToast('Something went wrong', 'error')
+      showToast('Terjadi kesalahan', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -165,21 +165,21 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
         {/* Submit - desktop */}
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
+            {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
           </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={() => router.back()}
           >
-            Cancel
+            Batal
           </Button>
         </div>
 
         {/* Mobile floating save button */}
         <div className="fixed bottom-4 right-4 sm:hidden z-50">
           <Button type="submit" disabled={isSubmitting} className="shadow-lg">
-            {isSubmitting ? 'Saving...' : 'Save'}
+            {isSubmitting ? 'Menyimpan...' : 'Simpan'}
           </Button>
         </div>
       </form>
@@ -247,7 +247,7 @@ export function EditCardForm({ card, deckId }: EditCardFormProps) {
       {/* Submit */}
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
+          {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
         </Button>
         <Button
           type="button"

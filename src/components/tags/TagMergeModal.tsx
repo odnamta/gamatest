@@ -72,7 +72,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Merge className="w-5 h-5" />
-            Merge Tags
+            Gabungkan Tag
           </h2>
           <button
             onClick={handleClose}
@@ -113,7 +113,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
             disabled={isMerging}
             className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            <option value="">Select target tag...</option>
+            <option value="">Pilih tag target...</option>
             {sourceTags.map(tag => (
               <option key={tag.id} value={tag.id}>
                 {tag.name} ({tag.category})
@@ -164,7 +164,7 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
             disabled={isMerging}
             className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancel
+            Batal
           </button>
           <button
             onClick={handleMerge}
@@ -174,12 +174,12 @@ export function TagMergeModal({ isOpen, onClose, sourceTags, onMerge }: TagMerge
             {isMerging ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Merging...
+                Menggabungkan...
               </>
             ) : (
               <>
                 <Merge className="w-4 h-4" />
-                Merge Tags
+                Gabungkan Tag
               </>
             )}
           </button>

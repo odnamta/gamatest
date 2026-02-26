@@ -114,7 +114,7 @@ export function TagCreateDialog({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {isEditMode ? 'Edit Tag' : 'Create Tag'}
+            {isEditMode ? 'Edit Tag' : 'Buat Tag'}
           </h2>
           <button
             onClick={onClose}
@@ -196,7 +196,7 @@ export function TagCreateDialog({
               disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
             >
-              Cancel
+              Batal
             </button>
             <button
               type="submit"
@@ -204,7 +204,7 @@ export function TagCreateDialog({
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEditMode ? 'Save Changes' : 'Create Tag'}
+              {isEditMode ? 'Simpan Perubahan' : 'Buat Tag'}
             </button>
           </div>
         </form>

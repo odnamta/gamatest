@@ -233,7 +233,7 @@ export default function CreateAssessmentPage() {
             onChange={(e) => { if (e.target.value) applyTemplate(e.target.value); e.target.value = '' }}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Select a template to apply settings...</option>
+            <option value="">Pilih template untuk menerapkan pengaturan...</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -261,7 +261,7 @@ export default function CreateAssessmentPage() {
               onChange={(e) => handleDeckChange(e.target.value)}
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select a deck...</option>
+              <option value="">Pilih deck...</option>
               {decks.map((deck) => (
                 <option key={deck.id} value={deck.id}>
                   {deck.title}
@@ -562,7 +562,7 @@ export default function CreateAssessmentPage() {
                 onClick={() => setShowSaveTemplate(false)}
                 className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               >
-                Cancel
+                Batal
               </button>
             </div>
           )}
@@ -574,7 +574,7 @@ export default function CreateAssessmentPage() {
           disabled={submitting || !deckTemplateId || !title}
           className="w-full"
         >
-          Create Assessment (as Draft)
+          Buat Asesmen (sebagai Draft)
         </Button>
       </form>
     </div>

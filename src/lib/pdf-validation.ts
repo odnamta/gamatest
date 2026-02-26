@@ -42,7 +42,7 @@ export function validatePdfFile(
     return { valid: false, error: `File exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024)} MB` }
   }
 
-  if (fileSize === 0) {
+  if (fileSize <= 0) {
     return { valid: false, error: 'File is empty' }
   }
 

@@ -88,14 +88,14 @@ function BulkImportErrorFallback({ onRetry }: { onRetry: () => void }) {
         <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
       </div>
       <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        Something went wrong
+        Terjadi kesalahan
       </h2>
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 max-w-md">
-        The PDF viewer encountered an error. You can try again or upload a different PDF.
+        Penampil PDF mengalami error. Anda bisa coba lagi atau unggah PDF lain.
       </p>
       <Button onClick={onRetry} variant="secondary" className="flex items-center gap-2">
         <RefreshCw className="w-4 h-4" />
-        Try Again
+        Coba Lagi
       </Button>
     </div>
   )
@@ -401,11 +401,11 @@ export default function BulkImportClient({ deckId, subject = 'General' }: BulkIm
             showToast('AI is not configured yet. Please set OPENAI_API_KEY in .env.local', 'error')
             break
           default:
-            showToast('Something went wrong. Please try again.', 'error')
+            showToast('Terjadi kesalahan. Silakan coba lagi.', 'error')
         }
       }
     } catch {
-      showToast('Something went wrong. Please try again.', 'error')
+      showToast('Terjadi kesalahan. Silakan coba lagi.', 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -464,7 +464,7 @@ export default function BulkImportClient({ deckId, subject = 'General' }: BulkIm
         showToast(result.error.message || 'Failed to generate drafts', 'error')
       }
     } catch {
-      showToast('Something went wrong. Please try again.', 'error')
+      showToast('Terjadi kesalahan. Silakan coba lagi.', 'error')
     } finally {
       setIsBatchGenerating(false)
     }
@@ -762,11 +762,11 @@ export default function BulkImportClient({ deckId, subject = 'General' }: BulkIm
             showToast('AI is not configured yet. Please set OPENAI_API_KEY in .env.local', 'error')
             break
           default:
-            showToast('Something went wrong. Please try again.', 'error')
+            showToast('Terjadi kesalahan. Silakan coba lagi.', 'error')
         }
       }
     } catch {
-      showToast('Something went wrong. Please try again.', 'error')
+      showToast('Terjadi kesalahan. Silakan coba lagi.', 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -868,7 +868,7 @@ export default function BulkImportClient({ deckId, subject = 'General' }: BulkIm
                   onClick={() => setShowUploadDropzone(false)}
                   className="block mx-auto mt-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                 >
-                  Cancel
+                  Batal
                 </button>
               )}
             </div>

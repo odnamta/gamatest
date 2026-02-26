@@ -496,7 +496,7 @@ export default function EditAssessmentPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button type="submit" loading={saving} disabled={saving || !title}>
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              Simpan Perubahan
             </Button>
             <Button
               type="button"
@@ -505,7 +505,7 @@ export default function EditAssessmentPage() {
               onClick={handlePublish}
               disabled={publishing}
             >
-              Publish Assessment
+              Terbitkan Asesmen
             </Button>
           </div>
         )}

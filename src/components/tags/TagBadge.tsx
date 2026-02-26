@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { X, BookOpen, FolderTree, Lightbulb } from 'lucide-react'
 import { getTagColorClasses, getCategoryColorClasses } from '@/lib/tag-colors'
 import type { Tag, TagCategory } from '@/types/database'
@@ -32,7 +33,7 @@ function CategoryIconRenderer({ category, className }: { category: TagCategory; 
  * V11.3: Added optional category icon indicator
  * Requirements: V5 Feature Set 1 - Req 1.7, V9-6.2, V11.3-6.1
  */
-export function TagBadge({ tag, onRemove, size = 'sm', showCategoryIcon = false }: TagBadgeProps) {
+export const TagBadge = memo(function TagBadge({ tag, onRemove, size = 'sm', showCategoryIcon = false }: TagBadgeProps) {
   // V9: Use category-based colors if category exists, otherwise fall back to color field
   const { bgClass, textClass } = tag.category 
     ? getCategoryColorClasses(tag.category)
@@ -66,7 +67,7 @@ export function TagBadge({ tag, onRemove, size = 'sm', showCategoryIcon = false 
       )}
     </span>
   )
-}
+})
 
 /**
  * V11.3: Helper to check if a tag has a category indicator

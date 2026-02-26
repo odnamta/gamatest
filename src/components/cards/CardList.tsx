@@ -667,7 +667,7 @@ export function CardList({ cards, deckId, deckTitle = 'deck', allTags = [], isAu
               {isSelectingAll ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Loading...
+                  Memuat...
                 </>
               ) : (
                 'Select all in deck'

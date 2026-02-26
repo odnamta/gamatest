@@ -54,8 +54,8 @@ export function CommandPalette() {
     ...(isAssessmentMode ? [
       { id: 'templates', label: 'Assessment Templates', href: '/assessments/templates', icon: <ClipboardList className="h-4 w-4" />, keywords: ['template', 'config', 'preset'], minRole: 'creator' as const },
     ] : []),
-    { id: 'org-settings', label: 'Organization Settings', href: `/orgs/${org.slug}/settings`, icon: <Settings className="h-4 w-4" />, keywords: ['org', 'configuration', 'branding'], minRole: 'admin' },
-    { id: 'org-members', label: 'Members', href: `/orgs/${org.slug}/members`, icon: <UserPlus className="h-4 w-4" />, keywords: ['invite', 'team', 'roles'], minRole: 'admin' },
+    { id: 'org-settings', label: 'Pengaturan Organisasi', href: `/orgs/${org.slug}/settings`, icon: <Settings className="h-4 w-4" />, keywords: ['org', 'configuration', 'branding', 'pengaturan'], minRole: 'admin' },
+    { id: 'org-members', label: 'Anggota', href: `/orgs/${org.slug}/members`, icon: <UserPlus className="h-4 w-4" />, keywords: ['invite', 'team', 'roles', 'anggota'], minRole: 'admin' },
     { id: 'org-analytics', label: 'Organization Analytics', href: `/orgs/${org.slug}/analytics`, icon: <PieChart className="h-4 w-4" />, keywords: ['org stats', 'metrics'], minRole: 'creator' },
     { id: 'audit-log', label: 'Audit Log', href: `/orgs/${org.slug}/audit`, icon: <Shield className="h-4 w-4" />, keywords: ['history', 'activity'], minRole: 'admin' },
     ...(isStudyMode ? [
@@ -146,7 +146,7 @@ export function CommandPalette() {
         className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 transition-colors"
       >
         <Search className="h-3.5 w-3.5" />
-        <span>Search</span>
+        <span>Cari</span>
         <kbd className="ml-1 font-mono text-[10px] text-slate-400" aria-hidden="true">⌘K</kbd>
       </button>
 
@@ -184,7 +184,7 @@ export function CommandPalette() {
         <div className="max-h-72 overflow-y-auto py-2" role="listbox" aria-label="Search results">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-slate-500">
-              No results found
+              Tidak ada hasil
             </div>
           ) : (
             filtered.map((item, idx) => (
