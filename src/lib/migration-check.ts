@@ -111,7 +111,7 @@ export async function logMigrationStatus(): Promise<void> {
     const status = await checkMigrationStatus()
 
     for (const warning of status.warnings) {
-      console.warn(warning)
+      logger.warn('migrationCheck', warning)
     }
   } catch (error) {
     logger.error('logMigrationStatus', error)

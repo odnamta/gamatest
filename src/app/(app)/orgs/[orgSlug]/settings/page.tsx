@@ -210,7 +210,7 @@ export default function OrgSettingsPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={branding.logo_url}
-                  alt="Org logo"
+                  alt="Preview logo organisasi"
                   className="h-10 w-10 rounded object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />

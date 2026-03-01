@@ -5,21 +5,43 @@
  *
  * Allows creators to update assessment settings before publishing.
  * Only editable while in draft status.
+ *
+ * Sub-components extracted for code splitting:
+ * - SkillDomainSection: skill domain linking UI (V19)
+ * - QuestionPreviewPanel: toggleable question preview with answer reveal
  */
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Save, Eye, EyeOff, CheckCircle2, Target, Link2, Unlink } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Save } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
-import { getAssessment, updateAssessment, publishAssessment, getAssessmentPreviewQuestions } from '@/actions/assessment-actions'
-import { getSkillDomainsForDeck, linkDeckToSkill, unlinkDeckFromSkill } from '@/actions/skill-actions'
+import { getAssessment, updateAssessment, publishAssessment } from '@/actions/assessment-actions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import type { Assessment } from '@/types/database'
 import { usePageTitle } from '@/hooks/use-page-title'
+
+const SkillDomainSection = dynamic(() => import('./SkillDomainSection'), {
+  ssr: false,
+  loading: () => (
+    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+      <div className="h-32 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+    </div>
+  ),
+})
+
+const QuestionPreviewPanel = dynamic(() => import('./QuestionPreviewPanel'), {
+  ssr: false,
+  loading: () => (
+    <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-6">
+      <div className="h-10 w-48 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+    </div>
+  ),
+})
 
 export default function EditAssessmentPage() {
   usePageTitle('Edit Assessment')
@@ -35,17 +57,9 @@ export default function EditAssessmentPage() {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewQuestions, setPreviewQuestions] = useState<{ id: string; stem: string; options: string[]; correctIndex: number }[]>([])
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [showAnswers, setShowAnswers] = useState(false)
 
-  // V19: Skill domain linking state
+  // V19: Skill domain linking
   const skillsEnabled = org.settings?.features?.skills_mapping ?? false
-  const [linkedSkills, setLinkedSkills] = useState<{ id: string; name: string; color: string }[]>([])
-  const [availableSkills, setAvailableSkills] = useState<{ id: string; name: string; color: string }[]>([])
-  const [skillLinking, startSkillTransition] = useTransition()
-  const [showSkillDropdown, setShowSkillDropdown] = useState(false)
 
   // Form state
   const [title, setTitle] = useState('')
@@ -61,15 +75,6 @@ export default function EditAssessmentPage() {
   const [allowReview, setAllowReview] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-
-  async function loadSkillDomains(deckTemplateId: string) {
-    if (!skillsEnabled) return
-    const skillResult = await getSkillDomainsForDeck(deckTemplateId)
-    if (skillResult.ok && skillResult.data) {
-      setLinkedSkills(skillResult.data.linked)
-      setAvailableSkills(skillResult.data.available)
-    }
-  }
 
   useEffect(() => {
     async function load() {
@@ -90,15 +95,12 @@ export default function EditAssessmentPage() {
         setAllowReview(a.allow_review)
         setStartDate(a.start_date ? new Date(a.start_date).toISOString().slice(0, 16) : '')
         setEndDate(a.end_date ? new Date(a.end_date).toISOString().slice(0, 16) : '')
-        // V19: Load skill domain mappings for this assessment's deck
-        loadSkillDomains(a.deck_template_id)
       } else if (!result.ok) {
         setError(result.error)
       }
       setLoading(false)
     }
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentId])
 
   if (!isCreator) {
@@ -140,16 +142,6 @@ export default function EditAssessmentPage() {
     setSaving(false)
   }
 
-  async function loadPreview() {
-    setPreviewLoading(true)
-    setShowPreview(true)
-    const result = await getAssessmentPreviewQuestions(assessmentId, 10)
-    if (result.ok && result.data) {
-      setPreviewQuestions(result.data)
-    }
-    setPreviewLoading(false)
-  }
-
   async function handlePublish() {
     setError(null)
     setPublishing(true)
@@ -161,28 +153,6 @@ export default function EditAssessmentPage() {
       setError(result.error)
       setPublishing(false)
     }
-  }
-
-  // V19: Skill domain linking handlers
-  function handleLinkSkill(skillDomainId: string) {
-    if (!assessment) return
-    startSkillTransition(async () => {
-      const result = await linkDeckToSkill(assessment.deck_template_id, skillDomainId)
-      if (result.ok) {
-        setShowSkillDropdown(false)
-        await loadSkillDomains(assessment.deck_template_id)
-      }
-    })
-  }
-
-  function handleUnlinkSkill(skillDomainId: string) {
-    if (!assessment) return
-    startSkillTransition(async () => {
-      const result = await unlinkDeckFromSkill(assessment.deck_template_id, skillDomainId)
-      if (result.ok) {
-        await loadSkillDomains(assessment.deck_template_id)
-      }
-    })
   }
 
   if (loading) {
@@ -404,92 +374,12 @@ export default function EditAssessmentPage() {
           </label>
         </div>
 
-        {/* V19: Skill Domain Linking Section */}
+        {/* V19: Skill Domain Linking — lazy loaded */}
         {skillsEnabled && (
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                  Skill Domains
-                </h3>
-              </div>
-              {isCreator && availableSkills.length > 0 && (
-                <div className="relative">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setShowSkillDropdown(!showSkillDropdown)}
-                    disabled={skillLinking}
-                  >
-                    <Link2 className="h-3.5 w-3.5 mr-1" />
-                    Link Skill
-                  </Button>
-                  {showSkillDropdown && (
-                    <div className="absolute right-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20">
-                      {availableSkills.map((skill) => (
-                        <button
-                          key={skill.id}
-                          type="button"
-                          onClick={() => handleLinkSkill(skill.id)}
-                          disabled={skillLinking}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2"
-                        >
-                          <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: skill.color }}
-                          />
-                          <span className="truncate">{skill.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Linked skill domains receive score updates when candidates complete this assessment.
-            </p>
-
-            {linkedSkills.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-3 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                No skill domains linked yet. Link skill domains to track competencies.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {linkedSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: skill.color }}
-                      />
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                        {skill.name}
-                      </span>
-                    </div>
-                    {isCreator && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleUnlinkSkill(skill.id)}
-                        disabled={skillLinking}
-                        title="Unlink skill domain"
-                      >
-                        <Unlink className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <SkillDomainSection
+            deckTemplateId={assessment.deck_template_id}
+            canEdit={isCreator}
+          />
         )}
 
         {isDraft && (
@@ -511,81 +401,11 @@ export default function EditAssessmentPage() {
         )}
       </form>
 
-      {/* Question Preview Section */}
-      <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Question Preview
-          </h2>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => showPreview ? setShowPreview(false) : loadPreview()}
-          >
-            {showPreview ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-            {showPreview ? 'Hide' : 'Preview Questions'}
-          </Button>
-        </div>
-
-        {showPreview && (
-          <div>
-            {previewLoading ? (
-              <div className="space-y-3 animate-pulse">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" />
-                ))}
-              </div>
-            ) : previewQuestions.length === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">No questions found in the linked deck.</p>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 mb-3">
-                  <button
-                    onClick={() => setShowAnswers(!showAnswers)}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {showAnswers ? 'Hide correct answers' : 'Show correct answers'}
-                  </button>
-                  <span className="text-xs text-slate-400">
-                    Showing {previewQuestions.length} of {assessment?.question_count ?? '?'} questions
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {previewQuestions.map((q, qIdx) => (
-                    <div
-                      key={q.id}
-                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4"
-                    >
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
-                        <span className="text-slate-400 mr-1">{qIdx + 1}.</span>
-                        {q.stem}
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {q.options.map((opt, oIdx) => (
-                          <div
-                            key={oIdx}
-                            className={`flex items-center gap-2 text-xs px-2.5 py-1.5 rounded ${
-                              showAnswers && oIdx === q.correctIndex
-                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 ring-1 ring-green-300 dark:ring-green-700'
-                                : 'bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400'
-                            }`}
-                          >
-                            {showAnswers && oIdx === q.correctIndex && (
-                              <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
-                            )}
-                            <span className="font-medium mr-1">{String.fromCharCode(65 + oIdx)}.</span>
-                            {opt}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Question Preview — lazy loaded */}
+      <QuestionPreviewPanel
+        assessmentId={assessmentId}
+        totalQuestionCount={assessment.question_count}
+      />
     </div>
   )
 }

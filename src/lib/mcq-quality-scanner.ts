@@ -13,6 +13,8 @@
  * - Fail soft: Returns empty result on errors, never throws
  */
 
+import { logger } from '@/lib/logger'
+
 // ============================================
 // Type Definitions
 // ============================================
@@ -195,7 +197,8 @@ export function scanChunkForQuestionsAndOptions(text: string): QualityScanResult
     }
   } catch (error) {
     // Fail soft: log and return empty result
-    console.warn('[mcq-quality-scanner] Scan failed, returning empty result:', error)
+    // Fail soft: structured log instead of bare console
+    logger.warn('mcqQualityScanner.scanFailed', 'Scan failed, returning empty result')
     return {
       rawQuestionCount: 0,
       questions: [],

@@ -200,7 +200,7 @@ export async function notifyOrgCandidates(
         message: body,
         actionUrl: buildFullUrl(link),
         unsubscribeUrl: buildUnsubscribeUrl(profile.id),
-      }).catch((err) => console.warn('[email] notifyOrgCandidates failed:', err))
+      }).catch((err) => logger.warn('notifyOrgCandidates.email', String(err)))
     }
 
     return { ok: true }
@@ -294,7 +294,7 @@ export async function sendAssessmentReminder(
         message: `Don't forget to complete "${assessment.title}".`,
         actionUrl: buildFullUrl('/assessments'),
         unsubscribeUrl: buildUnsubscribeUrl(profile.id),
-      }).catch((err) => console.warn('[email] sendAssessmentReminder failed:', err))
+      }).catch((err) => logger.warn('sendAssessmentReminder.email', String(err)))
     }
 
     return { ok: true, data: { notified: pendingMembers.length } }

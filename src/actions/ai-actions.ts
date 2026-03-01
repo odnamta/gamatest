@@ -47,7 +47,7 @@ function buildUserPrompt(sourceText: string, deckName?: string, mode: AIMode = '
 export async function draftMCQFromText(input: DraftMCQInput): Promise<MCQDraftResult> {
   // Check if OpenAI API key is configured (server-side only)
   if (!process.env.OPENAI_API_KEY) {
-    console.warn('draftMCQFromText: missing OPENAI_API_KEY')
+    logger.warn('draftMCQFromText', 'OPENAI_API_KEY not set')
     return { ok: false, error: 'NOT_CONFIGURED' }
   }
 

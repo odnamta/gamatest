@@ -5,6 +5,8 @@
  * Logs warnings for missing optional vars, throws for missing required vars.
  */
 
+import { logger } from '@/lib/logger'
+
 const REQUIRED_VARS = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -34,7 +36,7 @@ export function validateEnv(): void {
 
   for (const { key, feature } of OPTIONAL_VARS) {
     if (!process.env[key]) {
-      console.warn(`[env] ${key} not set — ${feature} disabled`)
+      logger.warn('env.optional', `${key} not set — ${feature} disabled`)
     }
   }
 }

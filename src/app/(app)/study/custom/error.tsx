@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import { Button } from '@/components/ui/Button'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
@@ -11,7 +12,7 @@ export default function CustomStudyError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  useEffect(() => { console.error('Custom study error:', error) }, [error])
+  useEffect(() => { logger.error('study.custom.error', error) }, [error])
 
   return (
     <div className="max-w-md mx-auto px-4 py-16 text-center">

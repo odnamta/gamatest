@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { logger } from '@/lib/logger'
 
 /**
  * OpenAI Client for Server-Side Use Only
@@ -19,10 +20,7 @@ if (typeof window !== 'undefined') {
 
 // Validate API key exists
 if (!process.env.OPENAI_API_KEY) {
-  console.warn(
-    'OPENAI_API_KEY is not set. AI features will not work. ' +
-    'Add OPENAI_API_KEY to your .env.local file.'
-  )
+  logger.warn('openai.init', 'OPENAI_API_KEY is not set — AI features will not work')
 }
 
 /**

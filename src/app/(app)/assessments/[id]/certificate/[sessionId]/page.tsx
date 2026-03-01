@@ -196,7 +196,7 @@ export default function CertificatePage() {
           <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 print:text-slate-600">
             <div className="text-left flex items-center gap-3">
               {logoUrl && (
-                <Image src={logoUrl} alt="" width={32} height={32} className="h-8 w-8 rounded object-contain print:block" />
+                <Image src={logoUrl} alt={`Logo ${org.name}`} width={32} height={32} className="h-8 w-8 rounded object-contain print:block" />
               )}
               <div>
                 <p className="font-medium text-slate-700 dark:text-slate-300 print:text-black">

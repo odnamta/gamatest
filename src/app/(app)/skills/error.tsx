@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -14,7 +15,7 @@ export default function SkillsError({ error, reset }: ErrorProps) {
   const router = useRouter()
 
   useEffect(() => {
-    console.error('Skills page error:', error)
+    logger.error('skills.error', error)
   }, [error])
 
   return (

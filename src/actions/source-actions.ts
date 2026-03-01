@@ -116,7 +116,7 @@ async function migrateLegacyDeck(
   })
 
   if (subscribeError) {
-    console.warn('[migrateLegacyDeck] Failed to auto-subscribe owner:', subscribeError)
+    logger.warn('migrateLegacyDeck.subscribe', String(subscribeError))
     // Don't fail - deck was created successfully
   }
 
@@ -226,13 +226,13 @@ export async function uploadSourceAction(
       const resolved = await resolveDeckTemplateId(supabase, validatedDeckId, user.id)
       
       if (!resolved) {
-        console.warn('[uploadSourceAction] Deck not found after 4-step lookup:', validatedDeckId, 'User:', user.id)
+        logger.warn('uploadSourceAction.deckNotFound', 'Deck not found after 4-step lookup', { deckId: validatedDeckId, userId: user.id })
         return { ok: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
       }
 
       // Only authors can upload PDFs to a deck
       if (resolved.authorId !== user.id) {
-        console.warn('[uploadSourceAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
+        logger.warn('uploadSourceAction.authorMismatch', 'Author mismatch', { templateAuthor: resolved.authorId, currentUser: user.id })
         return { ok: false, error: 'Only the deck author can upload source materials' }
       }
       
@@ -430,12 +430,12 @@ export async function linkSourceToDeckAction(
     const resolved = await resolveDeckTemplateId(supabase, deckId, user.id)
 
     if (!resolved) {
-      console.warn('[linkSourceToDeckAction] Deck not found after 4-step lookup:', deckId, 'User:', user.id)
+      logger.warn('linkSourceToDeckAction.deckNotFound', 'Deck not found after 4-step lookup', { deckId, userId: user.id })
       return { ok: false, error: 'Deck not found. Please verify the deck exists or create a new one.' }
     }
 
     if (resolved.authorId !== user.id) {
-      console.warn('[linkSourceToDeckAction] Author mismatch:', { templateAuthor: resolved.authorId, currentUser: user.id })
+      logger.warn('linkSourceToDeckAction.authorMismatch', 'Author mismatch', { templateAuthor: resolved.authorId, currentUser: user.id })
       return { ok: false, error: 'Only the deck author can link source materials' }
     }
 

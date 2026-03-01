@@ -200,7 +200,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
 
     const handleOffline = () => {
       if (isScanningRef.current) {
-        console.warn('[useAutoScan] Connection lost, pausing scan')
+        // Connection lost, pausing scan
         setIsScanning(false)
         onOffline?.()  // V7.1: Notify page to show toast
       }
@@ -328,7 +328,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
 
       // Safety stop after 3 consecutive errors
       if (newConsecutive >= MAX_CONSECUTIVE_ERRORS) {
-        console.warn('[useAutoScan] Safety stop: 3 consecutive errors')
+        // Safety stop: 3 consecutive errors
         setIsScanning(false)
         onSafetyStop?.()
         return
@@ -383,7 +383,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
       // V8.6: Defensive check - verify saved state exists before resuming
       const saved = loadAutoScanState(deckId, sourceId)
       if (!saved || !saved.isScanning) {
-        console.warn('[useAutoScan] No valid saved state for resume, falling back to startFresh')
+        // No valid saved state for resume, falling back to startFresh
         // Fall back to fresh start
         if (deckId && sourceId) {
           clearAutoScanState(deckId, sourceId)
@@ -456,7 +456,7 @@ export function useAutoScan(options: UseAutoScanOptions): UseAutoScanReturn {
     
     // Validate range
     if (range.startPage < 1 || range.endPage > totalPages || range.startPage > range.endPage) {
-      console.warn('[useAutoScan] Invalid range:', range)
+      // Invalid range — skip
       return
     }
     

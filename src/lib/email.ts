@@ -26,7 +26,7 @@ export async function sendEmail({
   react: React.ReactElement
 }) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set, skipping email')
+    logger.warn('email.send', 'RESEND_API_KEY not set, skipping email')
     return { ok: true as const }
   }
 

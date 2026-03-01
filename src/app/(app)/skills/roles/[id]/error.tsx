@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -14,7 +15,7 @@ export default function RoleDetailError({ error, reset }: ErrorProps) {
   const router = useRouter()
 
   useEffect(() => {
-    console.error('Role detail error:', error)
+    logger.error('skills.roles.detail.error', error)
   }, [error])
 
   return (

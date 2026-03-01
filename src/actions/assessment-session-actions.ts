@@ -10,6 +10,7 @@ import { headers } from 'next/headers'
 import { withOrgUser } from '@/actions/_helpers'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { RATE_LIMITS } from '@/lib/rate-limit'
+import { logger } from '@/lib/logger'
 import { submitAnswerSchema } from '@/lib/validations'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import type { ActionResultV2 } from '@/types/actions'
@@ -329,7 +330,7 @@ export async function completeSession(
               score,
               certificateUrl: buildFullUrl(certUrl),
               unsubscribeUrl: unsubUrl,
-            }).catch((err) => console.warn('[email] certificate email failed:', err))
+            }).catch((err) => logger.warn('completeSession.certificateEmail', String(err)))
           } else {
             // Fallback: send result notification if certificate not ready
             dispatchResultEmail({
@@ -342,7 +343,7 @@ export async function completeSession(
               passed: true,
               actionUrl: buildFullUrl(`/assessments/${session.assessment_id}/results/${sessionId}`),
               unsubscribeUrl: unsubUrl,
-            }).catch((err) => console.warn('[email] result email failed:', err))
+            }).catch((err) => logger.warn('completeSession.resultEmail', String(err)))
           }
         } else {
           // For failed candidates, send ResultNotification with retake link
@@ -356,11 +357,11 @@ export async function completeSession(
             passed: false,
             actionUrl: buildFullUrl(`/assessments/${session.assessment_id}/take`),
             unsubscribeUrl: unsubUrl,
-          }).catch((err) => console.warn('[email] result notification failed:', err))
+          }).catch((err) => logger.warn('completeSession.resultNotification', String(err)))
         }
       }
     } catch (emailError) {
-      console.warn('[completeSession] Email dispatch failed:', emailError)
+      logger.warn('completeSession.emailDispatch', String(emailError))
     }
 
     // V19: Update skill scores if skills_mapping is enabled
@@ -418,7 +419,7 @@ export async function completeSession(
       }
     } catch (skillError) {
       // Non-fatal: log but don't fail the session completion
-      console.warn('[completeSession] V19: Skill score update failed:', skillError)
+      logger.warn('completeSession.skillScore', String(skillError))
     }
 
     revalidatePath('/assessments')

@@ -138,7 +138,7 @@ export async function draftBatchMCQFromText(input: DraftBatchInput): Promise<Dra
     // V13: Deduplicate drafts by normalized stem (cross-page duplicates)
     const { unique: dedupedDrafts, removedCount: dedupedCount } = deduplicateMCQBatch(validDrafts)
     if (dedupedCount > 0) {
-      console.info(`[draftBatchMCQFromText] V13: Removed ${dedupedCount} duplicate draft(s) by stem`)
+      logger.info('draftBatchMCQFromText.dedup', `Removed ${dedupedCount} duplicate draft(s) by stem`)
     }
 
     // V12: Quality Scanner Integration (advisory only, never blocks)
@@ -533,7 +533,7 @@ export async function bulkCreateMCQV2(input: BulkCreateV2Input): Promise<BulkCre
             cardTagCount++
           }
         } else {
-          console.warn(`[bulkCreateMCQV2] Tag "${tagName}" not found in tagNameToId map`)
+          logger.warn('bulkCreateMCQV2.tagNotFound', `Tag "${tagName}" not found in tagNameToId map`)
         }
       }
       

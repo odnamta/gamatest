@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
@@ -17,8 +18,7 @@ interface ErrorProps {
  */
 export default function AppError({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // Log the error to console (could be sent to error reporting service)
-    console.error('App error:', error)
+    logger.error('app.error', error)
   }, [error])
 
   return (

@@ -5,22 +5,51 @@
  *
  * Form to create a new assessment from an existing deck template.
  * Creator+ only.
+ *
+ * Sub-components extracted for code splitting:
+ * - TemplateSelector: dropdown to apply saved assessment templates
+ * - SkillDomainSection: skill domain linking UI (V19)
+ * - SaveTemplateSection: expandable section to save settings as template
  */
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, BookmarkPlus, FileDown, Target, Link2, Unlink } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { hasMinimumRole } from '@/lib/org-authorization'
 import { getUserDeckTemplates } from '@/actions/deck-actions'
-import { createAssessment, getAssessmentTemplates, saveAssessmentTemplate } from '@/actions/assessment-actions'
-import { getSkillDomainsForDeck, linkDeckToSkill, unlinkDeckFromSkill } from '@/actions/skill-actions'
+import { createAssessment, getAssessmentTemplates } from '@/actions/assessment-actions'
 import type { AssessmentTemplate, AssessmentTemplateConfig } from '@/types/database'
 import { getAssessmentDefaults } from '@/actions/org-actions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { usePageTitle } from '@/hooks/use-page-title'
+
+const TemplateSelector = dynamic(() => import('./TemplateSelector'), {
+  ssr: false,
+  loading: () => (
+    <div className="mb-6 h-[88px] animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+  ),
+})
+
+const SkillDomainSection = dynamic(() => import('./SkillDomainSection'), {
+  ssr: false,
+  loading: () => (
+    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+      <div className="h-32 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+    </div>
+  ),
+})
+
+const SaveTemplateSection = dynamic(() => import('./SaveTemplateSection'), {
+  ssr: false,
+  loading: () => (
+    <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+      <div className="h-6 w-48 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+    </div>
+  ),
+})
 
 export default function CreateAssessmentPage() {
   usePageTitle('Create Assessment')
@@ -33,15 +62,9 @@ export default function CreateAssessmentPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saveTemplateName, setSaveTemplateName] = useState('')
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
 
-  // V19: Skill domain linking state
+  // V19: Skill domain linking
   const skillsEnabled = org.settings?.features?.skills_mapping ?? false
-  const [linkedSkills, setLinkedSkills] = useState<{ id: string; name: string; color: string }[]>([])
-  const [availableSkills, setAvailableSkills] = useState<{ id: string; name: string; color: string }[]>([])
-  const [skillLinking, startSkillTransition] = useTransition()
-  const [showSkillDropdown, setShowSkillDropdown] = useState(false)
 
   // Form state
   const [deckTemplateId, setDeckTemplateId] = useState('')
@@ -65,7 +88,6 @@ export default function CreateAssessmentPage() {
       setDecks(data)
       setLoading(false)
     })
-    // Pre-populate from org defaults
     getAssessmentDefaults().then((result) => {
       if (result.ok && result.data) {
         const d = result.data
@@ -77,7 +99,6 @@ export default function CreateAssessmentPage() {
         setAllowReview(d.allow_review)
       }
     })
-    // Load templates
     getAssessmentTemplates().then((result) => {
       if (result.ok && result.data) setTemplates(result.data)
     })
@@ -96,67 +117,6 @@ export default function CreateAssessmentPage() {
     setMaxAttempts(c.max_attempts ?? undefined)
     setCooldownMinutes(c.cooldown_minutes ?? undefined)
     setAllowReview(c.allow_review)
-  }
-
-  async function handleSaveTemplate() {
-    if (!saveTemplateName.trim()) return
-    const config: AssessmentTemplateConfig = {
-      time_limit_minutes: timeLimitMinutes,
-      pass_score: passScore,
-      question_count: questionCount,
-      shuffle_questions: shuffleQuestions,
-      shuffle_options: shuffleOptions,
-      show_results: showResults,
-      max_attempts: maxAttempts ?? null,
-      cooldown_minutes: cooldownMinutes ?? null,
-      allow_review: allowReview,
-    }
-    const result = await saveAssessmentTemplate({ name: saveTemplateName.trim(), config })
-    if (result.ok && result.data) {
-      setTemplates((prev) => [result.data!, ...prev])
-      setSaveTemplateName('')
-      setShowSaveTemplate(false)
-    }
-  }
-
-  // V19: Load skill domains when deck selection changes
-  async function loadSkillDomainsForDeck(deckId: string) {
-    if (!skillsEnabled || !deckId) {
-      setLinkedSkills([])
-      setAvailableSkills([])
-      return
-    }
-    const skillResult = await getSkillDomainsForDeck(deckId)
-    if (skillResult.ok && skillResult.data) {
-      setLinkedSkills(skillResult.data.linked)
-      setAvailableSkills(skillResult.data.available)
-    }
-  }
-
-  function handleDeckChange(deckId: string) {
-    setDeckTemplateId(deckId)
-    loadSkillDomainsForDeck(deckId)
-  }
-
-  function handleLinkSkill(skillDomainId: string) {
-    if (!deckTemplateId) return
-    startSkillTransition(async () => {
-      const result = await linkDeckToSkill(deckTemplateId, skillDomainId)
-      if (result.ok) {
-        setShowSkillDropdown(false)
-        await loadSkillDomainsForDeck(deckTemplateId)
-      }
-    })
-  }
-
-  function handleUnlinkSkill(skillDomainId: string) {
-    if (!deckTemplateId) return
-    startSkillTransition(async () => {
-      const result = await unlinkDeckFromSkill(deckTemplateId, skillDomainId)
-      if (result.ok) {
-        await loadSkillDomainsForDeck(deckTemplateId)
-      }
-    })
   }
 
   if (!isCreator) {
@@ -203,6 +163,18 @@ export default function CreateAssessmentPage() {
     }
   }
 
+  const currentConfig: AssessmentTemplateConfig = {
+    time_limit_minutes: timeLimitMinutes,
+    pass_score: passScore,
+    question_count: questionCount,
+    shuffle_questions: shuffleQuestions,
+    shuffle_options: shuffleOptions,
+    show_results: showResults,
+    max_attempts: maxAttempts ?? null,
+    cooldown_minutes: cooldownMinutes ?? null,
+    allow_review: allowReview,
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Breadcrumbs items={[
@@ -220,27 +192,9 @@ export default function CreateAssessmentPage() {
         </div>
       )}
 
-      {/* Template Selector */}
+      {/* Template Selector — lazy loaded */}
       {templates.length > 0 && (
-        <div className="mb-6 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
-          <div className="flex items-center gap-2 mb-2">
-            <FileDown className="h-4 w-4 text-blue-500" />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Load from Template
-            </span>
-          </div>
-          <select
-            onChange={(e) => { if (e.target.value) applyTemplate(e.target.value); e.target.value = '' }}
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Pilih template untuk menerapkan pengaturan...</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <TemplateSelector templates={templates} onApply={applyTemplate} />
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -258,7 +212,7 @@ export default function CreateAssessmentPage() {
           ) : (
             <select
               value={deckTemplateId}
-              onChange={(e) => handleDeckChange(e.target.value)}
+              onChange={(e) => setDeckTemplateId(e.target.value)}
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Pilih deck...</option>
@@ -448,125 +402,16 @@ export default function CreateAssessmentPage() {
           </label>
         </div>
 
-        {/* V19: Skill Domain Linking Section */}
+        {/* V19: Skill Domain Linking — lazy loaded */}
         {skillsEnabled && deckTemplateId && (
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                  Skill Domains
-                </h3>
-              </div>
-              {availableSkills.length > 0 && (
-                <div className="relative">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setShowSkillDropdown(!showSkillDropdown)}
-                    disabled={skillLinking}
-                  >
-                    <Link2 className="h-3.5 w-3.5 mr-1" />
-                    Link Skill
-                  </Button>
-                  {showSkillDropdown && (
-                    <div className="absolute right-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20">
-                      {availableSkills.map((skill) => (
-                        <button
-                          key={skill.id}
-                          type="button"
-                          onClick={() => handleLinkSkill(skill.id)}
-                          disabled={skillLinking}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2"
-                        >
-                          <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: skill.color }}
-                          />
-                          <span className="truncate">{skill.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Linked skill domains receive score updates when candidates complete this assessment.
-            </p>
-
-            {linkedSkills.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-3 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                No skill domains linked yet. Link skill domains to track competencies.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {linkedSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: skill.color }}
-                      />
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                        {skill.name}
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleUnlinkSkill(skill.id)}
-                      disabled={skillLinking}
-                      title="Unlink skill domain"
-                    >
-                      <Unlink className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <SkillDomainSection key={deckTemplateId} deckTemplateId={deckTemplateId} />
         )}
 
-        {/* Save as Template */}
-        <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-          {!showSaveTemplate ? (
-            <button
-              type="button"
-              onClick={() => setShowSaveTemplate(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            >
-              <BookmarkPlus className="h-3.5 w-3.5" />
-              Save current settings as template
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={saveTemplateName}
-                onChange={(e) => setSaveTemplateName(e.target.value)}
-                placeholder="Template name (e.g., Quick Quiz)"
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Button type="button" size="sm" onClick={handleSaveTemplate} disabled={!saveTemplateName.trim()}>
-                Save
-              </Button>
-              <button
-                type="button"
-                onClick={() => setShowSaveTemplate(false)}
-                className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              >
-                Batal
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Save as Template — lazy loaded */}
+        <SaveTemplateSection
+          config={currentConfig}
+          onTemplateSaved={(tpl) => setTemplates((prev) => [tpl, ...prev])}
+        />
 
         <Button
           type="submit"

@@ -235,6 +235,7 @@ export function PublicTestLanding({ code, assessment, orgName }: PublicTestLandi
         <button
           type="submit"
           disabled={!formValid || loading}
+          aria-label={loading ? 'Memproses pendaftaran' : 'Mulai Tes'}
           className="w-full bg-blue-600 text-white rounded-lg py-3 font-medium hover:bg-blue-700 active:scale-95 transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
         >
           {loading ? (

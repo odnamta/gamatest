@@ -117,15 +117,6 @@ export function BatchReviewPanel({
         tagNames: draft.aiTags, // V6.1: AI tags only, session tags merged server-side
       }))
 
-      // V7.2.1: Deep logging - BatchReviewPanel caller
-      // V11.3: Include importSessionId for draft/publish workflow
-      console.log('[BatchReviewPanel] Saving via bulkCreateMCQV2', {
-        deckTemplateId: deckId,
-        sessionTags: sessionTagNames,
-        cardsCount: cards.length,
-        importSessionId,
-      })
-      
       // V7.2: Use bulkCreateMCQV2 for V2 schema consistency with Auto-Scan
       // V11.3: Pass importSessionId for draft/publish workflow
       const result = await bulkCreateMCQV2({ 

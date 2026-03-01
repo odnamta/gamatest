@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -14,7 +15,7 @@ export default function AssessmentsError({ error, reset }: ErrorProps) {
   const router = useRouter()
 
   useEffect(() => {
-    console.error('Assessment error:', error)
+    logger.error('assessments.error', error)
   }, [error])
 
   return (
