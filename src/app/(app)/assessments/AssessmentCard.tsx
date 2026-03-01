@@ -110,35 +110,35 @@ export function AssessmentCard({
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {assessment.time_limit_minutes} min
+                {assessment.time_limit_minutes} menit
               </span>
               <span className="inline-flex items-center gap-1">
                 <Target className="h-3 w-3" />
-                {assessment.pass_score}% to pass
+                {assessment.pass_score}% untuk lulus
               </span>
-              <span>{assessment.question_count} questions</span>
+              <span>{assessment.question_count} soal</span>
               {isCreator && (
-                <span>{assessment.session_count} attempts</span>
+                <span>{assessment.session_count} percobaan</span>
               )}
               {!isCreator && assessment.max_attempts && (
                 <span>
-                  {attemptCount}/{assessment.max_attempts} attempts
+                  {attemptCount}/{assessment.max_attempts} percobaan
                 </span>
               )}
               {!isCreator && cooldownRemaining > 0 && (
                 <span className="text-amber-600 dark:text-amber-400">
-                  Retry in {cooldownRemaining}m
+                  Coba lagi dalam {cooldownRemaining}m
                 </span>
               )}
               {(assessment.start_date || assessment.end_date) && (
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays className="h-3 w-3" />
                   {isUpcoming
-                    ? `Opens ${new Date(assessment.start_date!).toLocaleDateString()}`
+                    ? `Dibuka ${new Date(assessment.start_date!).toLocaleDateString('id-ID')}`
                     : isClosed
-                      ? 'Closed'
+                      ? 'Ditutup'
                       : assessment.end_date
-                        ? `Closes ${new Date(assessment.end_date).toLocaleDateString()}`
+                        ? `Ditutup ${new Date(assessment.end_date).toLocaleDateString('id-ID')}`
                         : ''}
                 </span>
               )}
@@ -155,9 +155,9 @@ export function AssessmentCard({
               </div>
               <div className="flex items-center gap-1 text-xs">
                 {lastSession.passed ? (
-                  <><CheckCircle2 className="h-3 w-3 text-green-600" /> Passed</>
+                  <><CheckCircle2 className="h-3 w-3 text-green-600" /> Lulus</>
                 ) : (
-                  <><XCircle className="h-3 w-3 text-red-500" /> Failed</>
+                  <><XCircle className="h-3 w-3 text-red-500" /> Tidak Lulus</>
                 )}
               </div>
             </div>
@@ -170,15 +170,15 @@ export function AssessmentCard({
               onClick={() => router.push(`/assessments/${assessment.id}/take`)}
               disabled={!!isRetakeBlocked}
               title={
-                isMaxAttemptsReached ? 'Maximum attempts reached'
-                : cooldownRemaining > 0 ? `Wait ${cooldownRemaining} minutes`
-                : isUpcoming ? 'Not yet available'
-                : isClosed ? 'Assessment closed'
+                isMaxAttemptsReached ? 'Percobaan maksimum tercapai'
+                : cooldownRemaining > 0 ? `Tunggu ${cooldownRemaining} menit`
+                : isUpcoming ? 'Belum tersedia'
+                : isClosed ? 'Asesmen ditutup'
                 : undefined
               }
             >
               <Play className="h-4 w-4 mr-1" />
-              {lastSession ? 'Retake' : 'Start'}
+              {lastSession ? 'Ulangi' : 'Mulai'}
             </Button>
           )}
 
@@ -346,7 +346,7 @@ export function AssessmentCard({
             className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           >
             <ChevronDown className={`h-3 w-3 transition-transform ${expandedHistory.has(assessment.id) ? 'rotate-180' : ''}`} />
-            {mySessions.length} attempts
+            {mySessions.length} percobaan
           </button>
           {expandedHistory.has(assessment.id) && (
             <div className="mt-2 space-y-1">
@@ -358,9 +358,9 @@ export function AssessmentCard({
                   </span>
                   <span className={`font-medium ${s.passed ? 'text-green-600' : (s.status === 'completed' || s.status === 'timed_out') ? 'text-red-500' : 'text-slate-400'}`}>
                     {(s.status === 'completed' || s.status === 'timed_out') && s.score !== null
-                      ? `${s.score}% ${s.passed ? 'Passed' : s.status === 'timed_out' ? 'Timed Out' : 'Failed'}`
+                      ? `${s.score}% ${s.passed ? 'Lulus' : s.status === 'timed_out' ? 'Waktu Habis' : 'Tidak Lulus'}`
                       : s.status === 'in_progress'
-                        ? 'In progress'
+                        ? 'Sedang dikerjakan'
                         : '—'}
                   </span>
                 </div>

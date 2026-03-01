@@ -17,8 +17,9 @@ const OPTIONAL_VARS = [
   { key: 'OPENAI_API_KEY', feature: 'AI MCQ generation' },
   { key: 'RESEND_API_KEY', feature: 'Email notifications' },
   { key: 'NEXT_PUBLIC_APP_URL', feature: 'Email links (falls back to https://cekatan.com)' },
-  { key: 'UPSTASH_REDIS_REST_URL', feature: 'Production rate limiting' },
-  { key: 'UPSTASH_REDIS_REST_TOKEN', feature: 'Production rate limiting' },
+  { key: 'UPSTASH_REDIS_REST_URL', feature: 'Production rate limiting (REQUIRED on Vercel — in-memory fallback is per-Lambda)' },
+  { key: 'UPSTASH_REDIS_REST_TOKEN', feature: 'Production rate limiting (REQUIRED on Vercel — in-memory fallback is per-Lambda)' },
+  { key: 'HEALTH_API_KEY', feature: 'Health endpoint auth (if unset, detailed status is hidden)' },
 ] as const
 
 export function validateEnv(): void {

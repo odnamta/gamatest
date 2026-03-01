@@ -305,51 +305,60 @@ export async function mergeDuplicateDecks(): Promise<ActionResultV2<{ mergedCoun
           (masterCards || []).map(c => normalizeStem(c.stem))
         )
 
-        // Step 4: Process each Donor deck
-        for (const donorId of donorIds) {
-          const { data: donorCards } = await supabase
-            .from('card_templates')
-            .select('id, stem')
-            .eq('deck_template_id', donorId)
+        // Step 4: Get ALL donor cards in one batch query
+        const { data: allDonorCards } = await supabase
+          .from('card_templates')
+          .select('id, stem, deck_template_id')
+          .in('deck_template_id', donorIds)
 
-          for (const donorCard of donorCards || []) {
-            const normalizedStem = normalizeStem(donorCard.stem)
+        if (allDonorCards && allDonorCards.length > 0) {
+          // Separate into duplicates (stem matches master) and unique (to move)
+          const duplicateIds: string[] = []
+          const uniqueIds: string[] = []
 
-            if (masterStems.has(normalizedStem)) {
-              // Duplicate stem - delete Donor card
-              // First delete progress records
-              await supabase
-                .from('user_card_progress')
-                .delete()
-                .eq('card_template_id', donorCard.id)
-
-              // Then delete the card
-              await supabase
-                .from('card_templates')
-                .delete()
-                .eq('id', donorCard.id)
-
-              totalDeleted++
+          for (const card of allDonorCards) {
+            const normalized = normalizeStem(card.stem)
+            if (masterStems.has(normalized)) {
+              duplicateIds.push(card.id)
             } else {
-              // Unique stem - move to Master deck
-              await supabase
-                .from('card_templates')
-                .update({ deck_template_id: masterId })
-                .eq('id', donorCard.id)
-
-              // Add to master stems set to prevent future duplicates
-              masterStems.add(normalizedStem)
-              totalMoved++
+              uniqueIds.push(card.id)
+              masterStems.add(normalized) // prevent future duplicates within donors
             }
           }
 
-          // Step 5: Delete empty Donor deck_template
+          // Batch delete progress for duplicates
+          if (duplicateIds.length > 0) {
+            await supabase
+              .from('user_card_progress')
+              .delete()
+              .in('card_template_id', duplicateIds)
+
+            await supabase
+              .from('card_templates')
+              .delete()
+              .in('id', duplicateIds)
+
+            totalDeleted += duplicateIds.length
+          }
+
+          // Batch move unique cards to master
+          if (uniqueIds.length > 0) {
+            await supabase
+              .from('card_templates')
+              .update({ deck_template_id: masterId })
+              .in('id', uniqueIds)
+
+            totalMoved += uniqueIds.length
+          }
+        }
+
+        // Step 5 & 6: Delete donor decks and user_decks (per-donor, outer loop only)
+        for (const donorId of donorIds) {
           await supabase
             .from('deck_templates')
             .delete()
             .eq('id', donorId)
 
-          // Step 6: Update user_decks - remove subscriptions to deleted deck
           await supabase
             .from('user_decks')
             .delete()

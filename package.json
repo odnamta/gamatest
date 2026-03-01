@@ -14,7 +14,9 @@
     "seed:sca": "npx tsx scripts/seed-sca-test.ts",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
-    "test:e2e:headed": "npx playwright test --headed"
+    "test:e2e:headed": "npx playwright test --headed",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && eslint && vitest --run"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

@@ -28,7 +28,12 @@ function getRedis(): Redis | null {
   if (redis) return redis
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) return null
+  if (!url || !token) {
+    if (process.env.VERCEL) {
+      console.error('[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN not set on Vercel — rate limiting is ineffective (each Lambda has its own in-memory store)')
+    }
+    return null
+  }
   redis = new Redis({ url, token })
   return redis
 }

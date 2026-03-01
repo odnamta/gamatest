@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
 type ServiceStatus = 'ok' | 'degraded' | 'down'
+
+const HEALTH_API_KEY = process.env.HEALTH_API_KEY
 
 async function checkSupabase(): Promise<{ status: ServiceStatus; latencyMs: number }> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -37,7 +39,15 @@ async function checkResend(): Promise<{ status: ServiceStatus }> {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // If HEALTH_API_KEY is set, require Bearer token auth
+  if (HEALTH_API_KEY) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${HEALTH_API_KEY}`) {
+      return NextResponse.json({ status: 'ok' }, { status: 200 })
+    }
+  }
+
   const [supabase, resend] = await Promise.all([checkSupabase(), checkResend()])
 
   const services = { supabase, resend }
@@ -47,7 +57,6 @@ export async function GET() {
   return NextResponse.json({
     status: anyDown ? 'degraded' : allOk ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
     services,
   })
 }

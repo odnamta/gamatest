@@ -224,11 +224,16 @@ export default function TakeAssessmentPage() {
     setQuestions(updated)
   }
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   async function handleSelectAnswer(displayIndex: number) {
     if (!session || completing) return
 
     const q = questions[currentIndex]
     if (!q) return
+
+    // Clear any previous submit error
+    setSubmitError(null)
 
     // Optimistic update (store display index locally)
     const updated = [...questions]
@@ -246,15 +251,15 @@ export default function TakeAssessmentPage() {
         // Retry once
         const retry = await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
         if (!retry.ok) {
-          console.error('[submitAnswer] Failed after retry:', retry.error)
+          setSubmitError('Jawaban gagal disimpan. Coba pilih ulang.')
         }
       }
-    } catch (err) {
+    } catch {
       // Network error — retry once
       try {
         await submitAnswer(session.id, q.cardTemplateId, originalIndex, timeRemaining ?? undefined, timeSpent)
       } catch {
-        console.error('[submitAnswer] Network error after retry:', err)
+        setSubmitError('Koneksi terputus. Jawaban belum tersimpan.')
       }
     }
   }
@@ -576,6 +581,17 @@ export default function TakeAssessmentPage() {
           style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
         />
       </div>
+
+      {/* Submit error banner */}
+      {submitError && (
+        <div
+          role="alert"
+          className="mb-4 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400 flex items-center gap-2"
+        >
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {submitError}
+        </div>
+      )}
 
       {/* Question */}
       {currentQuestion && (

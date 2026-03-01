@@ -515,6 +515,12 @@ export async function submitPublicAnswer(
       return { ok: false, error: 'Token sesi tidak valid' }
     }
 
+    // Rate limit by session token: 120 answers per minute (2 per second burst)
+    const rl = await checkRateLimit(`pub-answer:${sessionId}`, RATE_LIMITS.standard)
+    if (!rl.allowed) {
+      return { ok: false, error: 'Terlalu banyak permintaan. Coba lagi.' }
+    }
+
     const supabase = await createSupabaseServiceClient()
 
     // Verify session is active
@@ -598,6 +604,12 @@ export async function completePublicSession(
     const sessionId = verifySessionToken(sessionIdOrToken)
     if (!sessionId) {
       return { ok: false, error: 'Token sesi tidak valid' }
+    }
+
+    // Rate limit session completion: 5 per minute per session
+    const rl = await checkRateLimit(`pub-complete:${sessionId}`, RATE_LIMITS.sensitive)
+    if (!rl.allowed) {
+      return { ok: false, error: 'Terlalu banyak permintaan. Coba lagi.' }
     }
 
     const supabase = await createSupabaseServiceClient()

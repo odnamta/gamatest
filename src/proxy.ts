@@ -2,14 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
-  // Generate nonce for CSP (no unsafe-inline)
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-
   const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host
   const cspHeader = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: https://${supabaseHost}`,
     "font-src 'self' data:",
     `connect-src 'self' https://${supabaseHost} wss://${supabaseHost}`,
@@ -18,9 +15,7 @@ export async function proxy(request: NextRequest) {
     "form-action 'self'",
   ].join('; ')
 
-  // Pass nonce to Next.js via request headers
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('Content-Security-Policy', cspHeader)
 
   const setSecurityHeaders = (response: NextResponse) => {

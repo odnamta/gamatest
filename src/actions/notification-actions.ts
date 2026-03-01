@@ -343,15 +343,25 @@ export async function sendDeadlineReminders(): Promise<ActionResultV2<{ notified
     let totalNotified = 0
     const serviceClient = await createSupabaseServiceClient()
 
-    for (const assessment of assessments) {
-      // Get users who already completed
-      const { data: completedSessions } = await supabase
-        .from('assessment_sessions')
-        .select('user_id')
-        .eq('assessment_id', assessment.id)
-        .in('status', ['completed', 'timed_out'])
+    // Single query to get all completed/timed_out sessions across all assessments
+    const assessmentIds = assessments.map((a) => a.id)
+    const { data: allCompletedSessions } = await supabase
+      .from('assessment_sessions')
+      .select('user_id, assessment_id')
+      .in('assessment_id', assessmentIds)
+      .in('status', ['completed', 'timed_out'])
 
-      const completedIds = new Set((completedSessions ?? []).map((s) => s.user_id))
+    // Group completed user_ids by assessment_id
+    const completedByAssessment = new Map<string, Set<string>>()
+    for (const s of allCompletedSessions ?? []) {
+      if (!completedByAssessment.has(s.assessment_id)) {
+        completedByAssessment.set(s.assessment_id, new Set())
+      }
+      completedByAssessment.get(s.assessment_id)!.add(s.user_id)
+    }
+
+    for (const assessment of assessments) {
+      const completedIds = completedByAssessment.get(assessment.id) ?? new Set<string>()
       const pending = members.filter((m) => !completedIds.has(m.user_id))
 
       if (pending.length === 0) continue
