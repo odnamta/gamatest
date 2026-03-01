@@ -18,6 +18,7 @@ import {
   getPublicQuestions,
   submitPublicAnswer,
   completePublicSession,
+  reportPublicTabSwitch,
 } from '@/actions/public-assessment-actions'
 
 // ============================================
@@ -178,10 +179,17 @@ export function PublicExam({ code }: { code: string }) {
   useEffect(() => {
     if (phase !== 'exam' && phase !== 'review') return
 
+    let lastReportTime = 0
     function handleVisibilityChange() {
       if (document.hidden) {
         setTabSwitchCount((prev) => prev + 1)
         setShowTabWarning(true)
+        // Debounce: report at most once every 2 seconds
+        const now = Date.now()
+        if (now - lastReportTime > 2000 && sessionTokenRef.current) {
+          lastReportTime = now
+          reportPublicTabSwitch(sessionTokenRef.current).catch(() => {})
+        }
       }
     }
 
@@ -199,6 +207,9 @@ export function PublicExam({ code }: { code: string }) {
       if (!document.fullscreenElement) {
         setTabSwitchCount((prev) => prev + 1)
         setShowTabWarning(true)
+        if (sessionTokenRef.current) {
+          reportPublicTabSwitch(sessionTokenRef.current).catch(() => {})
+        }
       }
     }
 

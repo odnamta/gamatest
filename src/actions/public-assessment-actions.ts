@@ -12,6 +12,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { publicRegistrationSchema } from '@/lib/validations'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
+import { generateCertificate } from '@/actions/certificate-actions'
 import type { ActionResultV2 } from '@/types/actions'
 import type { Assessment } from '@/types/database'
 
@@ -373,7 +374,13 @@ export async function registerAndStartSession(
       card_template_id: cardId,
     }))
 
-    await supabase.from('assessment_answers').insert(answerRows)
+    const { error: answerError } = await supabase.from('assessment_answers').insert(answerRows)
+    if (answerError) {
+      // Rollback: delete the session we just created
+      await supabase.from('assessment_sessions').delete().eq('id', session.id)
+      logger.error('registerAndStartSession.answerInsert', answerError)
+      return { ok: false, error: 'Gagal menyiapkan soal' }
+    }
 
     return {
       ok: true,
@@ -653,10 +660,66 @@ export async function completePublicSession(
       return { ok: false, error: uError.message }
     }
 
+    // Generate certificate for passing candidates
+    if (passed) {
+      try {
+        await generateCertificate(sessionId)
+      } catch {
+        // Non-fatal: certificate generation may fail
+        logger.warn('completePublicSession.certificate', 'Certificate generation failed for session ' + sessionId)
+      }
+    }
+
     return { ok: true, data: { score, passed, total, correct } }
   } catch (err) {
     logger.error('completePublicSession', err)
     return { ok: false, error: 'Sesi tidak ditemukan' }
+  }
+}
+
+// ============================================
+// 5b. reportPublicTabSwitch
+// ============================================
+
+/**
+ * Report a tab switch during a public assessment session.
+ * Increments tab_switch_count and appends to tab_switch_log.
+ */
+export async function reportPublicTabSwitch(
+  sessionIdOrToken: string
+): Promise<ActionResultV2<void>> {
+  try {
+    const sessionId = verifySessionToken(sessionIdOrToken)
+    if (!sessionId) {
+      return { ok: false, error: 'Token sesi tidak valid' }
+    }
+
+    const supabase = await createSupabaseServiceClient()
+
+    const { data: session } = await supabase
+      .from('assessment_sessions')
+      .select('id, tab_switch_count, tab_switch_log')
+      .eq('id', sessionId)
+      .eq('status', 'in_progress')
+      .single()
+
+    if (!session) {
+      return { ok: false, error: 'Sesi tidak ditemukan' }
+    }
+
+    const newCount = ((session.tab_switch_count as number) ?? 0) + 1
+    const log = Array.isArray(session.tab_switch_log) ? session.tab_switch_log : []
+    log.push({ timestamp: new Date().toISOString(), type: 'tab_hidden' })
+
+    await supabase
+      .from('assessment_sessions')
+      .update({ tab_switch_count: newCount, tab_switch_log: log })
+      .eq('id', sessionId)
+
+    return { ok: true }
+  } catch (err) {
+    logger.error('reportPublicTabSwitch', err)
+    return { ok: false, error: 'Gagal melaporkan pelanggaran' }
   }
 }
 

@@ -154,7 +154,13 @@ export async function startAssessmentSession(
       card_template_id: cardId,
     }))
 
-    await supabase.from('assessment_answers').insert(answerRows)
+    const { error: answerError } = await supabase.from('assessment_answers').insert(answerRows)
+    if (answerError) {
+      // Rollback: delete the session we just created
+      await supabase.from('assessment_sessions').delete().eq('id', session.id)
+      logger.error('startAssessmentSession.answerInsert', answerError)
+      return { ok: false, error: 'Gagal menyiapkan soal' }
+    }
 
     return { ok: true, data: session as AssessmentSession }
   }, undefined, RATE_LIMITS.sensitive)

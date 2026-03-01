@@ -69,7 +69,7 @@ function seededShuffle(seed: string, length: number): number[] {
 }
 
 export default function TakeAssessmentPage() {
-  usePageTitle('Take Assessment')
+  usePageTitle('Ujian')
   const router = useRouter()
   const params = useParams()
   const { org } = useOrg()
@@ -117,7 +117,7 @@ export default function TakeAssessmentPage() {
         return
       }
       if (!sResult.data) {
-        setError('Failed to start session')
+        setError('Gagal memulai sesi')
         setStarting(false)
         setLoading(false)
         return
@@ -274,7 +274,7 @@ export default function TakeAssessmentPage() {
         return
       }
       if (!aResult.data) {
-        setError('Assessment not found')
+        setError('Asesmen tidak ditemukan')
         setLoading(false)
         return
       }
@@ -317,7 +317,7 @@ export default function TakeAssessmentPage() {
           if (result.ok) {
             router.push(`/assessments/${assessmentId}/results?sessionId=${currentSession.id}`)
           } else {
-            setError(result.error ?? 'Failed to complete session')
+            setError(result.error ?? 'Gagal menyelesaikan sesi')
             setCompleting(false)
             completingRef.current = false
           }
@@ -481,7 +481,7 @@ export default function TakeAssessmentPage() {
     if (result.ok) {
       router.push(`/assessments/${assessmentId}/results?sessionId=${session.id}`)
     } else {
-      setError(result.error ?? 'Failed to complete session')
+      setError(result.error ?? 'Gagal menyelesaikan sesi')
       setCompleting(false)
       completingRef.current = false
     }
@@ -527,7 +527,7 @@ export default function TakeAssessmentPage() {
         <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-red-500" aria-hidden="true" />
         <p className="text-red-600 dark:text-red-400 mb-4" role="alert">{error}</p>
         <Button variant="secondary" onClick={() => router.push('/assessments')}>
-          Back to Assessments
+          Kembali ke Asesmen
         </Button>
       </div>
     )
@@ -543,16 +543,16 @@ export default function TakeAssessmentPage() {
       {/* Header: Timer + Progress */}
       <div className="flex items-center justify-between mb-6">
         <div className="text-sm text-slate-600 dark:text-slate-400">
-          Question {currentIndex + 1} of {questions.length}
+          Soal {currentIndex + 1} dari {questions.length}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm text-slate-500">
-            {answeredCount}/{questions.length} answered
+            {answeredCount}/{questions.length} dijawab
           </div>
           {timeRemaining !== null && (
             <div
               role="timer"
-              aria-label={`Time remaining: ${formatTime(timeRemaining)}`}
+              aria-label={`Sisa waktu: ${formatTime(timeRemaining)}`}
               aria-live={isTimeLow ? 'assertive' : 'off'}
               className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-mono font-medium ${
                 isTimeLow
@@ -573,7 +573,7 @@ export default function TakeAssessmentPage() {
         aria-valuenow={currentIndex + 1}
         aria-valuemin={1}
         aria-valuemax={questions.length}
-        aria-label={`Question ${currentIndex + 1} of ${questions.length}`}
+        aria-label={`Soal ${currentIndex + 1} dari ${questions.length}`}
         className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mb-8"
       >
         <div
@@ -598,11 +598,11 @@ export default function TakeAssessmentPage() {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-3 mb-6">
             <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100 leading-relaxed">
-              {currentQuestion.stem || `Question ${currentIndex + 1}`}
+              {currentQuestion.stem || `Soal ${currentIndex + 1}`}
             </h2>
             <button
               onClick={toggleFlag}
-              aria-label={currentQuestion.flagged ? 'Unflag this question' : 'Flag this question for review'}
+              aria-label={currentQuestion.flagged ? 'Hapus tanda soal ini' : 'Tandai soal ini'}
               className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${
                 currentQuestion.flagged
                   ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/20'
@@ -613,7 +613,7 @@ export default function TakeAssessmentPage() {
             </button>
           </div>
 
-          <div className="space-y-3" role="radiogroup" aria-label={`Options for question ${currentIndex + 1}`}>
+          <div className="space-y-3" role="radiogroup" aria-label={`Pilihan untuk soal ${currentIndex + 1}`}>
             {currentQuestion.options.map((option, idx) => {
               const isSelected = currentQuestion.selectedIndex === idx
               return (
@@ -623,7 +623,7 @@ export default function TakeAssessmentPage() {
                   disabled={completing}
                   role="radio"
                   aria-checked={isSelected}
-                  aria-label={`Option ${String.fromCharCode(65 + idx)}: ${option}`}
+                  aria-label={`Pilihan ${String.fromCharCode(65 + idx)}: ${option}`}
                   className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                     isSelected
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -661,7 +661,7 @@ export default function TakeAssessmentPage() {
           disabled={currentIndex === 0}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">Previous</span>
+          <span className="hidden sm:inline">Sebelumnya</span>
         </Button>
 
         <div className="flex items-center gap-2">
@@ -669,14 +669,14 @@ export default function TakeAssessmentPage() {
           <button
             onClick={() => setShowMobileNav(true)}
             className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 active:scale-95 transition-transform"
-            aria-label="Jump to question"
+            aria-label="Lompat ke soal"
           >
             <span>Q {currentIndex + 1}/{questions.length}</span>
-            <span className="text-[10px] text-slate-400">tap to jump</span>
+            <span className="text-[10px] text-slate-400">ketuk</span>
           </button>
 
           {/* Question dots (desktop) */}
-          <nav className="hidden sm:flex items-center gap-1" aria-label="Question navigation">
+          <nav className="hidden sm:flex items-center gap-1" aria-label="Navigasi soal">
             {questions.map((q, idx) => (
               <button
                 key={idx}
@@ -690,7 +690,7 @@ export default function TakeAssessmentPage() {
                         ? 'bg-green-500'
                         : 'bg-slate-300 dark:bg-slate-600'
                 }`}
-                aria-label={`Question ${idx + 1}${q.answered ? ', answered' : ', unanswered'}${q.flagged ? ', flagged' : ''}${idx === currentIndex ? ', current' : ''}`}
+                aria-label={`Soal ${idx + 1}${q.answered ? ', dijawab' : ', belum dijawab'}${q.flagged ? ', ditandai' : ''}${idx === currentIndex ? ', saat ini' : ''}`}
                 aria-current={idx === currentIndex ? 'step' : undefined}
               />
             ))}
@@ -705,7 +705,7 @@ export default function TakeAssessmentPage() {
               disabled={completing}
             >
               <CheckCircle2 className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Review &amp;</span> Submit
+              <span className="hidden sm:inline">Tinjau &amp;</span> Kirim
             </Button>
           ) : (
             <Button
@@ -713,7 +713,7 @@ export default function TakeAssessmentPage() {
               size="sm"
               onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
             >
-              <span className="hidden sm:inline">Next</span>
+              <span className="hidden sm:inline">Selanjutnya</span>
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}
@@ -723,10 +723,10 @@ export default function TakeAssessmentPage() {
       {/* Keyboard hints */}
       <div className="mt-4 text-center text-[10px] text-slate-400 dark:text-slate-500 hidden sm:block">
         <span className="inline-flex items-center gap-3">
-          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">A-E</kbd> select</span>
-          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">&larr; &rarr;</kbd> navigate</span>
-          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">F</kbd> flag</span>
-          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">Enter</kbd> next</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">A-E</kbd> pilih</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">&larr; &rarr;</kbd> navigasi</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">F</kbd> tandai</span>
+          <span><kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">Enter</kbd> lanjut</span>
         </span>
       </div>
 

@@ -38,17 +38,17 @@ export function TabWarningDialog({
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
         <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-amber-500" aria-hidden="true" />
         <h3 id="tab-warning-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-          Tab Switch Detected
+          Peringatan
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-          Leaving the exam window has been recorded.
+          Anda meninggalkan halaman ujian. Ini telah dicatat.
         </p>
         <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-          Violations: {tabSwitchCount}
+          Pelanggaran: {tabSwitchCount}
         </p>
         <div className="flex items-center gap-2 justify-center">
           <Button size="sm" onClick={onClose}>
-            Return to Exam
+            Kembali ke Ujian
           </Button>
           {fullscreenExited && !document.fullscreenElement && (
             <Button
@@ -56,7 +56,7 @@ export function TabWarningDialog({
               variant="secondary"
               onClick={onReenterFullscreen}
             >
-              Re-enter Fullscreen
+              Layar Penuh
             </Button>
           )}
         </div>
@@ -77,13 +77,13 @@ export function TimeWarningDialog({ onClose }: TimeWarningDialogProps) {
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
         <Clock className="h-10 w-10 mx-auto mb-3 text-red-500" aria-hidden="true" />
         <h3 id="time-warning-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-          Time Almost Up!
+          Waktu Hampir Habis!
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          Less than 30 seconds remaining. Your exam will be auto-submitted when time runs out.
+          Kurang dari 30 detik tersisa. Jawaban akan otomatis dikirim saat waktu habis.
         </p>
         <Button size="sm" onClick={onClose}>
-          Continue
+          Lanjutkan
         </Button>
       </div>
     </div>
@@ -105,20 +105,20 @@ export function MobileNavDialog({ questions, currentIndex, onSelectQuestion, onC
       <div className="bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-xl p-4 w-full sm:max-w-sm mx-0 sm:mx-4 shadow-xl max-h-[70vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Jump to Question
+            Lompat ke Soal
           </h3>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
-            aria-label="Close navigation"
+            aria-label="Tutup navigasi"
           >
             &times;
           </button>
         </div>
         <div className="flex items-center gap-3 mb-3 text-xs text-slate-500 dark:text-slate-400">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> answered</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> flagged</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" /> unanswered</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> dijawab</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> ditandai</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" /> belum dijawab</span>
         </div>
         <div className="grid grid-cols-5 gap-2">
           {questions.map((q, idx) => (
@@ -176,25 +176,25 @@ export function ReviewSummaryDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="review-title">
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-lg mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
         <h3 id="review-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-          Review Before Submitting
+          Tinjau Sebelum Mengirim
         </h3>
 
         {/* Stats */}
         <div className="flex items-center gap-4 mb-4 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            <span className="text-slate-600 dark:text-slate-400">{answeredCount} answered</span>
+            <span className="text-slate-600 dark:text-slate-400">{answeredCount} dijawab</span>
           </div>
           {unansweredCount > 0 && (
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <span className="text-slate-600 dark:text-slate-400">{unansweredCount} unanswered</span>
+              <span className="text-slate-600 dark:text-slate-400">{unansweredCount} belum dijawab</span>
             </div>
           )}
           {flaggedCount > 0 && (
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-              <span className="text-slate-600 dark:text-slate-400">{flaggedCount} flagged</span>
+              <span className="text-slate-600 dark:text-slate-400">{flaggedCount} ditandai</span>
             </div>
           )}
         </div>
@@ -215,7 +215,7 @@ export function ReviewSummaryDialog({
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
               } hover:ring-2 hover:ring-blue-400`}
-              aria-label={`Question ${idx + 1}: ${q.answered ? 'answered' : 'unanswered'}${q.flagged ? ', flagged' : ''}`}
+              aria-label={`Soal ${idx + 1}: ${q.answered ? 'dijawab' : 'belum dijawab'}${q.flagged ? ', ditandai' : ''}`}
             >
               {idx + 1}
               {q.flagged && (
@@ -227,7 +227,7 @@ export function ReviewSummaryDialog({
 
         {unansweredCount > 0 && (
           <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-            {unansweredCount} unanswered question{unansweredCount !== 1 ? 's' : ''} will be marked incorrect.
+            {unansweredCount} soal belum dijawab akan dianggap salah.
           </p>
         )}
 
@@ -238,7 +238,7 @@ export function ReviewSummaryDialog({
             onClick={onClose}
             className="flex-1"
           >
-            Back to Exam
+            Kembali ke Ujian
           </Button>
           <Button
             size="sm"
@@ -247,7 +247,7 @@ export function ReviewSummaryDialog({
             className="flex-1"
           >
             <CheckCircle2 className="h-4 w-4 mr-1" />
-            Submit
+            Kirim
           </Button>
         </div>
       </div>
