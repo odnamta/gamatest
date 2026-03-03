@@ -32,8 +32,8 @@ export async function generateCertificateForSession(
   const orgSettings = org.settings as Record<string, unknown> | null
   const branding = orgSettings?.branding as Record<string, unknown> | null
 
-  // Get candidate name: check profile first, fall back to candidate_name
-  let candidateName = (session.candidate_name as string) || 'Kandidat'
+  // Get candidate name: check profile first, fall back to default
+  let candidateName = 'Kandidat'
   if (session.user_id) {
     const { data: profile } = await supabase
       .from('profiles')

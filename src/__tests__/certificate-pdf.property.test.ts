@@ -7,6 +7,9 @@ vi.mock('@react-pdf/renderer', () => ({
   Page: 'Page',
   Text: 'Text',
   View: 'View',
+  Svg: 'Svg',
+  Path: 'Path',
+  Link: 'Link',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
   },
@@ -26,11 +29,11 @@ describe('Certificate PDF', () => {
     primaryColor: fc.stringMatching(/^[0-9a-f]{6}$/).map((s) => `#${s}`),
   })
 
-  it('generates a certificate ID from sessionId (first 8 chars)', () => {
+  it('generates a certificate ID from full sessionId (uppercase)', () => {
     fc.assert(
       fc.property(certDataArb, (data) => {
         const result = buildCertificateData(data)
-        expect(result.certificateId).toBe(data.sessionId.slice(0, 8).toUpperCase())
+        expect(result.certificateId).toBe(data.sessionId.toUpperCase())
       })
     )
   })
@@ -41,6 +44,15 @@ describe('Certificate PDF', () => {
         const result = buildCertificateData(data)
         expect(typeof result.formattedDate).toBe('string')
         expect(result.formattedDate.length).toBeGreaterThan(0)
+      })
+    )
+  })
+
+  it('generates a verification URL from sessionId', () => {
+    fc.assert(
+      fc.property(certDataArb, (data) => {
+        const result = buildCertificateData(data)
+        expect(result.verificationUrl).toBe(`https://cekatan.com/verify/${data.sessionId}`)
       })
     )
   })

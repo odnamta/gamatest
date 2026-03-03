@@ -9,8 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import Image from 'next/image'
-import { ArrowLeft, Printer, Award, Download } from 'lucide-react'
+import { ArrowLeft, Printer, Download } from 'lucide-react'
 import { useOrg } from '@/components/providers/OrgProvider'
 import { getAssessment, getSessionResults } from '@/actions/assessment-actions'
 import { generateCertificate } from '@/actions/certificate-actions'
@@ -96,7 +95,6 @@ export default function CertificatePage() {
   }
 
   const primaryColor = org.settings?.branding?.primary_color || '#3b82f6'
-  const logoUrl = org.settings?.branding?.logo_url || ''
 
   const completedDate = session.completed_at
     ? new Date(session.completed_at).toLocaleDateString('id-ID', {
@@ -139,76 +137,106 @@ export default function CertificatePage() {
       </div>
 
       {/* Certificate — printable */}
-      <div className="max-w-3xl mx-auto px-4 py-8 print:px-0 print:py-0">
-        <div
-          className="bg-white dark:bg-slate-800 rounded-xl border-2 p-12 text-center print:border-4 print:rounded-none print:shadow-none"
-          style={{ borderColor: primaryColor }}
-        >
-          {/* Header — logo or icon */}
-          <div className="mb-6">
-            {logoUrl ? (
-              <Image src={logoUrl} alt={org.name} width={160} height={64} className="h-16 w-auto mx-auto object-contain" />
-            ) : (
-              <Award className="h-16 w-16 mx-auto" style={{ color: primaryColor }} />
-            )}
-          </div>
+      <div className="max-w-4xl mx-auto px-4 py-8 print:px-0 print:py-0">
+        <div className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden print:rounded-none print:shadow-none">
+          {/* Top accent bar */}
+          <div className="h-1" style={{ backgroundColor: primaryColor }} />
 
-          <h1 className="text-3xl font-bold tracking-wide text-slate-900 dark:text-slate-100 mb-2 uppercase print:text-black">
-            Sertifikat Kelulusan
-          </h1>
-
-          <div className="w-24 h-0.5 mx-auto my-6" style={{ backgroundColor: primaryColor }} />
-
-          <p className="text-slate-500 dark:text-slate-400 mb-1 print:text-slate-600">
-            Dengan ini menyatakan bahwa
-          </p>
-
-          <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-6 print:text-black">
-            {candidateName ?? 'Kandidat'}
-          </p>
-
-          <p className="text-slate-500 dark:text-slate-400 mb-1 print:text-slate-600">
-            telah berhasil lulus
-          </p>
-
-          <p className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-6 print:text-black">
-            {assessment.title}
-          </p>
-
-          <div className="flex items-center justify-center gap-8 text-sm text-slate-600 dark:text-slate-400 mb-8 print:text-slate-700">
-            <div>
-              <span className="block text-2xl font-bold" style={{ color: primaryColor }}>
-                {session.score}%
-              </span>
-              <span>Skor</span>
+          {/* Header row */}
+          <div className="flex items-center justify-between px-12 pt-6 pb-4">
+            <div className="flex items-center gap-2">
+              <p className="text-sm italic text-slate-500 dark:text-slate-400 print:text-slate-600">
+                Sertifikat Terverifikasi
+              </p>
             </div>
-            <div className="w-px h-10 bg-slate-200 dark:bg-slate-600" />
-            <div>
-              <span className="block text-2xl font-bold text-slate-900 dark:text-slate-100 print:text-black">
-                {assessment.pass_score}%
+            <div className="flex items-center gap-2">
+              <svg viewBox="0 0 40 40" className="w-4 h-4">
+                <path d="M6 21L15 30L34 10" stroke={primaryColor} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-300 print:text-black">
+                {org.name}
               </span>
-              <span>Skor Lulus</span>
             </div>
           </div>
 
-          <div className="w-24 h-0.5 bg-slate-200 dark:bg-slate-600 mx-auto my-6" />
+          {/* Accent divider */}
+          <div className="mx-12 h-[1.5px]" style={{ backgroundColor: primaryColor }} />
 
-          <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 print:text-slate-600">
-            <div className="text-left flex items-center gap-3">
-              {logoUrl && (
-                <Image src={logoUrl} alt={`Logo ${org.name}`} width={32} height={32} className="h-8 w-8 rounded object-contain print:block" />
-              )}
-              <div>
-                <p className="font-medium text-slate-700 dark:text-slate-300 print:text-black">
-                  {org.name}
-                </p>
-                <p>Diterbitkan pada {completedDate}</p>
+          {/* Two-column body */}
+          <div className="flex px-12 py-10 gap-8 min-h-[280px]">
+            {/* Left column (60%) — certification text */}
+            <div className="w-[60%] flex flex-col justify-center pr-8">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1 print:text-slate-600">
+                Dengan ini menyatakan bahwa
+              </p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-600 mb-1 print:text-black">
+                {candidateName ?? 'Kandidat'}
+              </p>
+
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-5 mb-1 print:text-slate-600">
+                telah berhasil menyelesaikan dan lulus dalam
+              </p>
+              <p className="text-xl font-bold mb-1" style={{ color: primaryColor }}>
+                {assessment.title}
+              </p>
+
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-5 mb-1 print:text-slate-600">
+                yang diselenggarakan oleh
+              </p>
+              <p className="text-base font-bold text-slate-700 dark:text-slate-300 print:text-black">
+                {org.name}
+              </p>
+            </div>
+
+            {/* Right column (40%) — org, date, score */}
+            <div className="w-[40%] flex flex-col justify-center pl-8 border-l border-slate-200 dark:border-slate-600">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Diterbitkan oleh</p>
+              <p className="text-base font-bold text-slate-700 dark:text-slate-300 mb-5 print:text-black">
+                {org.name}
+              </p>
+
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">Tanggal</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 mb-6 print:text-black">
+                {completedDate}
+              </p>
+
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Skor</p>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-4xl font-bold" style={{ color: primaryColor }}>
+                  {session.score}
+                </span>
+                <span className="text-lg font-bold text-slate-400 mb-1">%</span>
               </div>
+              <p className="text-xs text-slate-400">
+                Minimum kelulusan: {assessment.pass_score}%
+              </p>
+            </div>
+          </div>
+
+          {/* Footer bar */}
+          <div className="flex items-center justify-between px-12 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 print:bg-slate-50">
+            <div className="flex items-center gap-1.5">
+              <svg viewBox="0 0 40 40" className="w-3 h-3">
+                <path d="M6 21L15 30L34 10" stroke={primaryColor} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+              <span className="text-[10px] font-bold text-slate-500">cekatan</span>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] uppercase tracking-wider text-slate-400">Sertifikat Terverifikasi</p>
+              <p className="text-[9px] text-slate-500">{completedDate}</p>
             </div>
             <div className="text-right">
-              <p className="font-mono text-xs text-slate-400 print:text-slate-500">
-                ID: {session.id.slice(0, 8)}
+              <p className="font-mono text-[7px] text-slate-400 print:text-slate-500">
+                {session.id.toUpperCase()}
               </p>
+              <a
+                href={`https://cekatan.com/verify/${session.id}`}
+                className="text-[7px] text-blue-500 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                cekatan.com/verify/{session.id}
+              </a>
             </div>
           </div>
         </div>

@@ -39,11 +39,11 @@ export function DashboardMockup({ className = '' }: { className?: string }) {
               </svg>
               <span className="text-[9px] font-bold text-white/80">cekatan</span>
             </div>
-            <NavItem active icon="home" label="Dasbor" />
-            <NavItem icon="clipboard" label="Assessments" />
-            <NavItem icon="chart" label="Analitik" />
+            <NavItem active icon="home" label="Home" />
+            <NavItem icon="clipboard" label="Assess" />
+            <NavItem icon="chart" label="Analytics" />
             <NavItem icon="book" label="Library" />
-            <NavItem icon="user" label="Profil" />
+            <NavItem icon="user" label="Profile" />
             <div className="pt-2 mt-2 border-t border-white/5">
               <div className="px-2 mb-1">
                 <span className="text-[7px] uppercase tracking-wider text-slate-600">Organisasi</span>
