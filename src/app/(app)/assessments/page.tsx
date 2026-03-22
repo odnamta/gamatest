@@ -8,7 +8,7 @@
  * Creators get publish/archive/edit controls.
  */
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/hooks/use-page-title'
@@ -218,23 +218,19 @@ export default function AssessmentsPage() {
     setQrAssessment(assessment)
   }
 
-  const generateQr = useCallback(async () => {
-    if (!qrAssessment?.public_code) {
-      setQrDataUrl(null)
-      return
-    }
-    try {
-      const url = `${window.location.origin}/t/${qrAssessment.public_code}`
-      const dataUrl = await QRCode.toDataURL(url, { width: 200, margin: 2 })
-      setQrDataUrl(dataUrl)
-    } catch {
-      setQrDataUrl(null)
-    }
-  }, [qrAssessment])
-
   useEffect(() => {
-    generateQr()
-  }, [generateQr])
+    if (!qrAssessment?.public_code) return
+    let cancelled = false
+    const url = `${window.location.origin}/t/${qrAssessment.public_code}`
+    QRCode.toDataURL(url, { width: 200, margin: 2 })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null)
+      })
+    return () => { cancelled = true }
+  }, [qrAssessment])
 
   function handleDeadlineReminders() {
     startTransition(async () => {
@@ -560,7 +556,7 @@ export default function AssessmentsPage() {
         <QRCodeModal
           assessment={qrAssessment}
           qrDataUrl={qrDataUrl}
-          onClose={() => setQrAssessment(null)}
+          onClose={() => { setQrAssessment(null); setQrDataUrl(null) }}
         />
       )}
     </div>

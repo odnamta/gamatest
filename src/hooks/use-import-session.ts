@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { generateImportSessionId } from '@/lib/import-session'
 import { getSessionStats } from '@/actions/session-actions'
 
 const STORAGE_KEY_PREFIX = 'cekatan:import-session:'
 
 interface ImportSessionState {
+  deckId: string
   sessionId: string | null
   draftCount: number
   publishedCount: number
@@ -14,61 +15,50 @@ interface ImportSessionState {
   isLoading: boolean
 }
 
-/**
- * V11.3: Hook for managing import session state
- * Generates and persists session ID per deck, tracks session stats.
- */
-export function useImportSession(deckId: string) {
-  const [state, setState] = useState<ImportSessionState>(() => {
-    // Initialize session ID from localStorage synchronously
-    if (typeof window !== 'undefined') {
-      const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
-      let sid = localStorage.getItem(storageKey)
-      if (!sid) {
-        sid = generateImportSessionId()
-        localStorage.setItem(storageKey, sid)
-      }
-      return {
-        sessionId: sid,
-        draftCount: 0,
-        publishedCount: 0,
-        questionNumbers: [],
-        isLoading: false,
-      }
-    }
-    return {
-      sessionId: null,
-      draftCount: 0,
-      publishedCount: 0,
-      questionNumbers: [],
-      isLoading: true,
-    }
-  })
-
-  // Handle deckId changes after initial mount
-  const prevDeckIdRef = useRef(deckId)
-  useEffect(() => {
-    if (prevDeckIdRef.current === deckId) return
-    prevDeckIdRef.current = deckId
+function initStateForDeck(deckId: string): ImportSessionState {
+  if (typeof window !== 'undefined') {
     const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
     let sid = localStorage.getItem(storageKey)
     if (!sid) {
       sid = generateImportSessionId()
       localStorage.setItem(storageKey, sid)
     }
-    setState({
+    return {
+      deckId,
       sessionId: sid,
       draftCount: 0,
       publishedCount: 0,
       questionNumbers: [],
       isLoading: false,
-    })
-  }, [deckId])
+    }
+  }
+  return {
+    deckId,
+    sessionId: null,
+    draftCount: 0,
+    publishedCount: 0,
+    questionNumbers: [],
+    isLoading: true,
+  }
+}
+
+/**
+ * V11.3: Hook for managing import session state
+ * Generates and persists session ID per deck, tracks session stats.
+ */
+export function useImportSession(deckId: string) {
+  const [state, setState] = useState<ImportSessionState>(() => initStateForDeck(deckId))
+
+  // React-recommended pattern: adjust state during render when prop changes
+  // See: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (state.deckId !== deckId) {
+    setState(initStateForDeck(deckId))
+  }
 
   // Refresh session stats
   const refreshStats = useCallback(async () => {
     if (!state.sessionId) return
-    
+
     const result = await getSessionStats(state.sessionId)
     if (result.ok && result.stats) {
       setState(prev => ({
@@ -85,8 +75,9 @@ export function useImportSession(deckId: string) {
     const storageKey = `${STORAGE_KEY_PREFIX}${deckId}`
     const newSessionId = generateImportSessionId()
     localStorage.setItem(storageKey, newSessionId)
-    
+
     setState({
+      deckId,
       sessionId: newSessionId,
       draftCount: 0,
       publishedCount: 0,
